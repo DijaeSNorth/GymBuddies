@@ -1,493 +1,534 @@
-import { useGameStore } from './store/gameStore';
-import { Suspense, lazy, useEffect, useRef } from 'react';
-import type { ReactNode } from 'react';
-import { TopBar } from './components/TopBar';
-import { PhaseGuideBar } from './components/PhaseGuideBar';
-import { LeftPanel } from './components/panels/LeftPanel';
-import { RightPanel } from './components/panels/RightPanel';
-import { CommanderTable } from './components/battlefield/CommanderTable';
-import { PlayerHand } from './components/hand/PlayerHand';
-import { FloatingCardPreview } from './components/cards/CardPreview';
-import { CardContextMenu } from './components/cards/CardContextMenu';
-import { LobbyScreen } from './components/lobby/LobbyScreen';
-import { CommandInput } from './components/command/CommandInput';
-import { CommanderCastMoment } from './components/commander/CommanderCastMoment';
-import { UISettingsPanel } from './components/settings/UISettingsPanel';
-import { ReplayControls } from './components/replay/ReplayControls';
-import { ReplayTimeline } from './components/replay/ReplayTimeline';
-import { ReplayInfoPanel } from './components/replay/ReplayInfoPanel';
-import { ReplayAnimationOverlay } from './components/replay/ReplayAnimationOverlay';
-import { ReplayLoader } from './components/replay/ReplayLoader';
-import { ReplayCreatorView } from './components/replay/ReplayCreatorView';
-import { ReplayClipsPanel } from './components/replay/ReplayClipsPanel';
-import { NextStepPanel } from './components/navigation/NextStepPanel';
-import { getBreadcrumb, getReplayViewerNextStep } from './components/navigation/navigationFlowModel';
-import { useIsMobile } from './hooks/use-mobile';
-import { startFrameHealthMonitor } from './engine/adaptivePerformance';
+import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-const CardSearchPanel = lazy(() =>
-  import('./components/panels/CardSearchPanel').then(module => ({ default: module.CardSearchPanel }))
-);
-const ProfilePanel = lazy(() =>
-  import('./components/profile/ProfilePanel').then(module => ({ default: module.ProfilePanel }))
-);
-const SoloDeckBuilder = lazy(() =>
-  import('./components/deckbuilder/SoloDeckBuilder').then(module => ({ default: module.SoloDeckBuilder }))
-);
-const ZoneDrawer = lazy(() =>
-  import('./components/zones/ZoneDrawer').then(module => ({ default: module.ZoneDrawer }))
-);
-const PracticeDummyPanel = lazy(() =>
-  import('./components/solo/PracticeDummyPanel').then(module => ({ default: module.PracticeDummyPanel }))
-);
-const TutorialOverlay = lazy(() => import('./components/tutorial/TutorialOverlay'));
-const GlobalHelpTooltip = lazy(() =>
-  import('./components/tutorial/GlobalHelpTooltip').then(module => ({ default: module.GlobalHelpTooltip }))
-);
-
-let multiplayerListenersInitialized = false;
-
-const BUILD_STAMP = {
-  version: import.meta.env.VITE_APP_VERSION ?? 'dev-unknown',
-  commit: import.meta.env.VITE_COMMIT_SHA ?? 'dev-unknown',
-  builtAt: import.meta.env.VITE_BUILD_TIME ?? 'dev-unknown',
+type MonsterBlueprint = {
+  dex: number;
+  species: string;
+  nickTheme: string;
+  description: string;
+  isExotic: boolean;
+  sprite: string[];
+  palette: {
+    skin: string;
+    core: string;
+    detail: string;
+    accent: string;
+    cry: string;
+  };
 };
 
+type GymBuddy = {
+  id: string;
+  nick: string;
+  level: number;
+  hp: number;
+  species: MonsterBlueprint;
+};
+
+type Encounter = {
+  species: MonsterBlueprint;
+  level: number;
+  odds: number;
+  state: 'idle' | 'caught' | 'failed' | 'full';
+};
+
+type CatchState = {
+  status: 'running' | 'done';
+  step: number;
+  lines: string[];
+  won: boolean;
+};
+
+const TEAM_CAPACITY = 6;
+const SUCCESS_LINES = [
+  'You and the wild buddy go flat on your stomachs and lock elbows.',
+  'Both of you grind shoulder to shoulder, and neither gives an inch.',
+  'The creature nearly tips you over, but you hold the center line.',
+  'You push with one final burst, muscles locked, and you drag them down.',
+  'You win the hold! They drop flat, crying like a baby.',
+];
+
+const FAILURE_LINES = [
+  'You and the wild buddy go flat on your stomachs and lock elbows.',
+  'The hold is brutal, and both sides shake with effort.',
+  'It slips once, then again — you almost lose the wrist lock.',
+  'The creature pushes once more and breaks your grip.',
+  'You lose the match as it slips away.',
+];
+
+const gymBuddyNames = [
+  'Muscle Mommy',
+  'Bench Bro',
+  'Squat Siren',
+  'Curl Captain',
+  'Plate Whisperer',
+  'Wrist-Railer',
+  'Grip Guru',
+  'Dumbbell Diva',
+  'Snatch Ninja',
+  'Rope Rebel',
+  'Tough Toad',
+  'Pectoral Pete',
+];
+
+const speciesCatalog: MonsterBlueprint[] = [
+  {
+    dex: 1,
+    species: 'Brawny Bear',
+    nickTheme: 'Bear',
+    description: 'A real bear turned trainer, broad-shouldered and fast to charge.',
+    isExotic: false,
+    sprite: ['..SSS..', '.SSMSS.', 'SSMMMMS', 'SMMMMMS', 'SMMMMS.', 'SMMMM.', '.SSS..', '...S..'],
+    palette: { skin: '#f2c48c', core: '#5f3a26', detail: '#f7e0a8', accent: '#7b4e24', cry: '#dbeafe' },
+  },
+  {
+    dex: 2,
+    species: 'Titan Tortoise',
+    nickTheme: 'Tortoise',
+    description: 'Shell first, then shoulders. A turtle with gym-bro discipline.',
+    isExotic: false,
+    sprite: ['.GGG..', 'GGGGG', 'GDDDG', 'GMMMG', 'GMMMG', 'GMMMG', 'GGGG.', '.GG..'],
+    palette: { skin: '#dbc39e', core: '#4f7345', detail: '#f5dd8f', accent: '#8d5f2d', cry: '#bfdbfe' },
+  },
+  {
+    dex: 3,
+    species: 'Iron Wolf',
+    nickTheme: 'Wolf',
+    description: 'Pack leader instincts and boulder arms; always ready to wrestle.',
+    isExotic: false,
+    sprite: ['..EEE.', '.EEME.', 'EMMMME', 'EMMMM.', 'EMMMME', 'EEEE..', '.EEE..', '..E...'],
+    palette: { skin: '#d6c8a0', core: '#4d4f58', detail: '#2f2e6b', accent: '#f1c45f', cry: '#e0f2fe' },
+  },
+  {
+    dex: 4,
+    species: 'Muscled Boar',
+    nickTheme: 'Boar',
+    description: 'A boar with a thick chest and a lot of stubborn force.',
+    isExotic: false,
+    sprite: ['.RRRR.', 'RRRRR', 'RMMMM', 'RMMMM', 'RRRRR', '.RRR.', '..RR.', '.R.R.'],
+    palette: { skin: '#f2b074', core: '#7b2d1f', detail: '#7a4f2b', accent: '#6c8b45', cry: '#fef3c7' },
+  },
+  {
+    dex: 5,
+    species: 'Ripped Rhino',
+    nickTheme: 'Rhino',
+    description: 'Small horn. Big chest. It uses one push and you feel it.',
+    isExotic: false,
+    sprite: ['..HH..', '.HHHH.', 'HMMMMH', 'HMMMMH', '.HHHH.', '..HH..', '.HHHH.', 'H....H'],
+    palette: { skin: '#eadbc0', core: '#7a7d84', detail: '#8e4e38', accent: '#c58a56', cry: '#f3e8ff' },
+  },
+  {
+    dex: 6,
+    species: 'Boulder Bison',
+    nickTheme: 'Bison',
+    description: 'A bison that can sprint into every encounter with explosive pull-up power.',
+    isExotic: false,
+    sprite: ['.PPPP.', 'PPPPPP', 'PWWWWP', 'PWWWWP', '.PWWP.', '..WW..', '.W..W.', 'WWWWW.'],
+    palette: { skin: '#efe3bc', core: '#7f5a38', detail: '#6c4d2e', accent: '#c7a84e', cry: '#bae6fd' },
+  },
+  {
+    dex: 50,
+    species: 'Slycera Griffin',
+    nickTheme: 'Griffin',
+    description: 'Mythical lion-eagle build. Strong wings and a dangerous hold.',
+    isExotic: true,
+    sprite: ['..AAAA.', '.AAAAAA', 'AAEEAA', 'AWWWWA', '.AWWA.', '.WMMW.', '.WMMW.', '.WWWW.'],
+    palette: { skin: '#f7d28f', core: '#c23b50', detail: '#ffefba', accent: '#5a4ed6', cry: '#fecdd3' },
+  },
+  {
+    dex: 51,
+    species: 'Cinder Manticore',
+    nickTheme: 'Manticore',
+    description: 'Mythic cat body with fiery spirit. It refuses easy wins.',
+    isExotic: true,
+    sprite: ['.FFFFF.', 'FFFFFFF', 'FMMMFF', 'FFMMFF', '.FWWF.', 'F.WWF.F', 'F.....F', '.FFF..'],
+    palette: { skin: '#f4c67a', core: '#4c4cd9', detail: '#f8f1bf', accent: '#ad3f6c', cry: '#fbcfe8' },
+  },
+  {
+    dex: 52,
+    species: 'Hydra Lurcher',
+    nickTheme: 'Hydra',
+    description: 'Mythical dog-bodied hydra with repeated pressure and huge leverage.',
+    isExotic: true,
+    sprite: ['...BBB.', '..BBBB.', '.BMMBB.', 'BMMMMB', 'BMMEBB', '.BMMB.', '.BMMB.', 'BBBBB.'],
+    palette: { skin: '#f6ab63', core: '#302f64', detail: '#b84848', accent: '#a25f34', cry: '#ffd4dc' },
+  },
+  {
+    dex: 53,
+    species: 'Pygmy Sable Pegasus',
+    nickTheme: 'Pegasus',
+    description: 'Winged and muscular with sharp training instincts.',
+    isExotic: true,
+    sprite: ['...CCC.', '.CCCCC.', 'CCMMCC', 'CMWWMC', 'CMMMMC', '.CWWC.', '..CC..', 'CC..CC'],
+    palette: { skin: '#f3cc97', core: '#385db3', detail: '#fbe5b0', accent: '#8d71eb', cry: '#ddd6fe' },
+  },
+  {
+    dex: 7,
+    species: 'Buff Otter',
+    nickTheme: 'Otter',
+    description: 'Playful at rest, ruthless in grip contests.',
+    isExotic: false,
+    sprite: ['.GGGG.', '.GMMM.', 'GMMEM.', 'GMMMMG', 'GMMMG.', '.GMMG.', '.GGG..', '..G...'],
+    palette: { skin: '#d3aa86', core: '#53709b', detail: '#925c37', accent: '#f6dfa1', cry: '#bfdbfe' },
+  },
+];
+
+function percent(value: number) {
+  return `${Math.round(value * 100)}%`;
+}
+
+function catchRate(level: number, isExotic: boolean) {
+  if (isExotic) return 0.4;
+  if (level <= 15) return 0.9;
+  if (level <= 25) return 0.85;
+  if (level <= 35) return 0.8;
+  return 0.7;
+}
+
+function getCatchLine(map: CatchState | null) {
+  if (!map) return '';
+  return map.lines[map.step];
+}
+
+function pickRandom<T>(items: T[]) {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function randomName(seed: number) {
+  return `${pickRandom(gymBuddyNames)} #${seed}`;
+}
+
+function classForPixel(cell: string) {
+  if (cell === 'M') return 'pixel-main';
+  if (cell === 'S') return 'pixel-skin';
+  if (cell === 'D') return 'pixel-core';
+  if (cell === 'E') return 'pixel-detail';
+  if (cell === 'W') return 'pixel-core';
+  if (cell === 'H') return 'pixel-accent';
+  if (cell === 'R') return 'pixel-skin';
+  if (cell === 'P') return 'pixel-detail';
+  if (cell === 'F') return 'pixel-accent';
+  if (cell === 'C') return 'pixel-main';
+  return 'pixel-empty';
+}
+
+function PixelSprite({ monster }: { monster: MonsterBlueprint }) {
+  return (
+    <div
+      className="pixel-sprite"
+      style={
+        {
+          '--skin': monster.palette.skin,
+          '--core': monster.palette.core,
+          '--detail': monster.palette.detail,
+          '--accent': monster.palette.accent,
+        } as CSSProperties
+      }
+    >
+      {monster.sprite.map((row, rowIndex) => (
+        <div key={`r-${rowIndex}`} className="pixel-row">
+          {[...row].map((cell, colIndex) => (
+            <span key={`${rowIndex}-${colIndex}`} className={`pixel ${classForPixel(cell)}`} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
-  const ui = useGameStore(s => s.ui);
-  const game = useGameStore(s => s.game);
-  const replay = useGameStore(s => s.replay);
-  const localPlayerId = useGameStore(s => s.localPlayerId);
-  const initMultiplayerListeners = useGameStore(s => s.initMultiplayerListeners);
-  const enterGameScreen = useGameStore(s => s.enterGameScreen);
-  const rightPanelOpen = useGameStore(s => s.ui.rightPanelOpen);
-  const setPanelSize = useGameStore(s => s.setPanelSize);
-  const resetPanelSizes = useGameStore(s => s.resetPanelSizes);
-  const toggleRightPanel = useGameStore(s => s.toggleRightPanel);
-  const updateFrameHealth = useGameStore(s => s.updateFrameHealth);
-  const recomputeAdaptivePerformance = useGameStore(s => s.recomputeAdaptivePerformance);
-  const replayClearAnimations = useGameStore(s => s.replayClearAnimations);
-  const isMobile = useIsMobile();
-  const appliedMobileLayout = useRef(false);
+  const starter = speciesCatalog[0];
+  const [team, setTeam] = useState<GymBuddy[]>([
+    { id: 'seed-1', nick: 'Muscle Mommy', level: 5, hp: 56, species: starter },
+    { id: 'seed-2', nick: 'Bench Bro', level: 4, hp: 48, species: speciesCatalog[1] },
+  ]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [encounter, setEncounter] = useState<Encounter | null>(null);
+  const [dexSeen, setDexSeen] = useState<number[]>([1, 2]);
+  const [catchState, setCatchState] = useState<CatchState | null>(null);
+  const [message, setMessage] = useState('Welcome home to Gym HQ. Train your team and go catch new Gym Buddies.');
+  const [steroids, setSteroids] = useState(3);
+  const [log, setLog] = useState<string[]>(['Home gym initialized.', 'Press Start to find a wild buddy.']);
+
+  const activeBuddy = team[activeIndex];
+  const caughtText = getCatchLine(catchState);
+  const catchResultFinished = catchState?.status === 'done';
+  const knownDex = useMemo(() => [...dexSeen].sort((a, b) => a - b), [dexSeen]);
+  const battling = catchState?.status === 'running';
 
   useEffect(() => {
-    if (multiplayerListenersInitialized) return;
-    multiplayerListenersInitialized = true;
-    console.info('[build]', BUILD_STAMP);
-    initMultiplayerListeners();
-  }, [initMultiplayerListeners]);
-
-  useEffect(() => {
-    if (isMobile && !appliedMobileLayout.current) {
-      appliedMobileLayout.current = true;
-      if (rightPanelOpen) toggleRightPanel();
-    }
-  }, [isMobile, rightPanelOpen, toggleRightPanel]);
-
-  useEffect(() => startFrameHealthMonitor(updateFrameHealth), [updateFrameHealth]);
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') {
-        replayClearAnimations();
-      } else {
-        recomputeAdaptivePerformance();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [recomputeAdaptivePerformance, replayClearAnimations]);
-
-  useEffect(() => {
-    if (game.status === 'playing' && ui.screen !== 'game' && ui.screen !== 'replay') {
-      if (import.meta.env.DEV === true || localStorage.getItem('on-da-stack-debug') === '1') {
-        console.debug('[multiplayer] App safety switching playing game to game screen', {
-          gameId: game.id,
-          currentScreen: ui.screen,
+    if (!catchState || catchState.status !== 'running') return;
+    if (catchState.step < catchState.lines.length - 1) {
+      const id = window.setTimeout(() => {
+        setCatchState(current => {
+          if (!current || current.status !== 'running') return current;
+          return { ...current, step: current.step + 1 };
         });
-      }
-      enterGameScreen();
-    }
-  }, [enterGameScreen, game.id, game.status, ui.screen]);
-
-  if (ui.screen === 'lobby') {
-    return (
-      <div style={{
-        width: '100vw',
-        height: '100vh',
-        background: '#080d11',
-        overflow: 'hidden',
-        fontFamily: '"Inter", "SF Pro Display", system-ui, sans-serif',
-      }}>
-        <LobbyScreen />
-        {ui.settings.showBuildStamp && <div style={{
-          position: 'fixed',
-          left: 8,
-          bottom: 6,
-          zIndex: 30000,
-          color: '#334155',
-          fontSize: 10,
-          fontFamily: '"SFMono-Regular", Consolas, monospace',
-          pointerEvents: 'none',
-        }}>
-          Build: {BUILD_STAMP.commit} · {BUILD_STAMP.builtAt}
-        </div>}
-        <Suspense fallback={null}>
-          <ProfilePanel />
-          <TutorialOverlay />
-          <GlobalHelpTooltip />
-        </Suspense>
-      </div>
-    );
-  }
-
-  if (ui.screen === 'replay') {
-    if (replay?.viewMode === 'creator') {
-      return (
-        <div
-          data-testid="replay-creator-shell"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            width: '100vw',
-            height: '100vh',
-            background: '#020617',
-            overflow: 'hidden',
-            fontFamily: '"Inter", "SF Pro Display", system-ui, sans-serif',
-          }}
-        >
-          <ReplayControls />
-          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-            <ReplayCreatorView />
-            <ReplayClipsPanel variant="overlay" />
-          </div>
-        </div>
-      );
+      }, 760);
+      return () => window.clearTimeout(id);
     }
 
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        width: '100vw',
-        height: '100vh',
-        background: '#080d11',
-        overflow: 'hidden',
-        fontFamily: '"Inter", "SF Pro Display", system-ui, sans-serif',
-      }}>
-        <TopBar />
-        <div style={{ padding: '10px 12px 0' }}>
-          <NextStepPanel
-            breadcrumb={getBreadcrumb(['Replay Viewer', replay ? 'Loaded' : 'Library'])}
-            step={getReplayViewerNextStep({ hasReplay: Boolean(replay) })}
-          />
-        </div>
-        {replay ? (
-          <>
-            <ReplayControls />
-            <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
-              <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-                <CommanderTable />
-                <ReplayAnimationOverlay />
-              </div>
-              <div style={{
-                width: isMobile ? 320 : 380,
-                maxWidth: '48vw',
-                minWidth: 260,
-                borderLeft: '1px solid #26323a',
-                background: '#080d11',
-                display: 'flex',
-                flexDirection: 'column',
-                minHeight: 0,
-              }}>
-                <ReplayTimeline />
-                {replay.viewMode === 'review' && <ReplayInfoPanel />}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div
-            data-testid="empty-no-replay"
-            style={{ flex: 1, display: 'grid', placeItems: 'center', padding: 24 }}
-          >
-            <section style={{
-              width: 'min(560px, 100%)',
-              border: '1px solid #26323a',
-              background: '#10161a',
-              borderRadius: 12,
-              padding: 20,
-              color: '#cbd5e1',
-            }}>
-              <h2 style={{ margin: '0 0 8px', color: '#f8fafc' }}>No replay loaded</h2>
-              <p style={{ margin: '0 0 14px', color: '#94a3b8' }}>
-                Load a saved replay file to review turns, actions, and board states.
-              </p>
-              <ReplayLoader />
-            </section>
-          </div>
-        )}
-        <FloatingCardPreview />
-        <CardContextMenu />
-        <UISettingsPanel />
-        <Suspense fallback={null}>
-          <CardSearchPanel />
-          <ProfilePanel />
-          <TutorialOverlay />
-          <GlobalHelpTooltip />
-        </Suspense>
-      </div>
-    );
-  }
+    const doneId = window.setTimeout(() => {
+      setCatchState(current => (current ? { ...current, status: 'done' } : current));
 
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      width: '100vw',
-      height: '100vh',
-      background: '#080d11',
-      overflow: 'hidden',
-      fontFamily: '"Inter", "SF Pro Display", system-ui, sans-serif',
-    }}>
-      {/* Top bar */}
-      <TopBar />
-      {/* Phase guide bar — player-driven, never auto-advances */}
-      <PhaseGuideBar />
-
-      {/* Main area: left panel + battlefield + right panel */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        overflow: 'hidden',
-        minHeight: 0,
-      }}>
-        {/* Left panel */}
-        {ui.leftPanelOpen && (
-          <>
-            <PanelShell width={ui.panelSizes.left} side="left">
-              <LeftPanel />
-            </PanelShell>
-            <ResizeHandle
-              ariaLabel="Resize players panel"
-              title="Drag to resize players panel. Double-click to reset panels."
-              onResize={delta => setPanelSize('left', ui.panelSizes.left + delta)}
-              onReset={resetPanelSizes}
-            />
-          </>
-        )}
-
-        {/* Collapsed left panel handle */}
-        {!ui.leftPanelOpen && (
-          <CollapseHandle side="left" />
-        )}
-
-        {/* Battlefield center */}
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          minWidth: 0,
-          position: 'relative',
-        }}>
-          {/* Battlefield (65-75% of screen) */}
-          <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, position: 'relative' }}>
-            <CommanderTable />
-            {game.config.playerCount === 1 && (
-              <Suspense fallback={null}>
-                <PracticeDummyPanel />
-              </Suspense>
-            )}
-          </div>
-
-          {/* Hand */}
-          <PlayerHand />
-
-          {/* NLP Command bar — always visible above hand */}
-          <CommandInput />
-        </div>
-
-        {/* Right panel */}
-        {ui.deckBuilderOpen && game.config.playerCount === 1 && (
-          <>
-          <ResizeHandle
-            ariaLabel="Resize deck lab panel"
-            title="Drag to resize deck lab panel. Double-click to reset panels."
-            onResize={delta => setPanelSize('deckBuilder', ui.panelSizes.deckBuilder - delta)}
-            onReset={resetPanelSizes}
-          />
-          <div style={{
-            width: ui.panelSizes.deckBuilder,
-            maxWidth: '55vw',
-            minWidth: 0,
-            borderLeft: '1px solid #26323a',
-            background: '#080d11',
-            overflow: 'auto',
-            padding: 10,
-            flexShrink: 0,
-          }}>
-            <Suspense fallback={null}>
-              <SoloDeckBuilder playerId={localPlayerId || game.players[0]?.id} compact loadLabel="Reload Test Deck" />
-            </Suspense>
-          </div>
-          </>
-        )}
-
-        {ui.rightPanelOpen && (
-          <>
-            <ResizeHandle
-              ariaLabel="Resize assistant panel"
-              title="Drag to resize assistant panel. Double-click to reset panels."
-              onResize={delta => setPanelSize('right', ui.panelSizes.right - delta)}
-              onReset={resetPanelSizes}
-            />
-            <PanelShell width={ui.panelSizes.right} side="right">
-              <RightPanel />
-            </PanelShell>
-          </>
-        )}
-
-        {/* Collapsed right panel handle */}
-        {!ui.rightPanelOpen && (
-          <CollapseHandle side="right" />
-        )}
-      </div>
-
-      {/* Overlays */}
-      <FloatingCardPreview />
-      <CommanderCastMoment />
-      <CardContextMenu />
-      <UISettingsPanel />
-      {ui.zoneDrawer && (
-        <Suspense fallback={null}>
-          <ZoneDrawer />
-        </Suspense>
-      )}
-      <Suspense fallback={null}>
-        <CardSearchPanel />
-        <ProfilePanel />
-        <TutorialOverlay />
-        <GlobalHelpTooltip />
-      </Suspense>
-    </div>
-  );
-}
-
-function PanelShell({ width, side, children }: { width: number; side: 'left' | 'right'; children: ReactNode }) {
-  return (
-    <div style={{
-      width,
-      minWidth: 0,
-      flexShrink: 0,
-      display: 'flex',
-      overflow: 'hidden',
-      borderRight: side === 'left' ? '1px solid #1e293b' : 'none',
-      borderLeft: side === 'right' ? '1px solid #1e293b' : 'none',
-    }}>
-      {children}
-    </div>
-  );
-}
-
-function ResizeHandle({
-  ariaLabel,
-  title,
-  onResize,
-  onReset,
-}: {
-  ariaLabel: string;
-  title: string;
-  onResize: (deltaX: number) => void;
-  onReset: () => void;
-}) {
-  const dragRef = useRef<{ startX: number; lastX: number; pointerId: number } | null>(null);
-
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      title={title}
-      onDoubleClick={onReset}
-      onPointerDown={event => {
-        dragRef.current = { startX: event.clientX, lastX: event.clientX, pointerId: event.pointerId };
-        event.currentTarget.setPointerCapture(event.pointerId);
-        event.preventDefault();
-      }}
-      onPointerMove={event => {
-        const drag = dragRef.current;
-        if (!drag || drag.pointerId !== event.pointerId) return;
-        const delta = event.clientX - drag.lastX;
-        drag.lastX = event.clientX;
-        if (delta !== 0) onResize(delta);
-      }}
-      onPointerUp={event => {
-        if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-          event.currentTarget.releasePointerCapture(event.pointerId);
+      setEncounter(current => {
+        if (!current || !catchState.won) return current && { ...current, state: 'failed' };
+        if (team.length >= TEAM_CAPACITY) {
+          setMessage('Caught, but your team is full. Keep at most six Gym Buddies.');
+          return { ...current, state: 'full' };
         }
-      }}
-      onPointerCancel={event => {
-        if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
-      }}
-      style={{
-        width: 14,
-        minWidth: 14,
-        alignSelf: 'stretch',
-        border: 'none',
-        borderLeft: '1px solid rgba(148,163,184,0.08)',
-        borderRight: '1px solid rgba(148,163,184,0.08)',
-        background: 'linear-gradient(90deg, #0b0f12, #10161a, #0b0f12)',
-        cursor: 'col-resize',
-        touchAction: 'none',
-        padding: 0,
-        flexShrink: 0,
-        position: 'relative',
-      }}
-    >
-      <span style={{
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: 3,
-        height: 38,
-        borderRadius: 999,
-        background: '#334155',
-        boxShadow: '5px 0 0 #26323a, -5px 0 0 #26323a',
-        pointerEvents: 'none',
-      }} />
-    </button>
-  );
-}
 
-function CollapseHandle({ side }: { side: 'left' | 'right' }) {
-  const store = useGameStore();
+        const newBuddy: GymBuddy = {
+          id: `${current.species.dex}-${Date.now()}`,
+          nick: randomName(current.species.dex),
+          level: current.level,
+          hp: 35 + current.level * 2,
+          species: current.species,
+        };
+        setTeam(previous => [...previous, newBuddy]);
+        setDexSeen(previous => (previous.includes(current.species.dex) ? previous : [...previous, current.species.dex]));
+        setMessage(`Caught ${newBuddy.nick}! They joined your party as ${newBuddy.species.species}.`);
+        setLog(prev => [`${newBuddy.species.species} Lv.${newBuddy.level} captured.`, ...prev.slice(0, 6)]);
+        return { ...current, state: 'caught' };
+      });
+    }, 900);
+
+    return () => window.clearTimeout(doneId);
+  }, [catchState?.status, catchState?.step, team.length]);
+
+  useEffect(() => {
+    if (catchResultFinished && encounter && encounter.state === 'failed') {
+      setMessage('The monster escaped before the last rep. Try again in the same encounter.');
+    }
+    if (catchResultFinished && encounter && encounter.state === 'caught') {
+      setMessage('You win the arm wrestle match; the buddy cries and joins your team.');
+    }
+  }, [catchResultFinished, encounter]);
+
+  function beginEncounter() {
+    const selected = pickRandom(speciesCatalog);
+    const level = Math.floor(Math.random() * 45) + 1;
+    const odds = catchRate(level, selected.isExotic);
+    setEncounter({ species: selected, level, odds, state: 'idle' });
+    setCatchState(null);
+    setDexSeen(previous => (previous.includes(selected.dex) ? previous : [...previous, selected.dex]));
+    setMessage(`Encountered ${selected.species} (Level ${level}). Get on the floor and arm wrestle to catch.`);
+    setLog(prev => [`Encounter found: ${selected.species} Lv.${level}`, ...prev.slice(0, 6)]);
+  }
+
+  function trainActive() {
+    if (!activeBuddy) return;
+    const nextLevel = Math.min(activeBuddy.level + 1, 100);
+    const heal = Math.max(1, Math.floor(nextLevel / 3));
+    const rewardSteroid = Math.random() < 0.22;
+
+    setTeam(previous =>
+      previous.map((buddy, index) =>
+        index === activeIndex
+          ? { ...buddy, level: nextLevel, hp: Math.min(120, buddy.hp + heal) }
+          : buddy,
+      ),
+    );
+    setMessage(`${activeBuddy.nick} trained hard and is now Lv ${nextLevel}.`);
+    setLog(prev => [`${activeBuddy.nick} leveled to Lv.${nextLevel}.`, ...prev.slice(0, 6)]);
+    if (rewardSteroid) {
+      setSteroids(prev => prev + 1);
+      setMessage(prev => `${prev} You found a Steroid from hard training.`);
+    }
+  }
+
+  function useSteroid() {
+    if (!activeBuddy || steroids <= 0) return;
+    const nextLevel = Math.min(activeBuddy.level + 1, 100);
+    setTeam(previous =>
+      previous.map((buddy, index) =>
+        index === activeIndex ? { ...buddy, level: nextLevel, hp: Math.min(120, buddy.hp + 1) } : buddy,
+      ),
+    );
+    setSteroids(previous => previous - 1);
+    setMessage(`Steroid applied: ${activeBuddy.nick} leveled to Lv ${nextLevel}.`);
+  }
+
+  function startCatchAttempt() {
+    if (!encounter || encounter.state !== 'idle' || catchState) return;
+    const roll = Math.random();
+    const won = roll <= encounter.odds;
+    setMessage(`Catch check roll: ${percent(roll)} target ${percent(encounter.odds)}.`);
+    setCatchState({
+      status: 'running',
+      step: 0,
+      lines: won ? SUCCESS_LINES : FAILURE_LINES,
+      won,
+    });
+  }
+
+  function returnHome() {
+    setEncounter(null);
+    setCatchState(null);
+    setMessage('Back at the Home Gym. Train and retry your next catch.');
+  }
 
   return (
-    <button
-      aria-label={side === 'left' ? 'Show players panel' : 'Show assistant panel'}
-      title={side === 'left' ? 'Show players panel' : 'Show assistant panel'}
-      onClick={side === 'left' ? store.toggleLeftPanel : store.toggleRightPanel}
-      style={{
-        width: 16,
-        background: '#0b0f12',
-        border: 'none',
-        borderRight: side === 'left' ? '1px solid #26323a' : 'none',
-        borderLeft: side === 'right' ? '1px solid #26323a' : 'none',
-        cursor: 'pointer',
-        color: '#475569',
-        fontSize: 12,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        transition: 'color 0.15s',
-      }}
-      onMouseEnter={e => { (e.target as HTMLElement).style.color = '#94a3b8'; }}
-      onMouseLeave={e => { (e.target as HTMLElement).style.color = '#475569'; }}
-    >
-      {side === 'left' ? '›' : '‹'}
-    </button>
+    <div className="app-shell">
+      <header className="top-banner">
+        <h1>GYM BUDDIES</h1>
+        <p>Pixel RPG clone for browser combat and capture</p>
+      </header>
+
+      <main className="game-grid">
+        <section className="panel">
+          <h2>Home Gym</h2>
+          <div className="panel-row">
+            <span className="chip">Party {team.length}/{TEAM_CAPACITY}</span>
+            <span className="chip">Steroids: {steroids}</span>
+          </div>
+
+          <h3>Team Slots (Pokémon-style)</h3>
+          <div className="team-slots">
+            {Array.from({ length: TEAM_CAPACITY }).map((_, index) => {
+              const slot = team[index];
+              const isSelected = index === activeIndex;
+              return (
+                <button
+                  key={`slot-${index}`}
+                  onClick={() => slot && setActiveIndex(index)}
+                  className={`team-slot ${isSelected ? 'active' : ''}`}
+                  disabled={!slot}
+                >
+                  <strong>{`#${String(index + 1).padStart(2, '0')}`}</strong>
+                  {slot ? (
+                    <>
+                      <span>{slot.nick}</span>
+                      <small>{slot.species.species}</small>
+                      <em>Lv {slot.level}</em>
+                    </>
+                  ) : (
+                    <span className="empty">EMPTY</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {activeBuddy && (
+            <>
+              <h3>Active Buddy</h3>
+              <div className="active-card">
+                <PixelSprite monster={activeBuddy.species} />
+                <div className="active-copy">
+                  <strong>{activeBuddy.nick}</strong>
+                  <div>{activeBuddy.species.species}</div>
+                  <div>Lv {activeBuddy.level}</div>
+                  <div>HP {activeBuddy.hp}</div>
+                  <p>{activeBuddy.species.description}</p>
+                </div>
+              </div>
+              <div className="action-row">
+                <button onClick={trainActive} className="primary-btn">
+                  Train for +1
+                </button>
+                <button onClick={useSteroid} disabled={steroids <= 0} className="primary-btn">
+                  Use Steroid (Lv candy) {steroids <= 0 ? '' : `x${steroids}`}
+                </button>
+              </div>
+            </>
+          )}
+
+          <button onClick={beginEncounter} disabled={!!encounter} className="primary-btn">
+            Begin wild encounter
+          </button>
+        </section>
+
+        <section className="panel">
+          <h2>Encounter / Capture</h2>
+          {!encounter ? (
+            <p className="small-note">No encounter. Return home and start hunting from Gym HQ.</p>
+          ) : (
+            <>
+              <div className="combat-stage">
+                <div className="combat-row">
+                  <div className="combat-figure">
+                    {activeBuddy ? <PixelSprite monster={activeBuddy.species} /> : null}
+                    <span>You</span>
+                  </div>
+                  <div className="combat-vs">VS</div>
+                  <div className="combat-figure">
+                    <PixelSprite monster={encounter.species} />
+                    <span>
+                      {encounter.species.species}
+                      {encounter.species.isExotic ? ' (Exotic)' : ''}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="encounter-data">
+                  <div>Lvl {encounter.level}</div>
+                  <div>Catch Rate: {percent(encounter.odds)}{encounter.species.isExotic && ' (mythical)'} </div>
+                  <div>State: {encounter.state}</div>
+                  <div>Layout: 1v1 arm-wrestle on the gym mat</div>
+                </div>
+              </div>
+
+              {encounter.state === 'idle' && !catchState && (
+                <button onClick={startCatchAttempt} className="primary-btn">
+                  Arm wrestle catch
+                </button>
+              )}
+              {battling && <p className="narration">{caughtText}</p>}
+              {catchResultFinished && encounter.state === 'idle' && (
+                <p className={catchState?.won ? 'narration win' : 'narration'}>
+                  {catchState?.won
+                    ? `You pin it. ${encounter.species.species} cries at your feet.`
+                    : `${encounter.species.species} escaped during the final count.`}
+                </p>
+              )}
+
+              {(encounter.state === 'caught' || encounter.state === 'failed' || encounter.state === 'full') && (
+                <div className="result-block">
+                  <p>
+                    {encounter.state === 'caught'
+                      ? 'Caught.'
+                      : encounter.state === 'full'
+                        ? 'Caught, but team has 6/6 already.'
+                        : 'Not caught this attempt.'}
+                  </p>
+                  <button onClick={returnHome} className="secondary-btn">
+                    Return Home
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        <section className="panel">
+          <h2>Gym Index</h2>
+          <p className="small-note">Pokémon-like index, shown by dex number and seen status.</p>
+          <div className="dex-list">
+            {speciesCatalog.map(monster => {
+              const seen = knownDex.includes(monster.dex);
+              return (
+                <div key={monster.dex} className={`dex-item ${seen ? 'seen' : 'unknown'}`}>
+                  <span>{`#${String(monster.dex).padStart(3, '0')}`}</span>
+                  {seen ? monster.species : '???'}
+                  {seen && monster.isExotic ? ' [Mythical]' : ''}
+                </div>
+              );
+            })}
+          </div>
+
+          <h3>Log</h3>
+          <ul className="log-list">
+            {log.map(entry => (
+              <li key={entry}>{entry}</li>
+            ))}
+          </ul>
+        </section>
+      </main>
+
+      <footer className="status-bar">
+        <strong>Broadcast:</strong> {message}
+      </footer>
+    </div>
   );
 }
