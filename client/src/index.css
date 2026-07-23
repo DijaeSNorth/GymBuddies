@@ -92,6 +92,50 @@ button {
   color: #f6e7be;
 }
 
+.gym-grid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gym-btn {
+  border: 2px solid #234762;
+  background: #071e32;
+  color: #dbe9f7;
+  padding: 7px;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 8px;
+}
+
+.gym-btn span {
+  font-size: 8px;
+  line-height: 1.35;
+  color: #9fc5e3;
+}
+
+.gym-btn.home {
+  border-color: #4f7090;
+  background: #0c2544;
+}
+
+.gym-btn.starter {
+  border-color: #3f6d53;
+  background: #102a20;
+}
+
+.gym-btn.higher {
+  border-color: #6c3f6d;
+  background: #2a1638;
+}
+
+.gym-btn.active {
+  outline: 2px solid #ffd166;
+  outline-offset: -4px;
+}
+
 .small-note {
   margin: 0;
   color: var(--muted);

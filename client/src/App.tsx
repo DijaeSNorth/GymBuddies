@@ -25,9 +25,19 @@ type GymBuddy = {
   species: MonsterBlueprint;
 };
 
+type GymZone = {
+  id: string;
+  name: string;
+  levelMin: number;
+  levelMax: number;
+  style: 'home' | 'starter' | 'higher';
+  note: string;
+};
+
 type Encounter = {
   species: MonsterBlueprint;
   level: number;
+  zoneId: string;
   odds: number;
   state: 'idle' | 'caught' | 'failed' | 'full';
 };
@@ -40,6 +50,7 @@ type CatchState = {
 };
 
 const TEAM_CAPACITY = 6;
+
 const SUCCESS_LINES = [
   'You and the wild buddy go flat on your stomachs and lock elbows.',
   'Both of you grind shoulder to shoulder, and neither gives an inch.',
@@ -51,7 +62,7 @@ const SUCCESS_LINES = [
 const FAILURE_LINES = [
   'You and the wild buddy go flat on your stomachs and lock elbows.',
   'The hold is brutal, and both sides shake with effort.',
-  'It slips once, then again — you almost lose the wrist lock.',
+  'It slips once, then again—you almost lose the wrist lock.',
   'The creature pushes once more and breaks your grip.',
   'You lose the match as it slips away.',
 ];
@@ -69,6 +80,57 @@ const gymBuddyNames = [
   'Rope Rebel',
   'Tough Toad',
   'Pectoral Pete',
+];
+
+const gymZones: GymZone[] = [
+  {
+    id: 'home',
+    name: 'Home Gym',
+    levelMin: 1,
+    levelMax: 1,
+    style: 'home',
+    note: 'Trainer HQ. Train and manage your team here.',
+  },
+  {
+    id: 'starter-1',
+    name: 'Starter Gym A',
+    levelMin: 1,
+    levelMax: 15,
+    style: 'starter',
+    note: 'Easy catches with friendly pressure.',
+  },
+  {
+    id: 'starter-2',
+    name: 'Starter Gym B',
+    levelMin: 16,
+    levelMax: 25,
+    style: 'starter',
+    note: 'Steady match-ups in the middle band.',
+  },
+  {
+    id: 'higher-1',
+    name: 'Iron Gym',
+    levelMin: 26,
+    levelMax: 35,
+    style: 'higher',
+    note: 'Harder matches; stronger opponents.',
+  },
+  {
+    id: 'higher-2',
+    name: 'Apex Gym',
+    levelMin: 36,
+    levelMax: 45,
+    style: 'higher',
+    note: 'Late-game pressure with bigger levels.',
+  },
+  {
+    id: 'higher-3',
+    name: 'Glory Gym',
+    levelMin: 36,
+    levelMax: 55,
+    style: 'higher',
+    note: 'Veteran-level brawls and rare encounters.',
+  },
 ];
 
 const speciesCatalog: MonsterBlueprint[] = [
@@ -173,6 +235,8 @@ const speciesCatalog: MonsterBlueprint[] = [
   },
 ];
 
+const zoneNameById = Object.fromEntries(gymZones.map(zone => [zone.id, zone.name])) as Record<string, string>;
+
 function percent(value: number) {
   return `${Math.round(value * 100)}%`;
 }
@@ -243,14 +307,19 @@ export default function App() {
     { id: 'seed-2', nick: 'Bench Bro', level: 4, hp: 48, species: speciesCatalog[1] },
   ]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [activeZoneId, setActiveZoneId] = useState('home');
   const [encounter, setEncounter] = useState<Encounter | null>(null);
   const [dexSeen, setDexSeen] = useState<number[]>([1, 2]);
   const [catchState, setCatchState] = useState<CatchState | null>(null);
-  const [message, setMessage] = useState('Welcome home to Gym HQ. Train your team and go catch new Gym Buddies.');
+  const [message, setMessage] = useState('Welcome to the gym network. Start at Home Gym and pick a gym to begin.');
   const [steroids, setSteroids] = useState(3);
-  const [log, setLog] = useState<string[]>(['Home gym initialized.', 'Press Start to find a wild buddy.']);
+  const [log, setLog] = useState<string[]>(['Home gym initialized.', '6 gyms online.']);
 
   const activeBuddy = team[activeIndex];
+  const activeZone = useMemo(
+    () => gymZones.find(zone => zone.id === activeZoneId) ?? gymZones[0],
+    [activeZoneId],
+  );
   const caughtText = getCatchLine(catchState);
   const catchResultFinished = catchState?.status === 'done';
   const knownDex = useMemo(() => [...dexSeen].sort((a, b) => a - b), [dexSeen]);
@@ -258,6 +327,7 @@ export default function App() {
 
   useEffect(() => {
     if (!catchState || catchState.status !== 'running') return;
+
     if (catchState.step < catchState.lines.length - 1) {
       const id = window.setTimeout(() => {
         setCatchState(current => {
@@ -288,7 +358,7 @@ export default function App() {
         setTeam(previous => [...previous, newBuddy]);
         setDexSeen(previous => (previous.includes(current.species.dex) ? previous : [...previous, current.species.dex]));
         setMessage(`Caught ${newBuddy.nick}! They joined your party as ${newBuddy.species.species}.`);
-        setLog(prev => [`${newBuddy.species.species} Lv.${newBuddy.level} captured.`, ...prev.slice(0, 6)]);
+        setLog(prev => [`${newBuddy.species.species} Lv.${newBuddy.level} captured in ${zoneNameById[current.zoneId]}.`, ...prev.slice(0, 6)]);
         return { ...current, state: 'caught' };
       });
     }, 900);
@@ -298,26 +368,68 @@ export default function App() {
 
   useEffect(() => {
     if (catchResultFinished && encounter && encounter.state === 'failed') {
-      setMessage('The monster escaped before the last rep. Try again in the same encounter.');
+      setMessage('The monster escaped before the final rep. Try again in the same encounter.');
     }
     if (catchResultFinished && encounter && encounter.state === 'caught') {
       setMessage('You win the arm wrestle match; the buddy cries and joins your team.');
     }
   }, [catchResultFinished, encounter]);
 
+  function travelTo(zoneId: string) {
+    if (zoneId === activeZoneId) return;
+    if (encounter && encounter.state === 'idle' && !catchState) {
+      setMessage('Finish or return from this encounter before leaving the area.');
+      return;
+    }
+    setActiveZoneId(zoneId);
+    setCatchState(null);
+    if (zoneId === 'home') {
+      setEncounter(null);
+      setMessage('Back to Home Gym.');
+      return;
+    }
+    const zone = gymZones.find(g => g.id === zoneId);
+    setMessage(`Entered ${zone?.name}. ${zone?.note ?? ''}`);
+  }
+
   function beginEncounter() {
+    if (activeZone.style === 'home') {
+      setMessage('Go to a Starter or Higher gym to trigger encounters.');
+      return;
+    }
+    if (!activeBuddy) {
+      setMessage('Choose an active buddy first.');
+      return;
+    }
+    if (encounter) {
+      setMessage('You already have an active wild encounter.');
+      return;
+    }
+
     const selected = pickRandom(speciesCatalog);
-    const level = Math.floor(Math.random() * 45) + 1;
+    const level = Math.floor(Math.random() * (activeZone.levelMax - activeZone.levelMin + 1)) + activeZone.levelMin;
     const odds = catchRate(level, selected.isExotic);
-    setEncounter({ species: selected, level, odds, state: 'idle' });
+    setEncounter({
+      species: selected,
+      level,
+      zoneId: activeZone.id,
+      odds,
+      state: 'idle',
+    });
     setCatchState(null);
     setDexSeen(previous => (previous.includes(selected.dex) ? previous : [...previous, selected.dex]));
-    setMessage(`Encountered ${selected.species} (Level ${level}). Get on the floor and arm wrestle to catch.`);
-    setLog(prev => [`Encounter found: ${selected.species} Lv.${level}`, ...prev.slice(0, 6)]);
+    setMessage(
+      `In ${activeZone.name}, a wild ${selected.species} (Level ${level}) appears. Get on the floor and arm wrestle to catch.`,
+    );
+    setLog(prev => [`${activeZone.name}: ${selected.species} Lv.${level}`, ...prev.slice(0, 6)]);
   }
 
   function trainActive() {
     if (!activeBuddy) return;
+    if (activeZone.style !== 'home') {
+      setMessage('Training can only happen at Home Gym.');
+      return;
+    }
     const nextLevel = Math.min(activeBuddy.level + 1, 100);
     const heal = Math.max(1, Math.floor(nextLevel / 3));
     const rewardSteroid = Math.random() < 0.22;
@@ -339,6 +451,10 @@ export default function App() {
 
   function useSteroid() {
     if (!activeBuddy || steroids <= 0) return;
+    if (activeZone.style !== 'home') {
+      setMessage('Steroids can only be used in Home Gym.');
+      return;
+    }
     const nextLevel = Math.min(activeBuddy.level + 1, 100);
     setTeam(previous =>
       previous.map((buddy, index) =>
@@ -365,6 +481,7 @@ export default function App() {
   function returnHome() {
     setEncounter(null);
     setCatchState(null);
+    setActiveZoneId('home');
     setMessage('Back at the Home Gym. Train and retry your next catch.');
   }
 
@@ -377,13 +494,26 @@ export default function App() {
 
       <main className="game-grid">
         <section className="panel">
-          <h2>Home Gym</h2>
+          <h2>6 Gyms</h2>
           <div className="panel-row">
             <span className="chip">Party {team.length}/{TEAM_CAPACITY}</span>
             <span className="chip">Steroids: {steroids}</span>
+            <span className="chip">Current: {activeZone.name}</span>
+          </div>
+          <div className="gym-grid">
+            {gymZones.map(zone => (
+              <button
+                key={zone.id}
+                className={`gym-btn ${zone.style} ${activeZone.id === zone.id ? 'active' : ''}`}
+                onClick={() => travelTo(zone.id)}
+              >
+                <strong>{zone.name}</strong>
+                <span>{zone.note}</span>
+              </button>
+            ))}
           </div>
 
-          <h3>Team Slots (Pokémon-style)</h3>
+          <h3>Team Slots (Poké Style)</h3>
           <div className="team-slots">
             {Array.from({ length: TEAM_CAPACITY }).map((_, index) => {
               const slot = team[index];
@@ -424,25 +554,40 @@ export default function App() {
                 </div>
               </div>
               <div className="action-row">
-                <button onClick={trainActive} className="primary-btn">
+                <button onClick={trainActive} className="primary-btn" disabled={activeZone.style !== 'home'}>
                   Train for +1
                 </button>
-                <button onClick={useSteroid} disabled={steroids <= 0} className="primary-btn">
+                <button
+                  onClick={useSteroid}
+                  disabled={steroids <= 0 || activeZone.style !== 'home'}
+                  className="primary-btn"
+                >
                   Use Steroid (Lv candy) {steroids <= 0 ? '' : `x${steroids}`}
                 </button>
               </div>
             </>
           )}
 
-          <button onClick={beginEncounter} disabled={!!encounter} className="primary-btn">
-            Begin wild encounter
-          </button>
+          <div className="panel-row">
+            <button
+              onClick={beginEncounter}
+              disabled={activeZone.style === 'home' || !!encounter}
+              className="primary-btn"
+            >
+              Begin wild encounter
+            </button>
+          </div>
+          <p className="small-note">Starter + Higher gyms are available immediately from launch.</p>
         </section>
 
         <section className="panel">
           <h2>Encounter / Capture</h2>
           {!encounter ? (
-            <p className="small-note">No encounter. Return home and start hunting from Gym HQ.</p>
+            <p className="small-note">
+              {activeZone.style === 'home'
+                ? 'No encounter. Move to a starter or higher gym to find a wild buddy.'
+                : `No encounter in ${activeZone.name}. Start one from the left panel.`}
+            </p>
           ) : (
             <>
               <div className="combat-stage">
@@ -462,8 +607,9 @@ export default function App() {
                 </div>
 
                 <div className="encounter-data">
+                  <div>Gym: {zoneNameById[encounter.zoneId]}</div>
                   <div>Lvl {encounter.level}</div>
-                  <div>Catch Rate: {percent(encounter.odds)}{encounter.species.isExotic && ' (mythical)'} </div>
+                  <div>Catch Rate: {percent(encounter.odds)}{encounter.species.isExotic ? ' (mythical)' : ''}</div>
                   <div>State: {encounter.state}</div>
                   <div>Layout: 1v1 arm-wrestle on the gym mat</div>
                 </div>
@@ -503,7 +649,7 @@ export default function App() {
 
         <section className="panel">
           <h2>Gym Index</h2>
-          <p className="small-note">Pokémon-like index, shown by dex number and seen status.</p>
+          <p className="small-note">Poké-style index, shown by dex number and seen status.</p>
           <div className="dex-list">
             {speciesCatalog.map(monster => {
               const seen = knownDex.includes(monster.dex);
@@ -519,8 +665,8 @@ export default function App() {
 
           <h3>Log</h3>
           <ul className="log-list">
-            {log.map(entry => (
-              <li key={entry}>{entry}</li>
+            {log.map((entry, index) => (
+              <li key={`${index}-${entry}`}>{entry}</li>
             ))}
           </ul>
         </section>
