@@ -1977,11 +1977,14 @@ export default function App() {
     ? connectedWalks
         .map(
           ({ direction, destinationZone, routeName, routeFatigue, encounterBoost }) =>
-            `${direction.toUpperCase()}: ${routeName} → ${destinationZone ? zoneNames[destinationZone] ?? destinationZone : 'Path'} (+${routeFatigue} fatigue)`,
+            `${direction.toUpperCase()}: ${routeName} → ${destinationZone ? zoneNames[destinationZone] ?? destinationZone : 'Path'} (+${routeFatigue} fatigue${
+              encounterBoost ? `, +${Math.round(encounterBoost * 100)}% encounter` : ''
+            })`,
         )
         .join(' · ')
     : 'No exits available';
-  const worldMovePercent = clamp01(1 - Math.max(0, worldMoveLockUntil - nowMs()) / WORLD_MOVE_COOLDOWN_MS);
+  const worldMoveCooldownRemaining = Math.max(0, worldMoveLockUntil - tick);
+  const worldMovePercent = clamp01(1 - worldMoveCooldownRemaining / WORLD_MOVE_COOLDOWN_MS);
   const worldMoveBlocked = nowMs() < worldMoveLockUntil;
   const isZoneUnlocked = (zoneId: string) => unlockedZoneSet.has(zoneId);
   const workoutProgress =
@@ -2444,6 +2447,18 @@ export default function App() {
     const point = WORLD_ZONE_POSITIONS[zoneId];
     if (!point) return null;
     return worldTileToStyle(point);
+  }
+
+  function routeSignPosition(route: WorldRouteConnection) {
+    const fromPos = WORLD_ZONE_POSITIONS[route.from];
+    const toPos = WORLD_ZONE_POSITIONS[route.to];
+    if (!fromPos || !toPos) return null;
+    const fromStyle = worldTileToStyle(fromPos);
+    const toStyle = worldTileToStyle(toPos);
+    return {
+      left: fromStyle.left + (toStyle.left - fromStyle.left) / 2,
+      top: fromStyle.top + (toStyle.top - fromStyle.top) / 2,
+    };
   }
 
   function travelToZone(zoneId: string) {
@@ -3401,7 +3416,11 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
               <div className="world-move-progress">
                 <div className="world-move-progress-fill" style={{ width: `${Math.round(worldMovePercent * 100)}%` }} />
               </div>
-              <small className="small-note">Stride lock: {Math.max(0, Math.ceil((worldMoveLockUntil - nowMs()) / 20)) / 50}s</small>
+              <small className="small-note">
+                Stride lock: {Math.max(0, worldMoveCooldownRemaining) / WORLD_MOVE_COOLDOWN_MS < 0.01
+                  ? 'free'
+                  : `${(Math.ceil(worldMoveCooldownRemaining / 10) / 100).toFixed(2)}s`}
+              </small>
             </div>
           ) : null}
           <div className="world-route-list">
@@ -3459,6 +3478,25 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                       <small>{zone.blurb}</small>
                       {!isUnlocked && !isActive ? '🔒' : ''}
                   </button>
+                );
+              })}
+              {WORLD_ROUTE_PATHS.map((route) => {
+                const signPos = routeSignPosition(route);
+                if (!signPos) return null;
+                return (
+                  <div
+                    key={`${route.from}-${route.to}-sign`}
+                    className="world-route-sign"
+                    style={{
+                      left: signPos.left,
+                      top: signPos.top,
+                    }}
+                    title={`${route.routeName}: +${route.travelFatigue.toFixed(1)} fatigue · +${Math.round(
+                      route.encounterBoost * 100,
+                    )}% scouting`}
+                  >
+                    {route.routeName}
+                  </div>
                 );
               })}
               <div
