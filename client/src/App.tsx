@@ -204,6 +204,32 @@ const WORKOUT_SPOT_WINDOW_MS = 1600;
 const WORKOUT_AUTO_FAILURE_MS = 1250;
 const BASE_TRAIN_FAIL_CHANCE = 0.5;
 const BASE_SPOT_SUCCESS_CHANCE = 0.5;
+const BOSS_ZONE_CATCH_SCALE: Record<'home' | 'starter' | 'higher', number> = {
+  home: 0.9,
+  starter: 1,
+  higher: 0.78,
+};
+const BOSS_CAPTURE_WEIGHTS: Record<
+  'home' | 'starter' | 'higher',
+  { trainerWeight: number; buddyWeight: number; bossPenaltyScale: number; maxCatch: number; minCatch: number }
+> = {
+  home: { trainerWeight: 1.2, buddyWeight: 1.02, bossPenaltyScale: 0.52, maxCatch: 0.94, minCatch: 0.08 },
+  starter: { trainerWeight: 1.18, buddyWeight: 0.95, bossPenaltyScale: 0.62, maxCatch: 0.92, minCatch: 0.07 },
+  higher: { trainerWeight: 1.14, buddyWeight: 0.9, bossPenaltyScale: 0.82, maxCatch: 0.82, minCatch: 0.06 },
+};
+const BOSS_CHALLENGE_PRESSURE: Record<
+  'home' | 'starter' | 'higher',
+  { matchMachineBonus: number; focusMatchBonus: number; focusMismatchPenalty: number }
+> = {
+  home: { matchMachineBonus: 5, focusMatchBonus: 2, focusMismatchPenalty: -1 },
+  starter: { matchMachineBonus: 6, focusMatchBonus: 3, focusMismatchPenalty: -2 },
+  higher: { matchMachineBonus: 9, focusMatchBonus: 4, focusMismatchPenalty: -4 },
+};
+const BOSS_POWER_BONUS_SCALE: Record<'home' | 'starter' | 'higher', number> = {
+  home: 0.55,
+  starter: 0.72,
+  higher: 0.95,
+};
 
 function machineDifficultyMultiplier(type: 'home' | 'starter' | 'higher') {
   if (type === 'higher') return 1.2;
@@ -278,10 +304,13 @@ function bossChallengePressure(encounter: Encounter, zone: GymArea, selectedMach
   if (!encounter.isBoss) return 0;
   const challengeMachine = getBossChallengeMachine(encounter, zone);
   if (!challengeMachine || !selectedMachine) return 0;
+  const difficulty = BOSS_CHALLENGE_PRESSURE[zone.type];
   if (challengeMachine.id === selectedMachine.id) {
-    return 6;
+    return difficulty.matchMachineBonus;
   }
-  return selectedMachine.focus.toLowerCase() === challengeMachine.focus.toLowerCase() ? 3 : -4;
+  return selectedMachine.focus.toLowerCase() === challengeMachine.focus.toLowerCase()
+    ? difficulty.focusMatchBonus
+    : difficulty.focusMismatchPenalty;
 }
 
 function matchCatchModifier(encounter: Encounter, zone: GymArea, machine: GymMachine | null, trainer: TrainerProfile, buddy: Buddy, meter: number) {
@@ -289,9 +318,11 @@ function matchCatchModifier(encounter: Encounter, zone: GymArea, machine: GymMac
   const buddyPressure = buddyArenaPressure(buddy);
   const machinePressure = bossChallengePressure(encounter, zone, machine);
   const bossPenalty = encounter.isBoss ? (encounter.bossPowerBonus ?? 0) : 0;
-  const trainerWeight = 1.18;
-  const buddyWeight = 0.9;
-  const raw = trainerPressure * trainerWeight + buddyPressure * buddyWeight + machinePressure - bossPenalty * 0.6;
+  const profile = BOSS_CAPTURE_WEIGHTS[zone.type];
+  const zonePenaltyMultiplier = encounter.isBoss ? profile.bossPenaltyScale : 0;
+  const trainerWeight = profile.trainerWeight;
+  const buddyWeight = profile.buddyWeight;
+  const raw = trainerPressure * trainerWeight + buddyPressure * buddyWeight + machinePressure - bossPenalty * zonePenaltyMultiplier;
   return {
     raw,
     meterDelta: clamp((meter - 50) / 150, -0.25, 0.22),
@@ -1471,12 +1502,13 @@ function createBoss(zone: GymArea): Encounter {
   const creature = boss.creature;
   const level = randInt(zone.levelMin + boss.levelShift, zone.levelMax + boss.levelShift);
   const baseChance = getCatchChance(level, creature.isExotic);
+  const zoneMultiplier = BOSS_ZONE_CATCH_SCALE[zone.type];
   const machine = randomChoice(zone.machines) ?? null;
   return {
     creature,
     level,
     zoneId: zone.id,
-    catchChance: clamp(baseChance * boss.catchMultiplier, 0.05, 0.6),
+    catchChance: clamp(baseChance * boss.catchMultiplier * zoneMultiplier, 0.05, 0.6),
     isBoss: true,
     bossName: `${boss.name} — ${creature.name}`,
     bossPowerBonus: boss.powerBoost,
@@ -2570,9 +2602,10 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const challengeMachine = getBossChallengeMachine(match.encounter, zone);
     const zoneMachine = activeMachineForMatch;
     const modifier = matchCatchModifier(match.encounter, zone, zoneMachine, trainer, activeBuddy, meter);
+    const zoneCatchProfile = BOSS_CAPTURE_WEIGHTS[zone.type];
     const base = clamp(match.encounter.catchChance + modifier.meterDelta, 0.08, 0.97);
     const bonus = clamp(modifier.raw / 165, -0.26, 0.32);
-    const finalChance = clamp(base + bonus, 0.08, 0.97);
+    const finalChance = clamp(base + bonus, zoneCatchProfile.minCatch, zoneCatchProfile.maxCatch);
 
     const passHold = meter >= 72;
 
@@ -2695,7 +2728,8 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const trainerPressure = Math.round(modifier.trainerPressure * 1.12);
     const buddyPressure = Math.round(modifier.buddyPressure * 0.93);
     const challengePressure = modifier.bossPressure;
-    const bossBonus = (match.encounter.bossPowerBonus ?? 0) * 0.86;
+    const bossPowerScale = BOSS_POWER_BONUS_SCALE[zone.type];
+    const bossBonus = (match.encounter.bossPowerBonus ?? 0) * bossPowerScale;
     const playerBase =
       activeBuddy.level * 1.75 +
       move.power +
