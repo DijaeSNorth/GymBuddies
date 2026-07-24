@@ -258,17 +258,17 @@ function trainerArenaPressure(trainer: TrainerProfile, machine: GymMachine | nul
   if (!activeMachine) return 0;
   const focusScore = machineFocusScore(activeMachine, trainer);
   const overallBody = Object.values(trainer.muscles).reduce((total, value) => total + value / MAX_MUSCLE_LEVEL, 0) / 8;
-  const zoneScale = zone.type === 'higher' ? 1.18 : zone.type === 'starter' ? 1.06 : 0.96;
-  const base = 8 + focusScore * 16 + overallBody * 14 + (zoneScale - 1) * 10;
-  return clamp(Math.round(base), 0, 28);
+  const zoneScale = zone.type === 'higher' ? 1.18 : zone.type === 'starter' ? 1.06 : 0.95;
+  const base = 10 + focusScore * 18 + overallBody * 17 + (zoneScale - 1) * 12;
+  return clamp(Math.round(base), 0, 36);
 }
 
 function buddyArenaPressure(buddy: Buddy) {
   const hpRatio = clamp01(buddy.hp / Math.max(1, buddy.maxHp));
-  const powerEdge = buddy.creature.power * 0.42;
+  const powerEdge = buddy.creature.power * 0.5;
   const healthEdge = hpRatio * 10;
   const fatiguePenalty = (1 - hpRatio) * 6;
-  return clamp(Math.round(buddy.level * 1.5 + powerEdge + healthEdge - fatiguePenalty), 10, 45);
+  return clamp(Math.round(buddy.level * 1.75 + powerEdge + healthEdge - fatiguePenalty), 8, 50);
 }
 
 function bossChallengePressure(encounter: Encounter, zone: GymArea, selectedMachine: GymMachine | null) {
@@ -276,9 +276,9 @@ function bossChallengePressure(encounter: Encounter, zone: GymArea, selectedMach
   const challengeMachine = getBossChallengeMachine(encounter, zone);
   if (!challengeMachine || !selectedMachine) return 0;
   if (challengeMachine.id === selectedMachine.id) {
-    return 7;
+    return 6;
   }
-  return selectedMachine.focus.toLowerCase() === challengeMachine.focus.toLowerCase() ? 2 : -6;
+  return selectedMachine.focus.toLowerCase() === challengeMachine.focus.toLowerCase() ? 3 : -4;
 }
 
 function matchCatchModifier(encounter: Encounter, zone: GymArea, machine: GymMachine | null, trainer: TrainerProfile, buddy: Buddy, meter: number) {
@@ -286,11 +286,15 @@ function matchCatchModifier(encounter: Encounter, zone: GymArea, machine: GymMac
   const buddyPressure = buddyArenaPressure(buddy);
   const machinePressure = bossChallengePressure(encounter, zone, machine);
   const bossPenalty = encounter.isBoss ? (encounter.bossPowerBonus ?? 0) : 0;
-  const raw = trainerPressure + buddyPressure + machinePressure - bossPenalty / 2;
+  const trainerWeight = 1.18;
+  const buddyWeight = 0.9;
+  const raw = trainerPressure * trainerWeight + buddyPressure * buddyWeight + machinePressure - bossPenalty * 0.6;
   return {
     raw,
     meterDelta: clamp((meter - 50) / 150, -0.25, 0.22),
     bossPressure: machinePressure,
+    trainerPressure,
+    buddyPressure,
   };
 }
 
@@ -2177,7 +2181,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const zoneMachine = activeMachineForMatch;
     const modifier = matchCatchModifier(match.encounter, zone, zoneMachine, trainer, activeBuddy, meter);
     const base = clamp(match.encounter.catchChance + modifier.meterDelta, 0.08, 0.97);
-    const bonus = clamp((trainerArenaPressure(trainer, zoneMachine, zone) + buddyArenaPressure(activeBuddy) + modifier.bossPressure - (match.encounter.bossPowerBonus ?? 0) / 2) / 130, -0.2, 0.28);
+    const bonus = clamp(modifier.raw / 165, -0.26, 0.32);
     const finalChance = clamp(base + bonus, 0.08, 0.97);
 
     const passHold = meter >= 72;
@@ -2297,12 +2301,13 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
 
     const zone = AREAS.find((entry) => entry.id === match.encounter.zoneId) ?? activeZone;
     const selectedMachine = activeMachine ?? zone.machines[0] ?? null;
-    const trainerPressure = trainerArenaPressure(trainer, selectedMachine, zone);
-    const buddyPressure = buddyArenaPressure(activeBuddy);
-    const challengePressure = bossChallengePressure(match.encounter, zone, selectedMachine);
-    const bossBonus = match.encounter.bossPowerBonus ?? 0;
+    const modifier = matchCatchModifier(match.encounter, zone, selectedMachine, trainer, activeBuddy, match.meter);
+    const trainerPressure = Math.round(modifier.trainerPressure * 1.12);
+    const buddyPressure = Math.round(modifier.buddyPressure * 0.93);
+    const challengePressure = modifier.bossPressure;
+    const bossBonus = (match.encounter.bossPowerBonus ?? 0) * 0.86;
     const playerBase =
-      activeBuddy.level * 1.7 +
+      activeBuddy.level * 1.75 +
       move.power +
       move.control +
       trainerPressure +
@@ -2310,7 +2315,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       challengePressure +
       randInt(-5, 9);
     const wildBase =
-      match.encounter.level * 2 + match.encounter.creature.power + bossBonus - challengePressure + randInt(-4, 12);
+      match.encounter.level * 2.05 + match.encounter.creature.power + bossBonus - challengePressure + randInt(-4, 12);
     const delta = playerBase - wildBase;
     const nextMeter = clamp(match.meter + Math.floor(delta / 2), 20, 92);
     const round = match.round + 1;
