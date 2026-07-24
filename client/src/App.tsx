@@ -138,6 +138,7 @@ type ZoneTransit = {
   routeName?: string;
   routeFatigue?: number;
   routeEncounterBoost?: number;
+  routeScoutChance?: number;
 };
 
 type TrainerEmote = 'neutral' | 'grind' | 'focus' | 'level' | 'victory' | 'drained' | 'ready' | 'pump';
@@ -2547,13 +2548,21 @@ export default function App() {
       unlockedZoneIds: unlockAdjacentZones(state.unlockedZoneIds, id),
     }));
     const routeProfile = routeProfileFromZones(save.activeZoneId, id);
+    const routeEncounterBonus = routeProfile?.encounterBoost ?? 0;
+    const routeFatigue = routeFatigueCost(activeZone.id, id, activeZone.type);
+    const baseEncounterChance = WORLD_ROUTE_ENCOUNTER_RATE[zone.type] * (1 + routeEncounterBonus);
+    const encounterChance = Math.min(
+      0.55,
+      baseEncounterChance * (1 + clamp01(save.trainingFatigue / MAX_TRAINING_FATIGUE) * 0.2),
+    );
     setZoneTransit({
       from: activeZone.name,
       to: zone.name,
       icon: ZONE_VIBES[id]?.icon ?? '🗺',
       routeName: routeProfile?.routeName,
-      routeFatigue: routeFatigueCost(activeZone.id, id, activeZone.type),
-      routeEncounterBoost: routeProfile?.encounterBoost ?? 0,
+      routeFatigue,
+      routeEncounterBoost: routeEncounterBonus,
+      routeScoutChance: routeEncounterBonus > 0 || encounterChance ? encounterChance : undefined,
     });
     setEncounter(null);
     setMatch(null);
@@ -3298,6 +3307,11 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
               ) : null}
               {zoneTransit.routeEncounterBoost ? (
                 <p className="small-note">Route scouting bonus: +{Math.round(zoneTransit.routeEncounterBoost * 100)}%</p>
+              ) : null}
+              {zoneTransit.routeScoutChance !== undefined ? (
+                <p className="small-note">
+                  Approx. route scouting chance: {Math.round(zoneTransit.routeScoutChance * 100)}%
+                </p>
               ) : null}
             </div>
           </div>
