@@ -96,6 +96,7 @@ type GymBoss = {
 
 type SaveData = {
   version: string;
+  trainingFatigue: number;
   hasStarterSet: boolean;
   unlockedZoneIds: string[];
   trainer: TrainerProfile;
@@ -196,39 +197,49 @@ type WorkoutSession = {
   steroidsAwarded: boolean;
   resolved: boolean;
   spotChanceBase: number;
+  readiness: number;
+  readinessLabel: string;
 };
 
 const MAX_MUSCLE_LEVEL = 14;
 const WORKOUT_DURATION_MS = 2800;
 const WORKOUT_SPOT_WINDOW_MS = 1600;
 const WORKOUT_AUTO_FAILURE_MS = 1250;
+const MAX_TRAINING_FATIGUE = 120;
+const FATIGUE_COOLDOWN_PER_TICK = 2;
+const FATIGUE_COOLDOWN_HOME_BONUS = 1;
 const BASE_TRAIN_FAIL_CHANCE = 0.5;
 const BASE_SPOT_SUCCESS_CHANCE = 0.5;
 const BOSS_ZONE_CATCH_SCALE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 0.9,
+  home: 0.95,
   starter: 1,
-  higher: 0.78,
+  higher: 0.73,
 };
 const BOSS_CAPTURE_WEIGHTS: Record<
   'home' | 'starter' | 'higher',
   { trainerWeight: number; buddyWeight: number; bossPenaltyScale: number; maxCatch: number; minCatch: number }
 > = {
-  home: { trainerWeight: 1.2, buddyWeight: 1.02, bossPenaltyScale: 0.52, maxCatch: 0.94, minCatch: 0.08 },
-  starter: { trainerWeight: 1.18, buddyWeight: 0.95, bossPenaltyScale: 0.62, maxCatch: 0.92, minCatch: 0.07 },
-  higher: { trainerWeight: 1.14, buddyWeight: 0.9, bossPenaltyScale: 0.82, maxCatch: 0.82, minCatch: 0.06 },
+  home: { trainerWeight: 1.22, buddyWeight: 1.06, bossPenaltyScale: 0.44, maxCatch: 0.94, minCatch: 0.09 },
+  starter: { trainerWeight: 1.16, buddyWeight: 0.99, bossPenaltyScale: 0.62, maxCatch: 0.88, minCatch: 0.07 },
+  higher: { trainerWeight: 1.05, buddyWeight: 0.92, bossPenaltyScale: 0.9, maxCatch: 0.74, minCatch: 0.05 },
 };
 const BOSS_CHALLENGE_PRESSURE: Record<
   'home' | 'starter' | 'higher',
   { matchMachineBonus: number; focusMatchBonus: number; focusMismatchPenalty: number }
 > = {
-  home: { matchMachineBonus: 5, focusMatchBonus: 2, focusMismatchPenalty: -1 },
-  starter: { matchMachineBonus: 6, focusMatchBonus: 3, focusMismatchPenalty: -2 },
-  higher: { matchMachineBonus: 9, focusMatchBonus: 4, focusMismatchPenalty: -4 },
+  home: { matchMachineBonus: 4, focusMatchBonus: 2, focusMismatchPenalty: -2 },
+  starter: { matchMachineBonus: 7, focusMatchBonus: 4, focusMismatchPenalty: -5 },
+  higher: { matchMachineBonus: 12, focusMatchBonus: 6, focusMismatchPenalty: -10 },
 };
 const BOSS_POWER_BONUS_SCALE: Record<'home' | 'starter' | 'higher', number> = {
   home: 0.55,
   starter: 0.72,
   higher: 0.95,
+};
+const BOSS_METER_CATCH_SCALE: Record<'home' | 'starter' | 'higher', number> = {
+  home: 190,
+  starter: 172,
+  higher: 154,
 };
 
 function machineDifficultyMultiplier(type: 'home' | 'starter' | 'higher') {
@@ -313,16 +324,25 @@ function bossChallengePressure(encounter: Encounter, zone: GymArea, selectedMach
     : difficulty.focusMismatchPenalty;
 }
 
-function matchCatchModifier(encounter: Encounter, zone: GymArea, machine: GymMachine | null, trainer: TrainerProfile, buddy: Buddy, meter: number) {
+function matchCatchModifier(
+  encounter: Encounter,
+  zone: GymArea,
+  machine: GymMachine | null,
+  trainer: TrainerProfile,
+  buddy: Buddy,
+  meter: number,
+  trainingFatigue = 0,
+) {
   const trainerPressure = trainerArenaPressure(trainer, machine, zone);
   const buddyPressure = buddyArenaPressure(buddy);
+  const fatiguePenalty = clamp01(trainingFatigue / MAX_TRAINING_FATIGUE) * 3;
   const machinePressure = bossChallengePressure(encounter, zone, machine);
   const bossPenalty = encounter.isBoss ? (encounter.bossPowerBonus ?? 0) : 0;
   const profile = BOSS_CAPTURE_WEIGHTS[zone.type];
   const zonePenaltyMultiplier = encounter.isBoss ? profile.bossPenaltyScale : 0;
   const trainerWeight = profile.trainerWeight;
   const buddyWeight = profile.buddyWeight;
-  const raw = trainerPressure * trainerWeight + buddyPressure * buddyWeight + machinePressure - bossPenalty * zonePenaltyMultiplier;
+  const raw = trainerPressure * trainerWeight + buddyPressure * buddyWeight + machinePressure - bossPenalty * zonePenaltyMultiplier - fatiguePenalty;
   return {
     raw,
     meterDelta: clamp((meter - 50) / 150, -0.25, 0.22),
@@ -957,6 +977,19 @@ const TUTORIAL_STEPS = [
   'Watch for boss encounters in any gym every 5 to 10 minutes and beat them for progress.',
 ];
 
+type WorldPosition = {
+  x: number;
+  y: number;
+};
+
+const WORLD_MOVE_COOLDOWN_MS = 150;
+const WORLD_GRID_WIDTH = 23;
+const WORLD_GRID_HEIGHT = 10;
+const WORLD_GRID_PADDING = 8;
+const WORLD_TILE_PX = 19;
+const WORLD_TILE_GAP = 2;
+const WORLD_TILE_PITCH = WORLD_TILE_PX + WORLD_TILE_GAP;
+
 const zoneNames = Object.fromEntries(AREAS.map((a) => [a.id, a.name])) as Record<string, string>;
 const ZONE_VIBES: Record<
   string,
@@ -979,29 +1012,106 @@ const WORLD_ROUTES: Record<string, string[]> = {
   'higher-3': ['higher-2'],
 };
 
-const WORLD_NAVIGATION: Record<string, Partial<Record<CardinalDirection, string>>> = {
-  home: { right: 'starter-a' },
-  'starter-a': { left: 'home', right: 'starter-b' },
-  'starter-b': { left: 'starter-a', down: 'higher-1' },
-  'higher-1': { up: 'starter-b', right: 'higher-2' },
-  'higher-2': { left: 'higher-1', right: 'higher-3' },
-  'higher-3': { left: 'higher-2' },
+const WORLD_ZONE_POSITIONS: Record<string, WorldPosition> = {
+  home: { x: 2, y: 6 },
+  'starter-a': { x: 6, y: 6 },
+  'starter-b': { x: 10, y: 6 },
+  'higher-1': { x: 10, y: 3 },
+  'higher-2': { x: 14, y: 3 },
+  'higher-3': { x: 18, y: 3 },
 };
 
-const WORLD_MAP_LAYOUT: Record<string, { col: number; row: number }> = {
-  home: { col: 1, row: 2 },
-  'starter-a': { col: 2, row: 2 },
-  'starter-b': { col: 3, row: 2 },
-  'higher-1': { col: 3, row: 1 },
-  'higher-2': { col: 4, row: 1 },
-  'higher-3': { col: 5, row: 1 },
+const WORLD_DIRECTION_VECTORS: Record<CardinalDirection, WorldPosition> = {
+  up: { x: 0, y: -1 },
+  down: { x: 0, y: 1 },
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
 };
 
-const WORLD_MAP_STEP = {
-  cellW: 92,
-  cellH: 58,
-  gap: 8,
-  padding: 8,
+const WORLD_TILE_KEY = (pos: WorldPosition) => `${pos.x},${pos.y}`;
+
+const WORLD_PATH_LINKS: Array<[string, string]> = [
+  ['home', 'starter-a'],
+  ['starter-a', 'starter-b'],
+  ['starter-b', 'higher-1'],
+  ['higher-1', 'higher-2'],
+  ['higher-2', 'higher-3'],
+];
+
+function addPathTile(setRef: Set<string>, from: WorldPosition, to: WorldPosition) {
+  let x = from.x;
+  let y = from.y;
+  const deltaX = clamp(Math.sign(to.x - from.x), -1, 1);
+  const deltaY = clamp(Math.sign(to.y - from.y), -1, 1);
+  setRef.add(WORLD_TILE_KEY({ x, y }));
+  while (x !== to.x || y !== to.y) {
+    if (x !== to.x) {
+      x += deltaX;
+    } else if (y !== to.y) {
+      y += deltaY;
+    }
+    setRef.add(WORLD_TILE_KEY({ x, y }));
+  }
+}
+
+function buildWorldWalkableMap() {
+  const walkable = new Set<string>();
+  const zoneAt = new Map<string, string>();
+  Object.entries(WORLD_ZONE_POSITIONS).forEach(([zoneId, position]) => {
+    const key = WORLD_TILE_KEY(position);
+    walkable.add(key);
+    zoneAt.set(key, zoneId);
+  });
+
+  const seenEdges = new Set<string>();
+  for (const [from, to] of WORLD_PATH_LINKS) {
+    const edgeKey = [from, to].sort().join('::');
+    if (seenEdges.has(edgeKey)) continue;
+    seenEdges.add(edgeKey);
+    const fromPos = WORLD_ZONE_POSITIONS[from];
+    const toPos = WORLD_ZONE_POSITIONS[to];
+    if (!fromPos || !toPos) continue;
+    addPathTile(walkable, fromPos, toPos);
+  }
+
+  return {
+    walkable,
+    zoneAt,
+  };
+}
+
+const WORLD_WALKABLE = buildWorldWalkableMap();
+const WORLD_WALKABLE_TILES = WORLD_WALKABLE.walkable;
+const WORLD_ZONE_BY_TILE = WORLD_WALKABLE.zoneAt;
+
+function worldTileZoneId(pos: WorldPosition) {
+  return WORLD_ZONE_BY_TILE.get(WORLD_TILE_KEY(pos)) ?? null;
+}
+
+function isWorldTileWalkable(pos: WorldPosition) {
+  const key = WORLD_TILE_KEY(pos);
+  return (
+    Number.isInteger(pos.x) &&
+    Number.isInteger(pos.y) &&
+    pos.x >= 0 &&
+    pos.y >= 0 &&
+    pos.x < WORLD_GRID_WIDTH &&
+    pos.y < WORLD_GRID_HEIGHT &&
+    WORLD_WALKABLE_TILES.has(key)
+  );
+}
+
+function worldTileToStyle(pos: WorldPosition) {
+  return {
+    left: WORLD_GRID_PADDING + pos.x * WORLD_TILE_PITCH,
+    top: WORLD_GRID_PADDING + pos.y * WORLD_TILE_PITCH,
+  };
+}
+
+const WORLD_ROUTE_ENCOUNTER_RATE: Record<'home' | 'starter' | 'higher', number> = {
+  home: 0,
+  starter: 0.16,
+  higher: 0.22,
 };
 
 const STARTING_ZONE_ID = 'home';
@@ -1051,11 +1161,40 @@ function workoutFailureChance(
   buddy: Buddy,
   zoneType: 'home' | 'starter' | 'higher',
   trainerBonus: number,
+  readiness = 1,
 ) {
   const stress = clamp((machine.fatigueCost - machine.hpRestore + 1) / 8, 0, 0.25);
   const wear = buddy.hp <= 0 ? 0.25 : clamp((buddy.maxHp - buddy.hp) / buddy.maxHp, 0, 0.28);
-  const base = (BASE_TRAIN_FAIL_CHANCE + stress + wear) * machineDifficultyMultiplier(zoneType) - trainerBonus;
+  const readinessFactor = clamp(1.4 - readiness * 0.6, 0.6, 1.4);
+  const base =
+    (BASE_TRAIN_FAIL_CHANCE + stress + wear) * machineDifficultyMultiplier(zoneType) * readinessFactor - trainerBonus;
   return clamp(base, 0.15, 0.85);
+}
+
+function workoutReadinessLabel(readiness: number) {
+  if (readiness >= 0.85) return 'Peak';
+  if (readiness >= 0.68) return 'Solid';
+  if (readiness >= 0.52) return 'Worn';
+  return 'Depleted';
+}
+
+function workoutReadiness(
+  machine: GymMachine,
+  buddy: Buddy,
+  trainer: TrainerProfile,
+  zoneType: 'home' | 'starter' | 'higher',
+  trainingFatigue = 0,
+) {
+  const hpRatio = clamp01(buddy.hp / Math.max(1, buddy.maxHp));
+  const machineRecoveryBias = clamp((machine.hpRestore - machine.fatigueCost + 4) / 10, -0.6, 0.6);
+  const trainerDensity = Object.values(trainer.muscles).reduce((sum, value) => sum + value, 0) / (8 * MAX_MUSCLE_LEVEL);
+  const focusMatch = machineFocusScore(machine, trainer) * 0.16;
+  const zoneDifficulty = zoneType === 'higher' ? 0.16 : zoneType === 'starter' ? 0.08 : 0;
+  const fatiguePenalty = clamp01(trainingFatigue / MAX_TRAINING_FATIGUE) * 0.34;
+
+  return clamp01(
+    0.22 + hpRatio * 0.48 + machineRecoveryBias * 0.32 + trainerDensity * 0.24 + focusMatch - zoneDifficulty - fatiguePenalty,
+  );
 }
 
 function workoutSpotSuccessChance(
@@ -1545,7 +1684,8 @@ function applyXpGain(buddy: Buddy, bonus: number) {
 function initialSaveData(): SaveData {
   const preset = { ...TRAINER_PRESETS[0], name: 'Trainer' };
   const fallback: SaveData = {
-    version: 'v7',
+    version: 'v8',
+    trainingFatigue: 0,
     hasStarterSet: false,
     unlockedZoneIds: FALLBACK_UNLOCKED_ZONES,
     trainer: {
@@ -1584,7 +1724,8 @@ function initialSaveData(): SaveData {
         parsed.version !== 'v4' &&
         parsed.version !== 'v5' &&
         parsed.version !== 'v6' &&
-        parsed.version !== 'v7')
+        parsed.version !== 'v7' &&
+        parsed.version !== 'v8')
     ) {
       return fallback;
     }
@@ -1621,6 +1762,7 @@ function initialSaveData(): SaveData {
       },
       activeIndex: clamp(parsed.activeIndex ?? 0, 0, Math.max(0, team.length - 1)),
       steroids: Math.max(0, parsed.steroids ?? 3),
+      trainingFatigue: clamp(Math.max(0, parsed.trainingFatigue ?? 0), 0, MAX_TRAINING_FATIGUE),
       seenDex: parsed.seenDex ?? fallback.seenDex,
       caughtDex: parsed.caughtDex ?? fallback.caughtDex,
       activeZoneId: parsed.activeZoneId ?? 'home',
@@ -1656,7 +1798,8 @@ export default function App() {
   const [showRoadmap, setShowRoadmap] = useState(false);
   const [zoneTransit, setZoneTransit] = useState<ZoneTransit | null>(null);
   const [trainerFacing, setTrainerFacing] = useState<CardinalDirection>('down');
-  const [worldPlayerZone, setWorldPlayerZone] = useState(save.activeZoneId);
+  const [worldPlayerPos, setWorldPlayerPos] = useState<WorldPosition>(() => WORLD_ZONE_POSITIONS[save.activeZoneId] ?? WORLD_ZONE_POSITIONS.home);
+  const [worldMoveLockUntil, setWorldMoveLockUntil] = useState(0);
   const [showTrainerPanel, setShowTrainerPanel] = useState(false);
   const [draftTrainer, setDraftTrainer] = useState<TrainerProfile>(() => ({ ...save.trainer }));
   const [trainerEmote, setTrainerEmote] = useState<TrainerEmote>('neutral');
@@ -1692,14 +1835,37 @@ export default function App() {
   const trainerPhysique = trainerPhysiqueLevel(trainer.muscles);
   const draftTrainerPhysique = trainerPhysiqueLevel(draftTrainer.muscles);
   const connectedZones = WORLD_ROUTES[save.activeZoneId] ?? [];
-  const movementOptions = WORLD_NAVIGATION[save.activeZoneId] ?? {};
-  const movementEntries = Object.entries(movementOptions) as Array<[CardinalDirection, string]>;
-  const isZoneUnlocked = (zoneId: string) => unlockedZoneSet.has(zoneId);
+  const worldPlayerZone = worldTileZoneId(worldPlayerPos);
+  const playerHasUnresolvedZoneEntry = worldPlayerZone !== null && worldPlayerZone !== save.activeZoneId;
+  const worldPlayerPixelPos = worldTileToStyle(worldPlayerPos);
   const isTraveling = Boolean(zoneTransit);
-  const isWorldMoving = worldPlayerZone !== save.activeZoneId;
-  const movementHint = movementEntries
-    .map(([direction, zoneId]) => `${direction.toUpperCase()}: ${zoneNames[zoneId] ?? zoneId}`)
-    .join(' · ');
+  const isWorldMoving = playerHasUnresolvedZoneEntry || isTraveling;
+  const trainingFatigueLevel = workoutReadinessLabel(clamp(1 - save.trainingFatigue / MAX_TRAINING_FATIGUE, 0, 1));
+  const connectedWalks = (Object.entries(WORLD_DIRECTION_VECTORS) as Array<[CardinalDirection, WorldPosition]>)
+    .map(([direction, delta]) => {
+      const next: WorldPosition = {
+        x: worldPlayerPos.x + delta.x,
+        y: worldPlayerPos.y + delta.y,
+      };
+      const blocked = !isWorldTileWalkable(next);
+      const destinationZone = worldTileZoneId(next);
+      if (blocked) return null;
+      if (destinationZone && !isZoneUnlocked(destinationZone)) return null;
+      return {
+        direction,
+        next,
+        destinationZone,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+  const movementHint = connectedWalks.length
+    ? connectedWalks
+        .map(({ direction, destinationZone }) =>
+          `${direction.toUpperCase()}: ${destinationZone ? zoneNames[destinationZone] ?? destinationZone : 'Path'}`,
+        )
+        .join(' · ')
+    : 'No exits available';
+  const isZoneUnlocked = (zoneId: string) => unlockedZoneSet.has(zoneId);
   const workoutProgress =
     !workoutSession || workoutSession.phase === 'resolved'
       ? 0
@@ -1818,11 +1984,16 @@ export default function App() {
   }, [zoneTransit]);
 
   useEffect(() => {
-    if (worldPlayerZone === save.activeZoneId) return;
-    if (save.activeZoneId) {
-      setWorldPlayerZone(save.activeZoneId);
+    const activeTile = WORLD_ZONE_POSITIONS[save.activeZoneId];
+    if (!activeTile) return;
+    const playerZoneAtPos = worldTileZoneId(worldPlayerPos);
+    if (!isTraveling && playerZoneAtPos && playerZoneAtPos !== save.activeZoneId) {
+      setWorldPlayerPos((state) => {
+        if (worldTileZoneId(state) === save.activeZoneId) return state;
+        return activeTile;
+      });
     }
-  }, [save.activeZoneId, worldPlayerZone]);
+  }, [save.activeZoneId, isTraveling, worldPlayerPos.x, worldPlayerPos.y]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1887,6 +2058,18 @@ export default function App() {
     }, 1000);
     return () => clearInterval(timer);
   }, [save.activeZoneId, save.bossSchedules, encounter, match]);
+
+  useEffect(() => {
+    if (save.trainingFatigue <= 0 || encounter || match || workoutSession) return;
+    const recovery = FATIGUE_COOLDOWN_PER_TICK + (activeZone.id === 'home' ? FATIGUE_COOLDOWN_HOME_BONUS : 0);
+    const timer = window.setInterval(() => {
+      setSave((state) => ({
+        ...state,
+        trainingFatigue: clamp(state.trainingFatigue - recovery, 0, MAX_TRAINING_FATIGUE),
+      }));
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [activeZone.id, encounter, match, workoutSession, save.trainingFatigue]);
 
   useEffect(() => {
     if (!save.audio.enabled) {
@@ -2066,62 +2249,81 @@ export default function App() {
   }
 
   function moveTrainerByDirection(direction: CardinalDirection) {
-    if (isTraveling || isWorldMoving) {
-      setMessage('Wait for the zone transition to finish.');
+    if (isWorldMoving) {
+      setMessage('Wait for the zone transition to settle.');
       return;
     }
-    const nextId = WORLD_NAVIGATION[save.activeZoneId]?.[direction];
-    if (!nextId) {
-      setMessage(`No connected route for ${direction.toUpperCase()}.`);
+
+    const now = nowMs();
+    if (now < worldMoveLockUntil) {
       return;
     }
-    if (!isZoneUnlocked(nextId)) {
-      setMessage(`This route to ${zoneNames[nextId] ?? nextId} is not unlocked yet.`);
+
+    const next = {
+      x: worldPlayerPos.x + WORLD_DIRECTION_VECTORS[direction].x,
+      y: worldPlayerPos.y + WORLD_DIRECTION_VECTORS[direction].y,
+    };
+
+    if (!isWorldTileWalkable(next)) {
+      setMessage(`No clear path for ${direction.toUpperCase()}.`);
       return;
     }
-    travelToZone(nextId, direction);
+
+    const nextZoneId = worldTileZoneId(next);
+    if (nextZoneId && !isZoneUnlocked(nextZoneId)) {
+      setMessage(`This route to ${zoneNames[nextZoneId] ?? nextZoneId} is not unlocked yet.`);
+      return;
+    }
+
+    setTrainerFacing(direction);
+    setWorldPlayerPos(next);
+    setWorldMoveLockUntil(now + WORLD_MOVE_COOLDOWN_MS);
+    setMessage(`Moved ${direction.toUpperCase()}.`);
+    if (nextZoneId && nextZoneId !== save.activeZoneId) {
+      travelToZone(nextZoneId);
+    }
   }
 
   function mapPointForZone(zoneId: string) {
-    const point = WORLD_MAP_LAYOUT[zoneId];
+    const point = WORLD_ZONE_POSITIONS[zoneId];
     if (!point) return null;
-    return {
-      left: WORLD_MAP_STEP.padding + (point.col - 1) * (WORLD_MAP_STEP.cellW + WORLD_MAP_STEP.gap),
-      top: WORLD_MAP_STEP.padding + (point.row - 1) * (WORLD_MAP_STEP.cellH + WORLD_MAP_STEP.gap),
-    };
+    return worldTileToStyle(point);
   }
 
-  function directionFromLayout(from: string, to: string): CardinalDirection | null {
-    const a = WORLD_MAP_LAYOUT[from];
-    const b = WORLD_MAP_LAYOUT[to];
-    if (!a || !b) return null;
-    if (a.col === b.col && a.row === b.row - 1) return 'down';
-    if (a.col === b.col && a.row === b.row + 1) return 'up';
-    if (a.row === b.row && a.col === b.col - 1) return 'right';
-    if (a.row === b.row && a.col === b.col + 1) return 'left';
-    return null;
-  }
-
-  function travelToZone(zoneId: string, forcedDirection?: CardinalDirection) {
+  function travelToZone(zoneId: string) {
     if (isTraveling || isWorldMoving) {
       setMessage('Keep moving with a steady stride before changing lanes again.');
       return;
     }
     const zone = AREAS.find((entry) => entry.id === zoneId);
     if (!zone) return;
+    if (zoneId !== save.activeZoneId && !WORLD_ROUTES[save.activeZoneId]?.includes(zoneId)) {
+      setMessage('No direct open-world path to that gym yet. Travel through connected routes.');
+      return;
+    }
     if (!isZoneUnlocked(zoneId)) {
       setMessage(`${zone.name} has not been unlocked yet. Visit nearby routes first.`);
       return;
     }
 
-    const directDirection = forcedDirection ?? directionFromLayout(save.activeZoneId, zoneId);
-    if (!directDirection) {
-      setMessage('Movement is only possible on mapped roads.');
+    const zonePos = WORLD_ZONE_POSITIONS[zoneId];
+    if (!zonePos) {
+      setMessage('That destination is not mapped yet.');
       return;
     }
+    const currentPos = WORLD_ZONE_POSITIONS[save.activeZoneId];
+    if (currentPos) {
+      const directionX = Math.sign(zonePos.x - currentPos.x);
+      const directionY = Math.sign(zonePos.y - currentPos.y);
+      if (directionX > 0) setTrainerFacing('right');
+      else if (directionX < 0) setTrainerFacing('left');
+      else if (directionY > 0) setTrainerFacing('down');
+      else if (directionY < 0) setTrainerFacing('up');
+    }
 
-    setTrainerFacing(directDirection);
-    setWorldPlayerZone(zoneId);
+    if (zonePos) {
+      setWorldPlayerPos(zonePos);
+    }
     window.setTimeout(() => {
       switchArea(zoneId);
     }, 220);
@@ -2147,12 +2349,19 @@ export default function App() {
       setMessage('No direct open-world path to that gym yet. Travel through connected routes.');
       return;
     }
+
     const zone = AREAS.find((area) => area.id === id);
     if (!zone) return;
     if (workoutSession && !workoutSession.resolved) {
       setWorkoutSession(null);
       setMessage('You left while your Buddy was in training. The set ends.');
     }
+
+    const zoneTile = WORLD_ZONE_POSITIONS[id];
+    if (zoneTile) {
+      setWorldPlayerPos(zoneTile);
+    }
+
     setSave((state) => ({
       ...state,
       activeZoneId: id,
@@ -2170,6 +2379,28 @@ export default function App() {
     setMessage(`Moved to ${zone.name}. Current machine: ${machineName}.`);
     pulseTrainerEmote('focus', 1600);
     triggerBossSpawn(zone);
+
+    const now = nowMs();
+    const wasBossDue = (save.bossSchedules[id]?.nextBossAt ?? 0) <= now;
+    if (
+      !wasBossDue &&
+      !encounter &&
+      !match &&
+      Math.random() < WORLD_ROUTE_ENCOUNTER_RATE[zone.type] &&
+      zone.type !== 'home'
+    ) {
+      const next = createOpponent(zone);
+      setEncounter(next);
+      setMatch(null);
+      setSave((state) => ({
+        ...state,
+        seenDex: state.seenDex.includes(next.creature.dex)
+          ? state.seenDex
+          : [...state.seenDex, next.creature.dex],
+      }));
+      setMessage(`A wild ${next.creature.name} stepped into ${zone.name}.`);
+      pushLog(`Scouted ${next.creature.name} Lv.${next.level} at ${zone.name}.`);
+    }
   }
 
   function selectBuddy(index: number) {
@@ -2305,8 +2536,14 @@ export default function App() {
                 );
               })}
             </div>
-            <h3>Trainer Path Preview</h3>
-            <div className="world-mini-grid">
+              <h3>Trainer Path Preview</h3>
+              <div
+                className="world-mini-grid world-overworld-map"
+                style={{
+                  width: WORLD_GRID_WIDTH * WORLD_TILE_PITCH + WORLD_GRID_PADDING * 2,
+                  height: WORLD_GRID_HEIGHT * WORLD_TILE_PITCH + WORLD_GRID_PADDING * 2,
+                }}
+              >
               {AREAS.map((zone) => {
                 const linked = connectedZones.includes(zone.id);
                 const isActive = save.activeZoneId === zone.id;
@@ -2319,8 +2556,8 @@ export default function App() {
                     key={`setup-${zone.id}`}
                     className={`world-mini-node ${isActive ? 'active' : ''} ${isRouteReady ? 'route-ready' : 'route-locked'}`}
                     style={{
-                      left: mapPos.left,
-                      top: mapPos.top,
+                      left: mapPos.left - WORLD_TILE_PX / 2,
+                      top: mapPos.top - WORLD_TILE_PX / 2,
                     }}
                     onClick={() => travelToZone(zone.id)}
                     disabled={!isRouteReady || isTraveling || isWorldMoving}
@@ -2330,15 +2567,18 @@ export default function App() {
                   </button>
                 );
               })}
-              {mapPointForZone(worldPlayerZone) ? (
+              {worldPlayerPixelPos ? (
                 <div
                   className={`world-mini-trainer trainer-facing-${trainerFacing}`}
-                  style={mapPointForZone(worldPlayerZone) ?? undefined}
+                  style={{
+                    left: worldPlayerPixelPos.left - WORLD_TILE_PX / 3,
+                    top: worldPlayerPixelPos.top - WORLD_TILE_PX / 3,
+                  }}
                 >
                   {ZONE_VIBES[activeZone.id]?.icon ?? '🧍'}
                 </div>
               ) : null}
-            </div>
+              </div>
           </section>
         </main>
       </div>
@@ -2367,11 +2607,16 @@ export default function App() {
       };
       const trainerStaminaGain = Math.max(1, Math.floor(session.xpGain / 3));
       const leveled = result.leveled;
+      const fatigueRecovery = Math.max(
+        6,
+        Math.round((session.readiness * 16) + machine.hpRestore - Math.abs(session.hpLossOnFail - 1) * 0.5),
+      );
 
       setSave((state) => ({
         ...state,
         trainer: applyTrainerGrowth(state.trainer, machine.focus, trainerStaminaGain, leveled ? 1 : 0),
         steroids: state.steroids + (session.steroidsAwarded ? 1 : 0),
+        trainingFatigue: clamp(state.trainingFatigue - fatigueRecovery, 0, MAX_TRAINING_FATIGUE),
         team: state.team.map((buddy) =>
           buddy.id === session.buddyId
             ? {
@@ -2383,9 +2628,9 @@ export default function App() {
         ),
       }));
       setMessage(
-        `${resultBuddy.nickname} finished training on ${machine.name}: +${session.xpGain}XP${leveled ? ' and leveled up.' : ''} · ${machine.focus} · Stamina ${
-          session.staminaChange >= 0 ? '+' : ''
-        }${session.staminaChange}${session.steroidsAwarded ? ' · Found one Steroid.' : ''}`,
+        `${resultBuddy.nickname} finished training on ${machine.name}: +${session.xpGain}XP${leveled ? ' and leveled up.' : ''} · ${machine.focus} · `
+          + `Readiness ${session.readinessLabel} ${percent(session.readiness)} · Stamina ${session.staminaChange >= 0 ? '+' : ''}${session.staminaChange}`
+          + `${session.steroidsAwarded ? ' · Found one Steroid.' : ''}`,
       );
       pushLog(`${resultBuddy.nickname} completed training on ${machine.name} at ${activeZone.name}.`);
       activateAudioEngine().emitSfx('train', Math.min(1.6, session.xpGain / machine.xpMax));
@@ -2394,8 +2639,10 @@ export default function App() {
     }
 
     const target = save.team.find((entry) => entry.id === session.buddyId);
+    const fatiguePenalty = clamp(Math.round((1 - session.readiness) * 18), 4, 18);
     setSave((state) => ({
       ...state,
+      trainingFatigue: clamp(state.trainingFatigue + session.hpLossOnFail * 1.6 + fatiguePenalty, 0, MAX_TRAINING_FATIGUE),
       team: state.team.map((buddy) =>
         buddy.id === session.buddyId
           ? {
@@ -2437,13 +2684,18 @@ export default function App() {
     const gain = randInt(activeMachine.xpMin, activeMachine.xpMax);
     const adjusted = Math.max(1, Math.ceil(gain * activeMachine.xpMultiplier));
     const staminaChange = activeMachine.hpRestore - activeMachine.fatigueCost;
+    const readiness = workoutReadiness(activeMachine, activeBuddy, trainer, activeZone.type, save.trainingFatigue);
+    const readinessLabel = workoutReadinessLabel(readiness);
+    const sessionStaminaChange = Math.max(-8, Math.min(8, staminaChange + Math.round((readiness - 0.5) * 2)));
     const trainerAdvantage = trainerWorkoutAdvantage(activeMachine, trainer, activeZone.type);
-    const failChance = workoutFailureChance(activeMachine, activeBuddy, activeZone.type, trainerAdvantage.failReduction);
+    const failChance = workoutFailureChance(activeMachine, activeBuddy, activeZone.type, trainerAdvantage.failReduction, readiness);
     const spotBase = clamp(
-      BASE_SPOT_SUCCESS_CHANCE + trainerAdvantage.spotBaseBonus + (activeZone.type === 'higher' ? -0.05 : 0),
+      (BASE_SPOT_SUCCESS_CHANCE + trainerAdvantage.spotBaseBonus + (activeZone.type === 'higher' ? -0.05 : 0)) *
+        (0.68 + readiness * 0.33),
       0.5,
       0.9,
     );
+    const adjustedXpGain = Math.max(1, Math.floor(adjusted * (0.75 + readiness * 0.5)));
     const willFail = Math.random() < failChance;
     const now = nowMs();
 
@@ -2462,15 +2714,19 @@ export default function App() {
       spotWindowEnd: 0,
       failChance,
       buddyLevelBefore: activeBuddy.level,
-      hpLossOnFail: clamp(Math.ceil(activeMachine.fatigueCost * 1.3), 1, activeBuddy.maxHp),
-      xpGain: adjusted,
+      hpLossOnFail: clamp(Math.ceil(activeMachine.fatigueCost * (1.1 + (1 - readiness) * 0.6)), 1, activeBuddy.maxHp),
+      xpGain: adjustedXpGain,
       spotChanceBase: spotBase,
       steroidsAwarded: Math.random() < activeMachine.steroidChance,
-      staminaChange,
+      staminaChange: sessionStaminaChange,
       resolved: false,
+      readiness,
+      readinessLabel,
     });
 
-    setMessage(`${activeBuddy.nickname} starts a full-set on ${activeMachine.name}. Spot if rep form breaks!`);
+    setMessage(
+      `${activeBuddy.nickname} starts a full-set on ${activeMachine.name}. Readiness ${readinessLabel} ${percent(readiness)}. Spot if rep form breaks!`,
+    );
     pulseTrainerEmote('focus', 900);
     activateAudioEngine().emitSfx('train', 0.6);
     pushLog(`${activeBuddy.nickname} began training on ${activeMachine.name} with ${percent(failChance)} fail chance.`);
@@ -2572,7 +2828,11 @@ export default function App() {
       encounter.isBoss && challengeMachine
         ? `${encounter.bossName} is anchored on ${challengeMachine.name}. Press the matching machine for peak control.`
         : 'Keep the pressure steady and rotate your grip each round.';
-    const pressureSummary = `Trainer pressure ${trainerPressure} · Buddy pressure ${buddyPressure} · Challenge bonus ${machinePressure >= 0 ? `+${machinePressure}` : `${machinePressure}`}`;
+    const fatigueState = workoutReadinessLabel(clamp01(1 - save.trainingFatigue / MAX_TRAINING_FATIGUE));
+    const pressureSummary = `Trainer pressure ${trainerPressure} · Buddy pressure ${buddyPressure} · Challenge bonus ${
+      machinePressure >= 0 ? `+${machinePressure}` : `${machinePressure}`
+    }`;
+    const fatigueSummary = `Fatigue ${fatigueState}`;
 
     setMatch({
       encounter,
@@ -2584,6 +2844,7 @@ export default function App() {
         'You and the wild buddy hit the mat, shoulders tight, and go flat on your stomachs.',
         `${opening}`,
         `${encounter.isBoss ? 'BOSS' : 'WILD'} pressure check: ${pressureSummary}.`,
+        `${fatigueSummary}.`,
         'The hold starts at a neutral meter. Push to your side to pin.',
       ],
     });
@@ -2601,10 +2862,10 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const activeMachineForMatch = activeMachine ?? zone.machines[0] ?? null;
     const challengeMachine = getBossChallengeMachine(match.encounter, zone);
     const zoneMachine = activeMachineForMatch;
-    const modifier = matchCatchModifier(match.encounter, zone, zoneMachine, trainer, activeBuddy, meter);
+    const modifier = matchCatchModifier(match.encounter, zone, zoneMachine, trainer, activeBuddy, meter, save.trainingFatigue);
     const zoneCatchProfile = BOSS_CAPTURE_WEIGHTS[zone.type];
     const base = clamp(match.encounter.catchChance + modifier.meterDelta, 0.08, 0.97);
-    const bonus = clamp(modifier.raw / 165, -0.26, 0.32);
+    const bonus = clamp(modifier.raw / BOSS_METER_CATCH_SCALE[zone.type], -0.24, 0.32);
     const finalChance = clamp(base + bonus, zoneCatchProfile.minCatch, zoneCatchProfile.maxCatch);
 
     const passHold = meter >= 72;
@@ -2724,7 +2985,15 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
 
     const zone = AREAS.find((entry) => entry.id === match.encounter.zoneId) ?? activeZone;
     const selectedMachine = activeMachine ?? zone.machines[0] ?? null;
-    const modifier = matchCatchModifier(match.encounter, zone, selectedMachine, trainer, activeBuddy, match.meter);
+    const modifier = matchCatchModifier(
+      match.encounter,
+      zone,
+      selectedMachine,
+      trainer,
+      activeBuddy,
+      match.meter,
+      save.trainingFatigue,
+    );
     const trainerPressure = Math.round(modifier.trainerPressure * 1.12);
     const buddyPressure = Math.round(modifier.buddyPressure * 0.93);
     const challengePressure = modifier.bossPressure;
@@ -2903,24 +3172,51 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           </div>
           <p className="small-note">Current: {activeZone.name}</p>
           <p className="small-note">Boss in this gym: {bossTicker} until spawn · active interval 5-10 min</p>
+          <p className="small-note">{activeZone.blurb}</p>
           <p className="small-note">Move with WASD or arrow keys: {movementHint || 'No exits available'}</p>
-          {movementEntries.length > 0 ? (
+          {connectedWalks.length > 0 ? (
             <div className="world-move-controls">
-              {movementEntries.map(([direction, zoneId]) => (
+              {connectedWalks.map(({ direction, destinationZone }) => (
                   <button
-                    key={`${direction}-${zoneId}`}
+                    key={`${direction}-${destinationZone ?? 'path'}`}
                     className="secondary-btn micro-btn"
                     onClick={() => moveTrainerByDirection(direction)}
                     disabled={isTraveling || isWorldMoving}
                   >
-                  {direction.toUpperCase()} → {zoneNames[zoneId]}
+                    {direction.toUpperCase()} → {destinationZone ? zoneNames[destinationZone] : 'Path'}
                 </button>
               ))}
             </div>
           ) : null}
           <div className="world-route-list">
-            <div className="world-route-pill">Available routes: {connectedZones.join(' · ') || 'none'}</div>
-            <div className="world-mini-grid">
+            <div className="world-route-pill">
+              Available routes:{' '}
+              {connectedZones.map((zoneId) => zoneNames[zoneId] ?? zoneId).join(' · ') || 'none'}
+            </div>
+            <div
+              className="world-mini-grid world-overworld-map"
+              style={{
+                width: WORLD_GRID_WIDTH * WORLD_TILE_PITCH + WORLD_GRID_PADDING * 2,
+                height: WORLD_GRID_HEIGHT * WORLD_TILE_PITCH + WORLD_GRID_PADDING * 2,
+              }}
+            >
+              {Array.from({ length: WORLD_GRID_WIDTH * WORLD_GRID_HEIGHT }, (_, index) => {
+                const x = index % WORLD_GRID_WIDTH;
+                const y = Math.floor(index / WORLD_GRID_WIDTH);
+                const point = { x, y };
+                const walkable = isWorldTileWalkable(point);
+                if (!walkable) return null;
+                const zoneId = worldTileZoneId(point);
+                const base = worldTileToStyle(point);
+                return (
+                  <span
+                    key={`cell-${x}-${y}`}
+                    className={`world-grid-cell ${zoneId ? 'world-gym-tile' : 'world-route-tile'}`}
+                    style={{ left: base.left, top: base.top }}
+                    aria-hidden="true"
+                  />
+                );
+              })}
               {AREAS.map((zone) => {
                 const mapPos = mapPointForZone(zone.id);
                 if (!mapPos) return null;
@@ -2928,31 +3224,36 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                 const linked = connectedZones.includes(zone.id);
                 const isUnlocked = isZoneUnlocked(zone.id);
                 const isRouteReady = (linked && isUnlocked) || isActive;
+                const nearby = WORLD_PATH_LINKS.some(([from, to]) => [from, to].includes(zone.id) && [from, to].includes(save.activeZoneId));
                 return (
                   <button
                     key={`main-${zone.id}`}
-                    className={`world-mini-node ${isActive ? 'active' : ''} ${isRouteReady ? 'route-ready' : 'route-locked'}`}
+                    className={`world-mini-node ${zone.type} ${isActive ? 'active' : ''} ${isRouteReady ? 'route-ready' : 'route-locked'} ${
+                      nearby ? 'route-nearby' : ''
+                    }`}
                     style={{
-                      left: mapPos.left,
-                      top: mapPos.top,
+                      left: mapPos.left - (WORLD_TILE_PX / 2),
+                      top: mapPos.top - (WORLD_TILE_PX / 2),
                     }}
                     onClick={() => travelToZone(zone.id)}
                     disabled={!isRouteReady || isTraveling || isWorldMoving}
                   >
                     {zone.type === 'home' ? '🏠' : '🏋'}
-                    <small>{zone.name}</small>
-                    {!isUnlocked && !isActive ? '🔒' : ''}
+                      <small>{zone.name}</small>
+                      <small>{zone.blurb}</small>
+                      {!isUnlocked && !isActive ? '🔒' : ''}
                   </button>
                 );
               })}
-              {mapPointForZone(worldPlayerZone) ? (
-                <div
-                  className={`world-mini-trainer trainer-facing-${trainerFacing}`}
-                  style={mapPointForZone(worldPlayerZone) ?? undefined}
-                >
-                  {trainer.name?.[0]?.toUpperCase() ?? 'T'}
-                </div>
-              ) : null}
+              <div
+                className={`world-mini-trainer trainer-facing-${trainerFacing}`}
+                style={{
+                  left: worldTileToStyle(worldPlayerPos).left - (WORLD_TILE_PX / 3),
+                  top: worldTileToStyle(worldPlayerPos).top - (WORLD_TILE_PX / 3),
+                }}
+              >
+                {trainer.name?.[0]?.toUpperCase() ?? 'T'}
+              </div>
             </div>
             <div className="gym-grid">
               {AREAS.map((area) => {
@@ -3094,18 +3395,23 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                 className={`machine-btn ${activeMachine?.id === machine.id ? 'active' : ''}`}
                 onClick={() => selectMachine(machine.id)}
               >
-                <strong>{machine.name}</strong>
-                <small>{machine.detail}</small>
-                <small>
-                  XP {machine.xpMin}-{machine.xpMax} | x{machine.xpMultiplier.toFixed(2)} · Steroid +
-                  {Math.round(machine.steroidChance * 100)}%
-                  {' | '}
-                  Focus: {machine.focus} · Stamina {machine.fatigueCost > 0 ? `-${machine.fatigueCost}` : '+0'}
-                  {machine.hpRestore ? ` · Recovery +${machine.hpRestore}` : ''}
-                </small>
-              </button>
-            ))}
-          </div>
+                  <strong>{machine.name}</strong>
+                  <small>{machine.detail}</small>
+                  <small>
+                    XP {machine.xpMin}-{machine.xpMax} | x{machine.xpMultiplier.toFixed(2)} · Steroid +
+                    {Math.round(machine.steroidChance * 100)}%
+                    {' | '}
+                    Focus: {machine.focus} · Stamina {machine.fatigueCost > 0 ? `-${machine.fatigueCost}` : '+0'}
+                    {machine.hpRestore ? ` · Recovery +${machine.hpRestore}` : ''}
+                    {activeBuddy
+                      ? ` · Readiness ${percent(
+                          workoutReadiness(machine, activeBuddy, trainer, activeZone.type, save.trainingFatigue),
+                        )}`
+                      : ''}
+                  </small>
+                </button>
+              ))}
+            </div>
 
           <div className="team-area">
             <h3>Team Slots (up to 6)</h3>
@@ -3164,6 +3470,9 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   <div>
                     HP {activeBuddy.hp}/{activeBuddy.maxHp}
                   </div>
+                  <div>
+                    Readiness state: {trainingFatigueLevel} ({percent(clamp01(1 - save.trainingFatigue / MAX_TRAINING_FATIGUE))})
+                  </div>
                   <div>XP {activeBuddy.xp}/{xpNeeded(activeBuddy.level)}</div>
                 </div>
               </div>
@@ -3186,6 +3495,9 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                     <span className="small-note">
                       Fail {percent(workoutSession.failChance)} · Spot bonus {percent(workoutSession.spotChanceBase)}
                     </span>
+                    <span className="small-note">
+                      Readiness {percent(workoutSession.readiness)} · {workoutSession.readinessLabel}
+                    </span>
                   </div>
 
                   <div className="workout-meter">
@@ -3195,6 +3507,17 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                     />
                     <div className="workout-meter-cursor" />
                   </div>
+                  <div className="workout-readiness-track">
+                    <div
+                      className="workout-readiness-fill"
+                      style={{ width: `${workoutSession.readiness * 100}%` }}
+                    />
+                  </div>
+                  <small className="small-note">
+                    Set recovery {workoutSession.staminaChange >= 0 ? '+' : ''}
+                    {workoutSession.staminaChange} HP expected ·
+                    {workoutSession.readiness >= 0.68 ? ' Balanced form' : ' Form drift risk'}
+                  </small>
 
                   {workoutSession.phase === 'running' && (
                     <>
