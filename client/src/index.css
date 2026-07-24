@@ -203,18 +203,19 @@ button {
 .world-mini-grid {
   position: relative;
   margin-top: 8px;
-  min-height: 150px;
+  width: min(560px, 100%);
+  min-height: 190px;
   padding: 8px;
   border: 2px solid #23435c;
   background: #08192c;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  display: block;
+  overflow: hidden;
 }
 
 .world-mini-node {
-  min-height: 34px;
+  position: absolute;
+  width: 92px;
+  min-height: 58px;
   border: 2px solid #2f5e80;
   background: #0f2e48;
   color: #d0e7ff;
@@ -224,6 +225,7 @@ button {
   display: grid;
   gap: 2px;
   align-items: center;
+  pointer-events: auto;
 }
 
 .world-mini-node small {
@@ -250,8 +252,8 @@ button {
 }
 
 .world-mini-trainer {
-  grid-column: 1;
-  grid-row: 1;
+  position: absolute;
+  transform: translateY(0);
   width: 26px;
   height: 26px;
   background: #ffd166;
@@ -261,9 +263,10 @@ button {
   place-items: center;
   font-size: 13px;
   font-weight: bold;
-  justify-self: center;
-  align-self: center;
-  transition: all 0.2s ease;
+  transition:
+    left 0.22s linear,
+    top 0.22s linear,
+    transform 0.18s linear;
   z-index: 2;
   animation: trainerPulse 0.8s steps(1) infinite;
 }

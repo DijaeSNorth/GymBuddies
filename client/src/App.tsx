@@ -965,6 +965,13 @@ const WORLD_MAP_LAYOUT: Record<string, { col: number; row: number }> = {
   'higher-3': { col: 5, row: 1 },
 };
 
+const WORLD_MAP_STEP = {
+  cellW: 92,
+  cellH: 58,
+  gap: 8,
+  padding: 8,
+};
+
 function formatRemainingTime(ms: number) {
   const left = Math.max(0, Math.ceil(ms / 1000));
   if (left <= 0) return 'ready';
@@ -1593,6 +1600,7 @@ export default function App() {
   const [showRoadmap, setShowRoadmap] = useState(false);
   const [zoneTransit, setZoneTransit] = useState<ZoneTransit | null>(null);
   const [trainerFacing, setTrainerFacing] = useState<CardinalDirection>('down');
+  const [worldPlayerZone, setWorldPlayerZone] = useState(save.activeZoneId);
   const [showTrainerPanel, setShowTrainerPanel] = useState(false);
   const [draftTrainer, setDraftTrainer] = useState<TrainerProfile>(() => ({ ...save.trainer }));
   const [trainerEmote, setTrainerEmote] = useState<TrainerEmote>('neutral');
@@ -1630,6 +1638,7 @@ export default function App() {
   const movementOptions = WORLD_NAVIGATION[save.activeZoneId] ?? {};
   const movementEntries = Object.entries(movementOptions) as Array<[CardinalDirection, string]>;
   const isTraveling = Boolean(zoneTransit);
+  const isWorldMoving = worldPlayerZone !== save.activeZoneId;
   const movementHint = movementEntries
     .map(([direction, zoneId]) => `${direction.toUpperCase()}: ${zoneNames[zoneId] ?? zoneId}`)
     .join(' · ');
@@ -1749,6 +1758,13 @@ export default function App() {
     const id = window.setTimeout(() => setZoneTransit(null), 1200);
     return () => clearTimeout(id);
   }, [zoneTransit]);
+
+  useEffect(() => {
+    if (worldPlayerZone === save.activeZoneId) return;
+    if (save.activeZoneId) {
+      setWorldPlayerZone(save.activeZoneId);
+    }
+  }, [save.activeZoneId, worldPlayerZone]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1992,17 +2008,57 @@ export default function App() {
   }
 
   function moveTrainerByDirection(direction: CardinalDirection) {
-    if (isTraveling) {
+    if (isTraveling || isWorldMoving) {
       setMessage('Wait for the zone transition to finish.');
       return;
     }
-    setTrainerFacing(direction);
     const nextId = WORLD_NAVIGATION[save.activeZoneId]?.[direction];
     if (!nextId) {
       setMessage(`No connected route for ${direction.toUpperCase()}.`);
       return;
     }
-    switchArea(nextId);
+    travelToZone(nextId, direction);
+  }
+
+  function mapPointForZone(zoneId: string) {
+    const point = WORLD_MAP_LAYOUT[zoneId];
+    if (!point) return null;
+    return {
+      left: WORLD_MAP_STEP.padding + (point.col - 1) * (WORLD_MAP_STEP.cellW + WORLD_MAP_STEP.gap),
+      top: WORLD_MAP_STEP.padding + (point.row - 1) * (WORLD_MAP_STEP.cellH + WORLD_MAP_STEP.gap),
+    };
+  }
+
+  function directionFromLayout(from: string, to: string): CardinalDirection | null {
+    const a = WORLD_MAP_LAYOUT[from];
+    const b = WORLD_MAP_LAYOUT[to];
+    if (!a || !b) return null;
+    if (a.col === b.col && a.row === b.row - 1) return 'down';
+    if (a.col === b.col && a.row === b.row + 1) return 'up';
+    if (a.row === b.row && a.col === b.col - 1) return 'right';
+    if (a.row === b.row && a.col === b.col + 1) return 'left';
+    return null;
+  }
+
+  function travelToZone(zoneId: string, forcedDirection?: CardinalDirection) {
+    if (isTraveling || isWorldMoving) {
+      setMessage('Keep moving with a steady stride before changing lanes again.');
+      return;
+    }
+    const zone = AREAS.find((entry) => entry.id === zoneId);
+    if (!zone) return;
+
+    const directDirection = forcedDirection ?? directionFromLayout(save.activeZoneId, zoneId);
+    if (!directDirection) {
+      setMessage('Movement is only possible on mapped roads.');
+      return;
+    }
+
+    setTrainerFacing(directDirection);
+    setWorldPlayerZone(zoneId);
+    window.setTimeout(() => {
+      switchArea(zoneId);
+    }, 220);
   }
 
   function pulseTrainerEmote(state: TrainerEmote, ttl = 1800) {
@@ -2178,35 +2234,34 @@ export default function App() {
             <h3>Trainer Path Preview</h3>
             <div className="world-mini-grid">
               {AREAS.map((zone) => {
-                const position = WORLD_MAP_LAYOUT[zone.id];
-                if (!position) return null;
                 const linked = connectedZones.includes(zone.id);
                 const isActive = save.activeZoneId === zone.id;
                 const isRouteReady = linked || isActive;
+                const mapPos = mapPointForZone(zone.id);
+                if (!mapPos) return null;
                 return (
                   <button
                     key={`setup-${zone.id}`}
                     className={`world-mini-node ${isActive ? 'active' : ''} ${isRouteReady ? 'route-ready' : 'route-locked'}`}
                     style={{
-                      gridColumn: position.col,
-                      gridRow: position.row,
+                      left: mapPos.left,
+                      top: mapPos.top,
                     }}
-                    onClick={() => switchArea(zone.id)}
-                    disabled={!isRouteReady}
+                    onClick={() => travelToZone(zone.id)}
+                    disabled={!isRouteReady || isTraveling || isWorldMoving}
                   >
                     {zone.name}
                   </button>
                 );
               })}
-              <div
-                className="world-mini-trainer"
-                style={{
-                  gridColumn: WORLD_MAP_LAYOUT[activeZone.id]?.col ?? 1,
-                  gridRow: WORLD_MAP_LAYOUT[activeZone.id]?.row ?? 1,
-                }}
-              >
-                {ZONE_VIBES[activeZone.id]?.icon ?? '🧍'}
-              </div>
+              {mapPointForZone(worldPlayerZone) ? (
+                <div
+                  className={`world-mini-trainer trainer-facing-${trainerFacing}`}
+                  style={mapPointForZone(worldPlayerZone) ?? undefined}
+                >
+                  {ZONE_VIBES[activeZone.id]?.icon ?? '🧍'}
+                </div>
+              ) : null}
             </div>
           </section>
         </main>
@@ -2774,12 +2829,12 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           {movementEntries.length > 0 ? (
             <div className="world-move-controls">
               {movementEntries.map(([direction, zoneId]) => (
-                <button
-                  key={`${direction}-${zoneId}`}
-                  className="secondary-btn micro-btn"
-                  onClick={() => moveTrainerByDirection(direction)}
-                  disabled={isTraveling}
-                >
+                  <button
+                    key={`${direction}-${zoneId}`}
+                    className="secondary-btn micro-btn"
+                    onClick={() => moveTrainerByDirection(direction)}
+                    disabled={isTraveling || isWorldMoving}
+                  >
                   {direction.toUpperCase()} → {zoneNames[zoneId]}
                 </button>
               ))}
@@ -2789,34 +2844,35 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
             <div className="world-route-pill">Available routes: {connectedZones.join(' · ') || 'none'}</div>
             <div className="world-mini-grid">
               {AREAS.map((zone) => {
-                const position = WORLD_MAP_LAYOUT[zone.id];
-                if (!position) return null;
+                const mapPos = mapPointForZone(zone.id);
+                if (!mapPos) return null;
                 const isActive = zone.id === save.activeZoneId;
+                const linked = connectedZones.includes(zone.id);
+                const isRouteReady = linked || isActive;
                 return (
                   <button
                     key={`main-${zone.id}`}
-                    className={`world-mini-node ${isActive ? 'active' : ''}`}
+                    className={`world-mini-node ${isActive ? 'active' : ''} ${isRouteReady ? 'route-ready' : 'route-locked'}`}
                     style={{
-                      gridColumn: position.col,
-                      gridRow: position.row,
+                      left: mapPos.left,
+                      top: mapPos.top,
                     }}
-                    onClick={() => switchArea(zone.id)}
-                    disabled={zone.id !== save.activeZoneId && !WORLD_ROUTES[zone.id]?.includes(save.activeZoneId) && !connectedZones.includes(zone.id)}
+                    onClick={() => travelToZone(zone.id)}
+                    disabled={!isRouteReady || isTraveling || isWorldMoving}
                   >
                     {zone.type === 'home' ? '🏠' : '🏋'}
                     <small>{zone.name}</small>
                   </button>
                 );
               })}
-              <div
-                className={`world-mini-trainer trainer-facing-${trainerFacing}`}
-                style={{
-                  gridColumn: WORLD_MAP_LAYOUT[activeZone.id]?.col ?? 1,
-                  gridRow: WORLD_MAP_LAYOUT[activeZone.id]?.row ?? 1,
-                }}
-              >
-                {trainer.name?.[0]?.toUpperCase() ?? 'T'}
-              </div>
+              {mapPointForZone(worldPlayerZone) ? (
+                <div
+                  className={`world-mini-trainer trainer-facing-${trainerFacing}`}
+                  style={mapPointForZone(worldPlayerZone) ?? undefined}
+                >
+                  {trainer.name?.[0]?.toUpperCase() ?? 'T'}
+                </div>
+              ) : null}
             </div>
             <div className="gym-grid">
               {AREAS.map((area) => {
