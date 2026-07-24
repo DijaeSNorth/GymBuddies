@@ -97,6 +97,7 @@ type GymBoss = {
 type SaveData = {
   version: string;
   hasStarterSet: boolean;
+  unlockedZoneIds: string[];
   trainer: TrainerProfile;
   steroids: number;
   activeIndex: number;
@@ -972,6 +973,24 @@ const WORLD_MAP_STEP = {
   padding: 8,
 };
 
+const STARTING_ZONE_ID = 'home';
+const FALLBACK_UNLOCKED_ZONES = [STARTING_ZONE_ID, ...(WORLD_ROUTES[STARTING_ZONE_ID] ?? [])];
+
+function uniqueStrings(items: string[]) {
+  return [...new Set(items)];
+}
+
+function normalizeUnlockedZones(raw: string[] | undefined, fallback: string[] = FALLBACK_UNLOCKED_ZONES) {
+  const zoneSet = new Set(AREAS.map((zone) => zone.id));
+  const normalized = uniqueStrings([...fallback, ...(raw ?? [])]).filter((zoneId) => zoneSet.has(zoneId));
+  return normalized.length > 0 ? normalized : [STARTING_ZONE_ID];
+}
+
+function unlockAdjacentZones(known: string[], zoneId: string) {
+  const expanded = [...(known ?? []), zoneId, ...(WORLD_ROUTES[zoneId] ?? [])];
+  return normalizeUnlockedZones(expanded, FALLBACK_UNLOCKED_ZONES);
+}
+
 function formatRemainingTime(ms: number) {
   const left = Math.max(0, Math.ceil(ms / 1000));
   if (left <= 0) return 'ready';
@@ -1496,6 +1515,7 @@ function initialSaveData(): SaveData {
   const fallback: SaveData = {
     version: 'v7',
     hasStarterSet: false,
+    unlockedZoneIds: FALLBACK_UNLOCKED_ZONES,
     trainer: {
       ...preset,
     },
@@ -1526,7 +1546,7 @@ function initialSaveData(): SaveData {
     if (!raw) return fallback;
 
     const parsed = JSON.parse(raw) as Partial<SaveData>;
-    if (
+      if (
       !parsed ||
       (parsed.version !== 'v3' &&
         parsed.version !== 'v4' &&
@@ -1572,6 +1592,10 @@ function initialSaveData(): SaveData {
       seenDex: parsed.seenDex ?? fallback.seenDex,
       caughtDex: parsed.caughtDex ?? fallback.caughtDex,
       activeZoneId: parsed.activeZoneId ?? 'home',
+      unlockedZoneIds: normalizeUnlockedZones(
+        parsed.unlockedZoneIds,
+        parsed.activeZoneId && WORLD_ROUTES[parsed.activeZoneId] ? [parsed.activeZoneId, ...WORLD_ROUTES[parsed.activeZoneId]] : FALLBACK_UNLOCKED_ZONES,
+      ),
       audio: {
         ...fallback.audio,
         ...parsed.audio,
@@ -1622,6 +1646,7 @@ export default function App() {
   const bossSchedule = save.bossSchedules[activeZone.id];
   const bossTicker = formatRemainingTime((bossSchedule?.nextBossAt ?? tick) - tick);
   const trainer = save.trainer;
+  const unlockedZoneSet = useMemo(() => new Set(save.unlockedZoneIds), [save.unlockedZoneIds]);
   const encounterZone = encounter ? AREAS.find((area) => area.id === encounter.zoneId) ?? activeZone : activeZone;
   const encounterChallengeMachine = encounter?.isBoss ? getBossChallengeMachine(encounter, encounterZone) : null;
   const encounterTrainerPressure = encounter ? trainerArenaPressure(trainer, activeMachine, encounterZone) : 0;
@@ -1637,6 +1662,7 @@ export default function App() {
   const connectedZones = WORLD_ROUTES[save.activeZoneId] ?? [];
   const movementOptions = WORLD_NAVIGATION[save.activeZoneId] ?? {};
   const movementEntries = Object.entries(movementOptions) as Array<[CardinalDirection, string]>;
+  const isZoneUnlocked = (zoneId: string) => unlockedZoneSet.has(zoneId);
   const isTraveling = Boolean(zoneTransit);
   const isWorldMoving = worldPlayerZone !== save.activeZoneId;
   const movementHint = movementEntries
@@ -2017,6 +2043,10 @@ export default function App() {
       setMessage(`No connected route for ${direction.toUpperCase()}.`);
       return;
     }
+    if (!isZoneUnlocked(nextId)) {
+      setMessage(`This route to ${zoneNames[nextId] ?? nextId} is not unlocked yet.`);
+      return;
+    }
     travelToZone(nextId, direction);
   }
 
@@ -2047,6 +2077,10 @@ export default function App() {
     }
     const zone = AREAS.find((entry) => entry.id === zoneId);
     if (!zone) return;
+    if (!isZoneUnlocked(zoneId)) {
+      setMessage(`${zone.name} has not been unlocked yet. Visit nearby routes first.`);
+      return;
+    }
 
     const directDirection = forcedDirection ?? directionFromLayout(save.activeZoneId, zoneId);
     if (!directDirection) {
@@ -2073,6 +2107,10 @@ export default function App() {
   function switchArea(id: string) {
     if (id === save.activeZoneId) return;
     const allowed = WORLD_ROUTES[save.activeZoneId]?.includes(id) || id === save.activeZoneId;
+    if (!isZoneUnlocked(id)) {
+      setMessage(`${zoneNames[id] ?? id} has not unlocked yet.`);
+      return;
+    }
     if (!allowed) {
       setMessage('No direct open-world path to that gym yet. Travel through connected routes.');
       return;
@@ -2083,7 +2121,11 @@ export default function App() {
       setWorkoutSession(null);
       setMessage('You left while your Buddy was in training. The set ends.');
     }
-    setSave((state) => ({ ...state, activeZoneId: id }));
+    setSave((state) => ({
+      ...state,
+      activeZoneId: id,
+      unlockedZoneIds: unlockAdjacentZones(state.unlockedZoneIds, id),
+    }));
     setZoneTransit({
       from: activeZone.name,
       to: zone.name,
@@ -2236,7 +2278,8 @@ export default function App() {
               {AREAS.map((zone) => {
                 const linked = connectedZones.includes(zone.id);
                 const isActive = save.activeZoneId === zone.id;
-                const isRouteReady = linked || isActive;
+                const isUnlocked = isZoneUnlocked(zone.id);
+                const isRouteReady = (linked && isUnlocked) || isActive;
                 const mapPos = mapPointForZone(zone.id);
                 if (!mapPos) return null;
                 return (
@@ -2251,6 +2294,7 @@ export default function App() {
                     disabled={!isRouteReady || isTraveling || isWorldMoving}
                   >
                     {zone.name}
+                    {!isUnlocked && !isActive ? ' 🔒' : ''}
                   </button>
                 );
               })}
@@ -2848,7 +2892,8 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                 if (!mapPos) return null;
                 const isActive = zone.id === save.activeZoneId;
                 const linked = connectedZones.includes(zone.id);
-                const isRouteReady = linked || isActive;
+                const isUnlocked = isZoneUnlocked(zone.id);
+                const isRouteReady = (linked && isUnlocked) || isActive;
                 return (
                   <button
                     key={`main-${zone.id}`}
@@ -2862,6 +2907,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   >
                     {zone.type === 'home' ? '🏠' : '🏋'}
                     <small>{zone.name}</small>
+                    {!isUnlocked && !isActive ? '🔒' : ''}
                   </button>
                 );
               })}
@@ -2878,15 +2924,26 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
               {AREAS.map((area) => {
                 const linked = connectedZones.includes(area.id);
                 const isActive = save.activeZoneId === area.id;
+                const isUnlocked = isZoneUnlocked(area.id);
                 const isHomeNode = area.id === 'home';
                 return (
                   <button
                     key={area.id}
-                    className={`gym-btn ${area.type} ${isActive ? 'active' : ''} ${linked ? 'route-ready' : isHomeNode ? '' : 'route-locked'}`}
+                    className={`gym-btn ${area.type} ${isActive ? 'active' : ''} ${
+                      linked && isUnlocked ? 'route-ready' : isHomeNode ? '' : 'route-locked'
+                    }`}
                     onClick={() => switchArea(area.id)}
-                    disabled={!linked && !isActive}
+                    disabled={(!linked && !isActive) || (!isUnlocked && !isActive)}
                     aria-label={`Travel to ${area.name}`}
-                    title={linked ? `Travel to ${area.name}` : 'Explore map route to unlock this route'}
+                    title={
+                      isActive
+                        ? 'Current location'
+                        : !isUnlocked
+                          ? 'Locked: visit nearby gyms to unlock'
+                          : linked
+                            ? `Travel to ${area.name}`
+                            : 'Explore map route to unlock this route'
+                    }
                   >
                     <strong>{area.name}</strong>
                     <span>{area.type.toUpperCase()} · {ZONE_VIBES[area.id]?.accent ?? area.type}</span>
