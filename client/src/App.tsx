@@ -1026,6 +1026,7 @@ type WorldPosition = {
 };
 
 const WORLD_MOVE_COOLDOWN_MS = 220;
+const WORLD_ROUTE_ENCOUNTER_COOLDOWN_MS = 1800;
 const WORLD_GRID_WIDTH = 23;
 const WORLD_GRID_HEIGHT = 10;
 const WORLD_GRID_PADDING = 8;
@@ -1905,6 +1906,7 @@ export default function App() {
   const [trainerFacing, setTrainerFacing] = useState<CardinalDirection>('down');
   const [worldPlayerPos, setWorldPlayerPos] = useState<WorldPosition>(() => WORLD_ZONE_POSITIONS[save.activeZoneId] ?? WORLD_ZONE_POSITIONS.home);
   const [worldMoveLockUntil, setWorldMoveLockUntil] = useState(0);
+  const [lastRouteEncounterMs, setLastRouteEncounterMs] = useState(0);
   const [showTrainerPanel, setShowTrainerPanel] = useState(false);
   const [draftTrainer, setDraftTrainer] = useState<TrainerProfile>(() => ({ ...save.trainer }));
   const [trainerEmote, setTrainerEmote] = useState<TrainerEmote>('neutral');
@@ -1986,6 +1988,7 @@ export default function App() {
   const worldMoveCooldownRemaining = Math.max(0, worldMoveLockUntil - tick);
   const worldMovePercent = clamp01(1 - worldMoveCooldownRemaining / WORLD_MOVE_COOLDOWN_MS);
   const worldMoveBlocked = nowMs() < worldMoveLockUntil;
+  const routeScoutCooldownRemaining = Math.max(0, WORLD_ROUTE_ENCOUNTER_COOLDOWN_MS - (tick - lastRouteEncounterMs));
   const isZoneUnlocked = (zoneId: string) => unlockedZoneSet.has(zoneId);
   const workoutProgress =
     !workoutSession || workoutSession.phase === 'resolved'
@@ -2074,6 +2077,10 @@ export default function App() {
 
   function trySpawnRouteEncounter(zone: GymArea, encounterBoost = 0) {
     const now = nowMs();
+    if (zone.type === 'home') return;
+    if (now - lastRouteEncounterMs < WORLD_ROUTE_ENCOUNTER_COOLDOWN_MS) {
+      return;
+    }
     const wasBossDue = (save.bossSchedules[zone.id]?.nextBossAt ?? 0) <= now;
     const encounterChance = WORLD_ROUTE_ENCOUNTER_RATE[zone.type] * (1 + encounterBoost) * (1 + clamp01(save.trainingFatigue / MAX_TRAINING_FATIGUE) * 0.2);
     if (
@@ -2081,7 +2088,6 @@ export default function App() {
       !encounter &&
       !match &&
       !workoutSession &&
-      zone.type !== 'home' &&
       Math.random() < Math.min(0.55, encounterChance)
     ) {
       const next = createOpponent(zone);
@@ -2093,6 +2099,7 @@ export default function App() {
       }));
       setMessage(`A wild ${next.creature.name} stepped out near your path at ${zone.name}.`);
       pushLog(`Scouted ${next.creature.name} Lv.${next.level} near ${zone.name}.`);
+      setLastRouteEncounterMs(now);
     }
   }
 
@@ -3396,7 +3403,12 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           <p className="small-note">Current: {activeZone.name}</p>
           <p className="small-note">Boss in this gym: {bossTicker} until spawn · active interval 5-10 min</p>
           <p className="small-note">{activeZone.blurb}</p>
-          <p className="small-note">Move with WASD or arrow keys: {movementHint || 'No exits available'}</p>
+          <p className="small-note">
+            Move with WASD or arrow keys: {movementHint || 'No exits available'}
+          </p>
+          <p className="small-note">
+            Route scouting cooldown: {routeScoutCooldownRemaining <= 0 ? 'ready' : `${(routeScoutCooldownRemaining / 1000).toFixed(1)}s`}
+          </p>
           {connectedWalks.length > 0 ? (
             <div className="world-move-controls">
               {connectedWalks.map(({ direction, destinationZone, routeName, routeFatigue, encounterBoost }) => (
