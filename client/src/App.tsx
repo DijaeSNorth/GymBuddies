@@ -26,6 +26,9 @@ type Buddy = {
   hp: number;
   maxHp: number;
   xp: number;
+  form: number;
+  mobility: number;
+  volume: number;
 };
 
 type GymArea = {
@@ -59,6 +62,8 @@ type Move = {
   control: number;
 };
 
+type WorkoutLoadTier = 'easy' | 'steady' | 'hard' | 'max';
+
 type Match = {
   encounter: Encounter;
   status: 'idle' | 'playing' | 'won' | 'escape' | 'failed' | 'full';
@@ -72,6 +77,13 @@ type Match = {
   bossChallengeMisses: number;
   bossChallengeMatchStreak: number;
   bossChallengeNearMisses: number;
+};
+
+type BossChallengeStress = {
+  percent: number;
+  tone: 'safe' | 'caution' | 'danger' | 'overload';
+  label: string;
+  detail: string;
 };
 
 type GymMachine = {
@@ -104,6 +116,8 @@ type GymBoss = {
 type SaveData = {
   version: string;
   trainingFatigue: number;
+  workoutMomentum: number;
+  deloadTokens: number;
   hasStarterSet: boolean;
   unlockedZoneIds: string[];
   trainer: TrainerProfile;
@@ -210,12 +224,21 @@ type WorkoutSession = {
   spotChanceBase: number;
   readiness: number;
   readinessLabel: string;
+  loadPressure: number;
+  loadTier: WorkoutLoadTier;
+  setStress: number;
+  movementConsistency: number;
+  volumePreparedness: number;
+  sessionQuality: number;
 };
 
 const MAX_MUSCLE_LEVEL = 14;
 const WORKOUT_DURATION_MS = 2800;
 const WORKOUT_SPOT_WINDOW_MS = 1600;
 const WORKOUT_AUTO_FAILURE_MS = 1250;
+const MAX_BUDDY_FORM = 24;
+const MAX_BUDDY_MOBILITY = 24;
+const MAX_BUDDY_VOLUME = 12;
 const MAX_TRAINING_FATIGUE = 120;
 const FATIGUE_COOLDOWN_PER_TICK = 2;
 const FATIGUE_COOLDOWN_HOME_BONUS = 1;
@@ -224,6 +247,20 @@ const REST_ACTION_BUDDY_HEAL = 9;
 const REST_ACTION_COOLDOWN_MS = 12500;
 const BASE_TRAIN_FAIL_CHANCE = 0.5;
 const BASE_SPOT_SUCCESS_CHANCE = 0.5;
+const WORKOUT_DELOAD_MAX = 4;
+const WORKOUT_DELOAD_RECOVERY_DIVISOR = 28;
+const WORKOUT_DELOAD_LOAD_REDUCTION = 0.18;
+const WORKOUT_DELOAD_READINESS_BONUS = 0.035;
+const WORKOUT_MOMENTUM_MAX = 30;
+const WORKOUT_MOMENTUM_RECOVERY = 1;
+const WORKOUT_REST_STAT_RECOVERY_DIVISOR = 12;
+const WORKOUT_REST_DELOAD_STAT_BONUS = 1;
+const WORKOUT_DELOAD_BY_TIER: Record<WorkoutLoadTier, number> = {
+  easy: 0,
+  steady: 1,
+  hard: 1,
+  max: 2,
+};
 const BOSS_ZONE_CATCH_SCALE: Record<'home' | 'starter' | 'higher', number> = {
   home: 0.96,
   starter: 1.02,
@@ -242,9 +279,53 @@ const BOSS_CAPTURE_WEIGHTS: Record<
   'home' | 'starter' | 'higher',
   { trainerWeight: number; buddyWeight: number; bossPenaltyScale: number; maxCatch: number; minCatch: number }
 > = {
-  home: { trainerWeight: 1.22, buddyWeight: 1.04, bossPenaltyScale: 0.34, maxCatch: 0.96, minCatch: 0.1 },
-  starter: { trainerWeight: 1.15, buddyWeight: 0.99, bossPenaltyScale: 0.55, maxCatch: 0.86, minCatch: 0.07 },
-  higher: { trainerWeight: 1.08, buddyWeight: 0.96, bossPenaltyScale: 0.68, maxCatch: 0.73, minCatch: 0.05 },
+  home: { trainerWeight: 1.2, buddyWeight: 1.03, bossPenaltyScale: 0.34, maxCatch: 0.96, minCatch: 0.1 },
+  starter: { trainerWeight: 1.16, buddyWeight: 1.0, bossPenaltyScale: 0.46, maxCatch: 0.88, minCatch: 0.08 },
+  higher: { trainerWeight: 1.11, buddyWeight: 0.98, bossPenaltyScale: 0.58, maxCatch: 0.78, minCatch: 0.06 },
+};
+const BOSS_CAPTURE_ALIGNMENT: Record<
+  'home' | 'starter' | 'higher',
+  {
+    alignedShift: number;
+    misalignedShift: number;
+    unknownShift: number;
+    consistencyScale: number;
+    missShift: number;
+    nearShift: number;
+    streakShift: number;
+    zoneShift: number;
+  }
+> = {
+  home: {
+    alignedShift: -6,
+    misalignedShift: 5,
+    unknownShift: 3,
+    consistencyScale: 7,
+    missShift: 1.3,
+    nearShift: 1.6,
+    streakShift: 2.2,
+    zoneShift: 0,
+  },
+  starter: {
+    alignedShift: -5,
+    misalignedShift: 7,
+    unknownShift: 4,
+    consistencyScale: 6.3,
+    missShift: 1.7,
+    nearShift: 2.0,
+    streakShift: 2.5,
+    zoneShift: 2,
+  },
+  higher: {
+    alignedShift: -4,
+    misalignedShift: 10,
+    unknownShift: 5,
+    consistencyScale: 8.2,
+    missShift: 2.2,
+    nearShift: 2.3,
+    streakShift: 3.1,
+    zoneShift: 3,
+  },
 };
 const BOSS_CHALLENGE_PRESSURE: Record<
   'home' | 'starter' | 'higher',
@@ -259,6 +340,13 @@ const BOSS_CHALLENGE_TIER: Record<BossChallengeTier, BossChallengeDifficultyProf
   normal: { matchMachineBonus: 5, focusMatchBonus: 2, focusMismatchPenalty: -6, maxRounds: 5, streakLimit: 3, missResetGrace: 1 },
   high: { matchMachineBonus: 8, focusMatchBonus: 4, focusMismatchPenalty: -10, maxRounds: 6, streakLimit: 4, missResetGrace: 1 },
 };
+const BOSS_CAPTURE_TARGET: Record<'home' | 'starter' | 'higher', number> = {
+  home: 70,
+  starter: 74,
+  higher: 78,
+};
+const BOSS_CAPTURE_TARGET_FLOOR = 64;
+const BOSS_CAPTURE_TARGET_CEILING = 92;
 const BOSS_CHALLENGE_MOVE_MODIFIERS: Record<Move['id'], { alignmentBonus: number; mismatchPenalty: number; staminaDrain: number }> = {
   burst: { alignmentBonus: 1, mismatchPenalty: 2, staminaDrain: 2 },
   grind: { alignmentBonus: 3, mismatchPenalty: -1, staminaDrain: 1 },
@@ -268,6 +356,16 @@ const BOSS_CHALLENGE_PENALTY_BASE: Record<'home' | 'starter' | 'higher', number>
   home: 6,
   starter: 8,
   higher: 10,
+};
+const BOSS_CHALLENGE_PENALTY_SCALE: Record<'home' | 'starter' | 'higher', number> = {
+  home: 0.82,
+  starter: 0.94,
+  higher: 1.16,
+};
+const BOSS_MATCH_FATIGUE_SCALE: Record<'home' | 'starter' | 'higher', number> = {
+  home: 0.75,
+  starter: 1,
+  higher: 1.25,
 };
 const BOSS_POWER_BONUS_SCALE: Record<'home' | 'starter' | 'higher', number> = {
   home: 0.55,
@@ -405,6 +503,7 @@ function bossChallengeCapturePenalty(
   zone: GymArea,
   activeMachine: GymMachine | null,
   meter: number,
+  buddy?: Buddy,
 ) {
   if (!match.encounter.isBoss || !match.isBossChallengeActive) {
     return {
@@ -439,11 +538,14 @@ function bossChallengeCapturePenalty(
   }
   const profile = summary.profile;
   const nearOver = Math.max(0, match.bossChallengeNearMisses - profile.missResetGrace);
-  const missPenalty = (match.bossChallengeMisses * BOSS_CHALLENGE_PENALTY_BASE[zone.type]) / 100;
-  const nearPenalty = (nearOver * 1.9) / 100;
+  const penaltyScale = BOSS_CHALLENGE_PENALTY_SCALE[zone.type];
+  const missPenalty = (match.bossChallengeMisses * BOSS_CHALLENGE_PENALTY_BASE[zone.type] * penaltyScale) / 100;
+  const nearPenalty = (nearOver * 1.9 * penaltyScale) / 100;
   const streakMultiplier = Math.min(match.bossChallengeMatchStreak, profile.streakLimit);
   const streakBonus = (summary.isAligned ? Math.max(0, streakMultiplier) * 0.012 : 0) + (meter > 78 ? 0.018 : 0);
-  const basePenalty = clamp(missPenalty + nearPenalty - streakBonus, 0, 0.34);
+  const buddyProfile = buddy ? workoutBuddyProfile(buddy) : null;
+  const buddyShield = buddyProfile ? buddyProfile.bossSteady + buddyProfile.failureSafety * 0.2 : 0;
+  const basePenalty = clamp(missPenalty + nearPenalty - streakBonus - buddyShield, 0, 0.34);
   const nearWarn = nearOver >= 1;
   const isAligned = summary.isAligned;
   const pressure = isAligned ? 1 : -1;
@@ -487,10 +589,14 @@ function trainerArenaPressure(trainer: TrainerProfile, machine: GymMachine | nul
 }
 
 function matchReadinessModifier(trainer: TrainerProfile, buddy: Buddy, zoneType: 'home' | 'starter' | 'higher') {
+  const buddyFormRatio = clamp01(buddy.form / MAX_BUDDY_FORM);
+  const buddyMobilityRatio = clamp01(buddy.mobility / MAX_BUDDY_MOBILITY);
+  const buddyVolumeRatio = clamp01(buddy.volume / MAX_BUDDY_VOLUME);
   const trainerForm = Object.values(trainer.muscles).reduce((sum, value) => sum + value / MAX_MUSCLE_LEVEL, 0) / 8;
   const buddyHpRatio = clamp01(buddy.hp / Math.max(1, buddy.maxHp));
   const trainerEdge = Math.round((trainerForm - 0.42) * 22 * (zoneType === 'higher' ? 1.15 : zoneType === 'starter' ? 1.02 : 1));
-  const buddyEdge = Math.round((buddyHpRatio - 0.5) * 14);
+  const buddyReadinessEdge = Math.round((buddyFormRatio - 0.55) * 12 + (buddyMobilityRatio - 0.5) * 8 + (buddyVolumeRatio - 0.5) * 5);
+  const buddyEdge = clamp(Math.round((buddyHpRatio - 0.5) * 10 + buddyReadinessEdge), -12, 12);
   return {
     trainerForm,
     trainerEdge: clamp(trainerEdge, -12, 12),
@@ -502,10 +608,25 @@ function matchReadinessModifier(trainer: TrainerProfile, buddy: Buddy, zoneType:
 
 function buddyArenaPressure(buddy: Buddy) {
   const hpRatio = clamp01(buddy.hp / Math.max(1, buddy.maxHp));
+  const formRatio = clamp01(buddy.form / MAX_BUDDY_FORM);
+  const mobilityRatio = clamp01(buddy.mobility / MAX_BUDDY_MOBILITY);
+  const volumeRatio = clamp01(buddy.volume / MAX_BUDDY_VOLUME);
   const powerEdge = buddy.creature.power * 0.5;
   const healthEdge = hpRatio * 10;
   const fatiguePenalty = (1 - hpRatio) * 6;
-  return clamp(Math.round(buddy.level * 1.75 + powerEdge + healthEdge - fatiguePenalty), 8, 50);
+  return clamp(
+    Math.round(
+      buddy.level * 1.4 +
+        powerEdge +
+        healthEdge +
+        formRatio * 12 +
+        mobilityRatio * 10 +
+        volumeRatio * 6 -
+        fatiguePenalty,
+    ),
+    8,
+    58,
+  );
 }
 
 function bossChallengePressure(encounter: Encounter, zone: GymArea, selectedMachine: GymMachine | null) {
@@ -527,7 +648,8 @@ function matchCatchModifier(
 ) {
   const trainerPressure = trainerArenaPressure(trainer, machine, zone);
   const buddyPressure = buddyArenaPressure(buddy);
-  const fatiguePenalty = clamp01(trainingFatigue / MAX_TRAINING_FATIGUE) * 3;
+  const fatigueScale = BOSS_MATCH_FATIGUE_SCALE[zone.type];
+  const fatiguePenalty = clamp01(trainingFatigue / MAX_TRAINING_FATIGUE) * 3 * fatigueScale;
   const machinePressure = bossChallengePressure(encounter, zone, machine);
   const bossPenalty = encounter.isBoss ? (encounter.bossPowerBonus ?? 0) : 0;
   const profile = BOSS_CAPTURE_WEIGHTS[zone.type];
@@ -551,6 +673,77 @@ function matchCatchModifier(
     trainerEdge: readiness.trainerEdge,
     buddyEdge: readiness.buddyEdge,
     readinessTotal: readiness.total,
+  };
+}
+
+function bossCaptureTarget(
+  zone: GymArea,
+  encounter: Encounter,
+  isChallengeAligned: boolean | null,
+  missCount = 0,
+  nearMissCount = 0,
+  matchStreak = 0,
+  buddy?: Buddy,
+) {
+  if (!encounter.isBoss) {
+    return BOSS_CAPTURE_TARGET.home;
+  }
+  const alignmentProfile = BOSS_CAPTURE_ALIGNMENT[zone.type];
+  const profile = BOSS_CHALLENGE_PRESSURE[zone.type];
+  const base = BOSS_CAPTURE_TARGET[zone.type];
+  const consistencyShift = buddy
+    ? Math.round((0.55 - workoutBuddyProfile(buddy).movementConsistency) * alignmentProfile.consistencyScale)
+    : 0;
+  const alignmentShift = isChallengeAligned
+    ? alignmentProfile.alignedShift
+    : isChallengeAligned === false
+      ? alignmentProfile.misalignedShift
+      : alignmentProfile.unknownShift;
+  const missShift = missCount * alignmentProfile.missShift;
+  const nearShift = Math.max(0, nearMissCount - profile.missResetGrace) * alignmentProfile.nearShift;
+  const streakShift = matchStreak * alignmentProfile.streakShift;
+  const zoneShift = alignmentProfile.zoneShift;
+  return clamp(
+    Math.round(base + zoneShift + alignmentShift + consistencyShift + missShift + nearShift - streakShift),
+    BOSS_CAPTURE_TARGET_FLOOR,
+    BOSS_CAPTURE_TARGET_CEILING,
+  );
+}
+
+function clampBuddyStats(value: number, max: number, min = 0) {
+  return clamp(Math.round(value), min, max);
+}
+
+function buddyStatBand(value: number, max: number) {
+  if (value <= 0) return 'Raw';
+  if (value >= max * 0.82) return 'Explosive';
+  if (value >= max * 0.64) return 'Strong';
+  if (value >= max * 0.46) return 'Ready';
+  if (value >= max * 0.28) return 'Steady';
+  return 'Raw';
+}
+
+function buddyGrowthFromWorkout(
+  machine: GymMachine,
+  readiness: number,
+  zoneType: 'home' | 'starter' | 'higher',
+  succeeded: boolean,
+) {
+  const focus = machine.focus.toLowerCase();
+  const zoneScale = zoneType === 'higher' ? 1.15 : zoneType === 'starter' ? 1.05 : 0.95;
+  const formBias = focus.includes('precision') ? 1.25 : focus.includes('control') ? 0.85 : 0.38;
+  const mobilityBias = focus.includes('mobility') || focus.includes('stability') ? 1.1 : 0.4;
+  const volumeBias = zoneType === 'higher' ? 0.95 : zoneType === 'starter' ? 0.7 : 0.55;
+  const form = (succeeded ? 4.1 : -2.1) + readiness * 4.8 + formBias;
+  const mobility = (succeeded ? 3.4 : -1.8) + readiness * 3.8 + mobilityBias;
+  const volume = (succeeded ? volumeBias * 2.6 : -0.8);
+  const fatigueSafety = succeeded ? 0.7 : -0.6;
+  const multiplier = zoneScale * (succeeded ? 0.8 : 0.6);
+
+  return {
+    form: clampBuddyStats(form * multiplier, MAX_BUDDY_FORM, succeeded ? 0 : -6),
+    mobility: clampBuddyStats(mobility * multiplier + fatigueSafety, MAX_BUDDY_MOBILITY, succeeded ? 0 : -5),
+    volume: clampBuddyStats(volume * multiplier, MAX_BUDDY_VOLUME, succeeded ? 0 : -4),
   };
 }
 
@@ -1428,11 +1621,14 @@ function workoutFailureChance(
   trainerBonus: number,
   readiness = 1,
 ) {
+  const buddyProfile = workoutBuddyProfile(buddy);
   const stress = clamp((machine.fatigueCost - machine.hpRestore + 1) / 8, 0, 0.25);
   const wear = buddy.hp <= 0 ? 0.25 : clamp((buddy.maxHp - buddy.hp) / buddy.maxHp, 0, 0.28);
   const readinessFactor = clamp(1.4 - readiness * 0.6, 0.6, 1.4);
   const base =
-    (BASE_TRAIN_FAIL_CHANCE + stress + wear) * machineDifficultyMultiplier(zoneType) * readinessFactor - trainerBonus;
+    (BASE_TRAIN_FAIL_CHANCE + stress + wear) * machineDifficultyMultiplier(zoneType) * readinessFactor -
+    trainerBonus -
+    buddyProfile.failureSafety;
   return clamp(base, 0.15, 0.85);
 }
 
@@ -1443,23 +1639,118 @@ function workoutReadinessLabel(readiness: number) {
   return 'Depleted';
 }
 
+function workoutMomentumFactor(workoutMomentum = 0) {
+  return clamp01(workoutMomentum / WORKOUT_MOMENTUM_MAX);
+}
+
+function workoutMomentumLabel(workoutMomentum = 0) {
+  if (workoutMomentum >= 24) return 'Flow state';
+  if (workoutMomentum >= 16) return 'Strong rhythm';
+  if (workoutMomentum >= 8) return 'Building';
+  if (workoutMomentum >= 4) return 'Warming up';
+  return 'Cold';
+}
+
+function workoutLoadPressure(
+  machine: GymMachine,
+  buddy: Buddy,
+  zoneType: 'home' | 'starter' | 'higher',
+  readiness: number,
+  trainingFatigue = 0,
+  workoutMomentum = 0,
+) {
+  const profile = workoutBuddyProfile(buddy);
+  const momentumFactor = workoutMomentumFactor(workoutMomentum);
+  const fatigueRatio = clamp01(trainingFatigue / MAX_TRAINING_FATIGUE);
+  const baseEffort = clamp((machine.fatigueCost + machine.xpMultiplier) / 10, 0.09, 0.85);
+  const recoveryDrag = clamp((machine.fatigueCost - machine.hpRestore) / 10, 0, 0.5);
+  const zoneDrag = zoneType === 'higher' ? 0.22 : zoneType === 'starter' ? 0.11 : 0.05;
+  const movementDrag = clamp(0.42 - profile.movementConsistency, 0, 0.36);
+  const volumeDrag = clamp((MAX_BUDDY_VOLUME - buddy.volume) / MAX_BUDDY_VOLUME, 0, 0.14);
+  const readinessBuffer = readiness * 0.45;
+  return clamp(baseEffort + recoveryDrag + zoneDrag + movementDrag + volumeDrag - readinessBuffer - momentumFactor * 0.24 + fatigueRatio * 0.18, 0, 1);
+}
+
+function workoutLoadTier(pressure: number): WorkoutLoadTier {
+  if (pressure >= 0.8) return 'max';
+  if (pressure >= 0.64) return 'hard';
+  if (pressure >= 0.47) return 'steady';
+  return 'easy';
+}
+
+function workoutSetStress(
+  loadPressure: number,
+  readiness: number,
+  trainingFatigue = 0,
+  zoneType: 'home' | 'starter' | 'higher' = 'starter',
+  loadTier: WorkoutLoadTier = 'easy',
+) {
+  const fatigueRatio = clamp01(trainingFatigue / MAX_TRAINING_FATIGUE);
+  const zoneDrag = zoneType === 'higher' ? 0.09 : zoneType === 'starter' ? 0.03 : 0;
+  const tierDrag = loadTier === 'max' ? 0.22 : loadTier === 'hard' ? 0.11 : 0;
+  const readinessRecovery = readiness * 0.35;
+  return clamp(loadPressure + fatigueRatio * 0.3 + zoneDrag + tierDrag - readinessRecovery, 0, 1);
+}
+
+function workoutSetStressLabel(setStress: number) {
+  if (setStress >= 0.86) return 'Critical overload';
+  if (setStress >= 0.7) return 'High strain';
+  if (setStress >= 0.52) return 'Moderate strain';
+  if (setStress >= 0.34) return 'Controlled';
+  return 'Light';
+}
+
 function workoutReadiness(
   machine: GymMachine,
   buddy: Buddy,
   trainer: TrainerProfile,
   zoneType: 'home' | 'starter' | 'higher',
   trainingFatigue = 0,
+  workoutMomentum = 0,
 ) {
+  const buddyProfile = workoutBuddyProfile(buddy);
   const hpRatio = clamp01(buddy.hp / Math.max(1, buddy.maxHp));
+  const formRatio = clamp01(buddy.form / MAX_BUDDY_FORM);
+  const mobilityRatio = clamp01(buddy.mobility / MAX_BUDDY_MOBILITY);
   const machineRecoveryBias = clamp((machine.hpRestore - machine.fatigueCost + 4) / 10, -0.6, 0.6);
   const trainerDensity = Object.values(trainer.muscles).reduce((sum, value) => sum + value, 0) / (8 * MAX_MUSCLE_LEVEL);
   const focusMatch = machineFocusScore(machine, trainer) * 0.16;
   const zoneDifficulty = zoneType === 'higher' ? 0.16 : zoneType === 'starter' ? 0.08 : 0;
   const fatiguePenalty = clamp01(trainingFatigue / MAX_TRAINING_FATIGUE) * 0.34;
+  const buddyFormBonus = formRatio * 0.14 + mobilityRatio * 0.1;
+  const momentumBonus = workoutMomentumFactor(workoutMomentum) * 0.12;
 
   return clamp01(
-    0.22 + hpRatio * 0.48 + machineRecoveryBias * 0.32 + trainerDensity * 0.24 + focusMatch - zoneDifficulty - fatiguePenalty,
+    0.22 +
+      hpRatio * 0.48 +
+      machineRecoveryBias * 0.32 +
+      trainerDensity * 0.24 +
+      focusMatch +
+      buddyFormBonus +
+      buddyProfile.readinessSupport -
+      zoneDifficulty +
+      momentumBonus -
+      fatiguePenalty,
   );
+}
+
+function workoutBuddyProfile(buddy: Buddy) {
+  const formRatio = clamp01(buddy.form / MAX_BUDDY_FORM);
+  const mobilityRatio = clamp01(buddy.mobility / MAX_BUDDY_MOBILITY);
+  const volumeRatio = clamp01(buddy.volume / MAX_BUDDY_VOLUME);
+  const movementConsistency = clamp01(formRatio * 0.45 + mobilityRatio * 0.4 + volumeRatio * 0.15);
+
+  return {
+    formRatio,
+    mobilityRatio,
+    volumeRatio,
+    movementConsistency,
+    failureSafety: clamp((movementConsistency - 0.45) * 0.34, -0.14, 0.16),
+    readinessSupport: clamp((movementConsistency - 0.4) * 0.08, -0.03, 0.08),
+    fatigueRecoveryBonus: clamp((movementConsistency - 0.45) * 11, -5, 10),
+    hpLossResistance: clamp((movementConsistency - 0.45) * 0.28, -0.22, 0.3),
+    bossSteady: clamp((mobilityRatio - 0.45) * 0.12, -0.06, 0.06),
+  };
 }
 
 function workoutSpotSuccessChance(
@@ -1678,6 +1969,9 @@ function seedBuddy(seed: number, creature: Creature, level = 4): Buddy {
     hp: maxHp,
     maxHp,
     xp: 0,
+    form: clampBuddyStats(8 + Math.min(8, level), MAX_BUDDY_FORM),
+    mobility: clampBuddyStats(9 + Math.min(6, level), MAX_BUDDY_MOBILITY),
+    volume: clampBuddyStats(1 + Math.max(1, Math.floor(level / 2)), MAX_BUDDY_VOLUME),
   };
 }
 
@@ -1962,6 +2256,9 @@ function applyXpGain(buddy: Buddy, bonus: number) {
       xp,
       level,
       maxHp,
+      form: clampBuddyStats(buddy.form, MAX_BUDDY_FORM),
+      mobility: clampBuddyStats(buddy.mobility, MAX_BUDDY_MOBILITY),
+      volume: clampBuddyStats(buddy.volume, MAX_BUDDY_VOLUME),
       hp: clamp(buddy.hp + (leveled ? 12 : 5), 1, maxHp),
     },
   };
@@ -1970,8 +2267,10 @@ function applyXpGain(buddy: Buddy, bonus: number) {
 function initialSaveData(): SaveData {
   const preset = { ...TRAINER_PRESETS[0], name: 'Trainer' };
   const fallback: SaveData = {
-    version: 'v8',
+    version: 'v11',
     trainingFatigue: 0,
+    workoutMomentum: 0,
+    deloadTokens: 0,
     hasStarterSet: false,
     unlockedZoneIds: FALLBACK_UNLOCKED_ZONES,
     trainer: {
@@ -2005,14 +2304,17 @@ function initialSaveData(): SaveData {
 
     const parsed = JSON.parse(raw) as Partial<SaveData>;
       if (
-      !parsed ||
-      (parsed.version !== 'v3' &&
-        parsed.version !== 'v4' &&
-        parsed.version !== 'v5' &&
-        parsed.version !== 'v6' &&
-        parsed.version !== 'v7' &&
-        parsed.version !== 'v8')
-    ) {
+        !parsed ||
+        (parsed.version !== 'v3' &&
+          parsed.version !== 'v4' &&
+          parsed.version !== 'v5' &&
+          parsed.version !== 'v6' &&
+          parsed.version !== 'v7' &&
+          parsed.version !== 'v8' &&
+          parsed.version !== 'v9' &&
+          parsed.version !== 'v10' &&
+          parsed.version !== 'v11')
+      ) {
       return fallback;
     }
 
@@ -2022,6 +2324,9 @@ function initialSaveData(): SaveData {
       hp: Math.max(1, Math.min(buddy.maxHp, buddy.hp)),
       maxHp: Math.max(18, buddy.maxHp),
       xp: Math.max(0, buddy.xp),
+      form: clampBuddyStats(Math.round(buddy.form), MAX_BUDDY_FORM, 1),
+      mobility: clampBuddyStats(Math.round(buddy.mobility), MAX_BUDDY_MOBILITY, 1),
+      volume: clampBuddyStats(Math.round(buddy.volume), MAX_BUDDY_VOLUME, 1),
     }));
 
     return {
@@ -2049,6 +2354,8 @@ function initialSaveData(): SaveData {
       activeIndex: clamp(parsed.activeIndex ?? 0, 0, Math.max(0, team.length - 1)),
       steroids: Math.max(0, parsed.steroids ?? 3),
       trainingFatigue: clamp(Math.max(0, parsed.trainingFatigue ?? 0), 0, MAX_TRAINING_FATIGUE),
+      workoutMomentum: clamp(Math.max(0, parsed.workoutMomentum ?? 0), 0, WORKOUT_MOMENTUM_MAX),
+      deloadTokens: clamp(Math.max(0, parsed.deloadTokens ?? 0), 0, WORKOUT_DELOAD_MAX),
       seenDex: parsed.seenDex ?? fallback.seenDex,
       caughtDex: parsed.caughtDex ?? fallback.caughtDex,
       activeZoneId: parsed.activeZoneId ?? 'home',
@@ -2126,6 +2433,17 @@ export default function App() {
     : BOSS_CHALLENGE_PRESSURE[encounterZone.type];
   const matchChallengeMissCount = match?.bossChallengeMisses ?? 0;
   const matchChallengeNearMissCount = match?.bossChallengeNearMisses ?? 0;
+  const activeMatchCaptureTarget = match?.encounter?.isBoss
+    ? bossCaptureTarget(
+        encounterZone,
+        match.encounter,
+        isMatchChallengeAligned,
+        match.bossChallengeMisses,
+        match.bossChallengeNearMisses,
+        match.bossChallengeMatchStreak,
+        activeBuddy ?? undefined,
+      )
+    : BOSS_CAPTURE_TARGET.home;
   const isMatchChallengeStreakReady =
     match?.isBossChallengeActive &&
     isMatchChallengeAligned === true &&
@@ -2137,6 +2455,49 @@ export default function App() {
   const isMatchChallengeNearWarn =
     match?.isBossChallengeActive &&
     matchChallengeNearMissCount > activeMatchChallengeProfile.missResetGrace;
+  const isMatchChallengeOverload = match?.isBossChallengeActive
+    ? match.bossChallengeMisses >= Math.max(2, activeMatchChallengeProfile.streakLimit + 1)
+    : false;
+  const isMatchChallengeForcedRecovery =
+    isMatchChallengeOverload && match?.encounter?.isBoss && isMatchChallengeAligned === false;
+  const activeMatchChallengeStress: BossChallengeStress = match?.encounter?.isBoss && match?.isBossChallengeActive
+    ? (() => {
+        const rawAlignmentPenalty =
+          match.bossChallengeMachineId && activeMachine?.id
+            ? match.bossChallengeMachineId === activeMachine.id
+              ? 10
+              : 38
+            : 24;
+        const missPressure = Math.min(4, matchChallengeMissCount) * 12;
+        const nearPressure =
+          Math.max(0, matchChallengeNearMissCount - activeMatchChallengeProfile.missResetGrace) * 8;
+        const overloadBoost = isMatchChallengeOverload ? 28 : 0;
+        const nearWarnBoost = isMatchChallengeNearWarn ? 6 : 0;
+        const streakRecovery = (match.bossChallengeMatchStreak / Math.max(1, activeMatchChallengeProfile.streakLimit)) * 12;
+        const percent = clamp(
+          Math.round(12 + rawAlignmentPenalty + missPressure + nearPressure + nearWarnBoost + overloadBoost - streakRecovery),
+          0,
+          100,
+        );
+        const tone = percent > 84 ? 'overload' : percent > 70 ? 'danger' : percent > 35 ? 'caution' : 'safe';
+        return {
+          percent,
+          tone,
+          label:
+            percent > 84
+              ? 'Overload'
+              : percent > 70
+                ? 'Danger'
+                : percent > 35
+                  ? 'Caution'
+                  : 'Stable',
+          detail:
+            match.bossChallengeMisses + matchChallengeNearMissCount > 0
+              ? `${matchChallengeMissCount} misses · ${matchChallengeNearMissCount} near misses`
+              : 'No pressure events yet',
+        };
+      })()
+    : { percent: 0, tone: 'safe', label: 'No stress', detail: 'No active boss challenge pressure' };
   const challengeAlignmentText =
     match?.isBossChallengeActive && match.bossChallengeMachineId && isMatchChallengeAligned !== null
       ? isMatchChallengeAligned
@@ -2425,6 +2786,7 @@ export default function App() {
       setSave((state) => ({
         ...state,
         trainingFatigue: clamp(state.trainingFatigue - recovery, 0, MAX_TRAINING_FATIGUE),
+        workoutMomentum: clamp(state.workoutMomentum - WORKOUT_MOMENTUM_RECOVERY, 0, WORKOUT_MOMENTUM_MAX),
       }));
     }, 5000);
     return () => clearInterval(timer);
@@ -3063,23 +3425,93 @@ export default function App() {
         setWorkoutSession(null);
         return;
       }
+      const profile = workoutBuddyProfile(sourceBuddy);
+      const qualityLabel =
+        session.sessionQuality >= 0.82
+          ? 'Excellent prep'
+          : session.sessionQuality >= 0.64
+            ? 'Solid prep'
+            : session.sessionQuality >= 0.45
+              ? 'Good prep'
+              : 'Rushed prep';
+      const qualityGrowth = session.sessionQuality * 0.2;
+      const qualityStrainShield = clamp(Math.round(session.sessionQuality * 3), 0, 3);
+      const qualityMomentum = clamp(Math.round(session.sessionQuality * 2), 0, 2);
 
+      const growthMultiplier = clamp(
+        1 + session.loadPressure * 0.32 - session.setStress * 0.28 + qualityGrowth,
+        0.55,
+        1.35,
+      );
+      const growth = buddyGrowthFromWorkout(
+        machine,
+        session.readiness,
+        session.zoneType,
+        true,
+      );
+      const strainFatigue = clamp(
+        Math.round((session.setStress + session.loadPressure) * 6) - qualityStrainShield,
+        0,
+        5,
+      );
+      const formTax = clamp(Math.round(0.55 + session.setStress * 2 + session.loadPressure * 2) - qualityStrainShield, 0, 3);
+      const mobilityTax = clamp(Math.round(0.35 + session.setStress * 2.4 + session.loadPressure * 2.1) - qualityStrainShield, 0, 4);
+      const volumeTax = clamp(Math.round(0.3 + session.setStress * 3 + session.loadPressure * 2.8) - qualityStrainShield, 0, 5);
       const result = applyXpGain(sourceBuddy, session.xpGain);
       const resultBuddy: Buddy = {
         ...result.buddy,
+        form: clampBuddyStats(
+          result.buddy.form + Math.max(-3, Math.round(growth.form * growthMultiplier) - Math.max(formTax, strainFatigue * 0.55)),
+          MAX_BUDDY_FORM,
+        ),
+        mobility: clampBuddyStats(
+          result.buddy.mobility +
+            Math.max(
+              -4,
+              Math.round(growth.mobility * growthMultiplier) - Math.max(mobilityTax, strainFatigue * 0.7),
+            ),
+          MAX_BUDDY_MOBILITY,
+        ),
+        volume: clampBuddyStats(
+          result.buddy.volume + Math.max(-4, Math.round(growth.volume * growthMultiplier) - Math.max(volumeTax, strainFatigue)),
+          MAX_BUDDY_VOLUME,
+        ),
         hp: clamp(result.buddy.hp + session.staminaChange, 0, result.buddy.maxHp),
       };
-      const trainerStaminaGain = Math.max(1, Math.floor(session.xpGain / 3));
+      const momentumGain = clamp(
+        Math.round(
+          session.readiness * 10 -
+            session.loadPressure * 3 -
+            session.setStress * 3 +
+            (session.staminaChange > 0 ? 2 : 0) +
+            qualityMomentum,
+        ),
+        0,
+        7,
+      );
+      const trainerStaminaGain = Math.max(
+        1,
+        Math.floor(session.xpGain / (3.2 - session.loadPressure * 1.2)),
+      );
       const leveled = result.leveled;
+      const fatigueRecoveryPenalty = Math.round(session.loadPressure * 9 + session.setStress * 8);
       const fatigueRecovery = Math.max(
         6,
-        Math.round((session.readiness * 16) + machine.hpRestore - Math.abs(session.hpLossOnFail - 1) * 0.5),
+        Math.round(
+          (session.readiness * 16) +
+            machine.hpRestore +
+            profile.fatigueRecoveryBonus +
+            profile.hpLossResistance * 10 -
+            Math.round(session.sessionQuality * 4) +
+            Math.abs(session.hpLossOnFail - 1) * 0.5,
+        ) - fatigueRecoveryPenalty,
       );
 
       setSave((state) => ({
         ...state,
         trainer: applyTrainerGrowth(state.trainer, machine.focus, trainerStaminaGain, leveled ? 1 : 0),
         steroids: state.steroids + (session.steroidsAwarded ? 1 : 0),
+        workoutMomentum: clamp(state.workoutMomentum + momentumGain, 0, WORKOUT_MOMENTUM_MAX),
         trainingFatigue: clamp(state.trainingFatigue - fatigueRecovery, 0, MAX_TRAINING_FATIGUE),
         team: state.team.map((buddy) =>
           buddy.id === session.buddyId
@@ -3092,8 +3524,13 @@ export default function App() {
         ),
       }));
       setMessage(
-        `${resultBuddy.nickname} finished training on ${machine.name}: +${session.xpGain}XP${leveled ? ' and leveled up.' : ''} · ${machine.focus} · `
+      `${resultBuddy.nickname} finished training on ${machine.name}: +${session.xpGain}XP${leveled ? ' and leveled up.' : ''} · ${machine.focus} · `
           + `Readiness ${session.readinessLabel} ${percent(session.readiness)} · Stamina ${session.staminaChange >= 0 ? '+' : ''}${session.staminaChange}`
+          + ` · Form ${resultBuddy.form} (${buddyStatBand(resultBuddy.form, MAX_BUDDY_FORM)})`
+          + ` · Mobility ${resultBuddy.mobility} (${buddyStatBand(resultBuddy.mobility, MAX_BUDDY_MOBILITY)})`
+          + ` · Volume ${resultBuddy.volume} (${buddyStatBand(resultBuddy.volume, MAX_BUDDY_VOLUME)})`
+          + ` · Session ${qualityLabel} (${percent(session.sessionQuality)})`
+          + ` · Set strain ${workoutSetStressLabel(session.setStress)} · ${percent(session.setStress)}`
           + `${session.steroidsAwarded ? ' · Found one Steroid.' : ''}`,
       );
       pushLog(`${resultBuddy.nickname} completed training on ${machine.name} at ${activeZone.name}.`);
@@ -3103,20 +3540,87 @@ export default function App() {
     }
 
     const target = save.team.find((entry) => entry.id === session.buddyId);
+    const sourceProfile = target ? workoutBuddyProfile(target) : null;
     const fatiguePenalty = clamp(Math.round((1 - session.readiness) * 18), 4, 18);
+    const resistancePenalty = sourceProfile ? clamp(Math.round((1 - sourceProfile.movementConsistency) * 8), 0, 6) : 0;
+    const stressFailurePenalty = Math.round(session.setStress * 14);
+    const qualityPenaltyReduction = clamp(Math.round(session.sessionQuality * 6), 0, 6);
+    const failFatiguePenalty = clamp(
+      fatiguePenalty + resistancePenalty + Math.round(session.loadPressure * 16) + stressFailurePenalty - qualityPenaltyReduction,
+      4,
+      30,
+    );
+    const momentumLoss = clamp(
+      Math.round((1.4 - session.readiness) * 8 + session.loadPressure * 2 + session.setStress * 2 + 1) - Math.round(session.sessionQuality * 2),
+      2,
+      8,
+    );
+    const failQualityGrowth = clamp(session.sessionQuality * 0.28, 0, 0.2);
+    const failGrowthScale = clamp(1 + session.setStress * 0.18 + failQualityGrowth, 0.45, 1.3);
+    const failHpMitigation = clamp(Math.round(session.sessionQuality * 4), 0, 6);
+    const growth = buddyGrowthFromWorkout(
+      machine,
+      session.readiness,
+      session.zoneType,
+      false,
+    );
+      const failureStrainFatigue = clamp(
+        Math.round((session.setStress + session.loadPressure) * 5 + session.staminaChange * 0.2),
+        1,
+        8,
+      );
+      const sessionQualityFatigue = Math.max(0, session.hpLossOnFail + Math.round(session.loadPressure * 4) + Math.round(session.setStress * 4) - failHpMitigation);
+
     setSave((state) => ({
-      ...state,
-      trainingFatigue: clamp(state.trainingFatigue + session.hpLossOnFail * 1.6 + fatiguePenalty, 0, MAX_TRAINING_FATIGUE),
+        ...state,
+        workoutMomentum: clamp(state.workoutMomentum - momentumLoss, 0, WORKOUT_MOMENTUM_MAX),
+        trainingFatigue: clamp(
+          state.trainingFatigue +
+            Math.round(sessionQualityFatigue * 1.2) +
+            failFatiguePenalty +
+            Math.round(session.hpLossOnFail * (1 - (sourceProfile?.movementConsistency ?? 0.5))),
+          0,
+          MAX_TRAINING_FATIGUE,
+        ),
       team: state.team.map((buddy) =>
         buddy.id === session.buddyId
           ? {
               ...buddy,
-              hp: clamp(buddy.hp - session.hpLossOnFail, 0, buddy.maxHp),
+                form: clampBuddyStats(
+                  buddy.form + Math.round(growth.form * failGrowthScale * (1 + session.loadPressure * 0.45)),
+                  MAX_BUDDY_FORM,
+                -8,
+              ),
+              mobility: clampBuddyStats(
+                buddy.mobility + Math.round(growth.mobility * failGrowthScale * (1 + session.loadPressure * 0.45)),
+                MAX_BUDDY_MOBILITY,
+                -8,
+              ),
+              volume: clampBuddyStats(
+                buddy.volume +
+                  Math.max(-4, Math.round(growth.volume * failGrowthScale * (1 + session.loadPressure * 0.45) - failureStrainFatigue * 0.35)),
+                MAX_BUDDY_VOLUME,
+                -5,
+                ),
+                hp: clamp(
+                  buddy.hp - sessionQualityFatigue,
+                  0,
+                  buddy.maxHp,
+                ),
             }
           : buddy,
       ),
     }));
-    setMessage(`${target?.nickname ?? 'Buddy'} failed ${machine.name} and was spot-needed.`);
+    setMessage(
+      `${target?.nickname ?? 'Buddy'} failed ${machine.name} and was spot-needed.`
+        + ` Tough set: ${growth.form < 0 ? `Form -${Math.abs(growth.form)}` : `Form +${growth.form}`}`
+        + `, Mobility ${growth.mobility < 0 ? `-${Math.abs(growth.mobility)}` : `+${growth.mobility}`}`
+        + `, Volume ${growth.volume < 0 ? `-${Math.abs(growth.volume)}` : `+${growth.volume}`}`
+        + ` · Session ${session.sessionQuality >= 0.82 ? 'Excellent prep' : session.sessionQuality >= 0.64 ? 'Solid prep' : session.sessionQuality >= 0.45 ? 'Good prep' : 'Rushed prep'} (${percent(
+          session.sessionQuality,
+        )})`
+        + `. Set stress: ${workoutSetStressLabel(session.setStress)} (${percent(session.setStress)}).`,
+    );
     pushLog(`${target?.nickname ?? 'Buddy'} failed training on ${machine.name} at ${activeZone.name}.`);
     pulseTrainerEmote('drained', 900);
     activateAudioEngine().emitSfx('moveBad', 1);
@@ -3148,20 +3652,111 @@ export default function App() {
     const gain = randInt(activeMachine.xpMin, activeMachine.xpMax);
     const adjusted = Math.max(1, Math.ceil(gain * activeMachine.xpMultiplier));
     const staminaChange = activeMachine.hpRestore - activeMachine.fatigueCost;
-    const readiness = workoutReadiness(activeMachine, activeBuddy, trainer, activeZone.type, save.trainingFatigue);
+    const buddyProfile = workoutBuddyProfile(activeBuddy);
+    const readiness = workoutReadiness(
+      activeMachine,
+      activeBuddy,
+      trainer,
+      activeZone.type,
+      save.trainingFatigue,
+      save.workoutMomentum,
+    );
     const readinessLabel = workoutReadinessLabel(readiness);
-    const sessionStaminaChange = Math.max(-8, Math.min(8, staminaChange + Math.round((readiness - 0.5) * 2)));
+    const movementConsistency = buddyProfile.movementConsistency;
+    const volumePreparedness = clamp01(activeBuddy.volume / MAX_BUDDY_VOLUME);
+    const loadPressure = workoutLoadPressure(
+      activeMachine,
+      activeBuddy,
+      activeZone.type,
+      readiness,
+      save.trainingFatigue,
+      save.workoutMomentum,
+    );
+    const loadTier = workoutLoadTier(loadPressure);
+    const deloadUsed = clamp(
+      Math.min(save.deloadTokens, WORKOUT_DELOAD_BY_TIER[loadTier]),
+      0,
+      WORKOUT_DELOAD_MAX,
+    );
+    const deloadLoadPressure = clamp(loadPressure - deloadUsed * WORKOUT_DELOAD_LOAD_REDUCTION, 0.05, 1);
+    const deloadReadiness = clamp(
+      readiness + deloadUsed * WORKOUT_DELOAD_READINESS_BONUS,
+      0,
+      1,
+    );
+    const sessionQuality = clamp(
+      movementConsistency * 0.6 + deloadReadiness * 0.22 + volumePreparedness * 0.18,
+      0,
+      1,
+    );
+    const setStress = workoutSetStress(
+      deloadLoadPressure,
+      deloadReadiness,
+      save.trainingFatigue,
+      activeZone.type,
+      loadTier,
+    );
+    const sessionStaminaChange = Math.max(
+      -8,
+      Math.min(
+        8,
+        staminaChange +
+          Math.round(
+            (deloadReadiness - 0.5) * 2 + buddyProfile.fatigueRecoveryBonus * 0.15 + buddyProfile.readinessSupport * 20,
+          ) -
+          Math.round(deloadLoadPressure * 3),
+      ),
+    );
     const trainerAdvantage = trainerWorkoutAdvantage(activeMachine, trainer, activeZone.type);
-    const failChance = workoutFailureChance(activeMachine, activeBuddy, activeZone.type, trainerAdvantage.failReduction, readiness);
+    const failChance = clamp(
+      workoutFailureChance(activeMachine, activeBuddy, activeZone.type, trainerAdvantage.failReduction, deloadReadiness) +
+        clamp(setStress * 0.22, 0, 0.22) -
+        workoutMomentumFactor(save.workoutMomentum) * 0.12 -
+        sessionQuality * 0.16,
+      0.12,
+      0.9,
+    );
     const spotBase = clamp(
       (BASE_SPOT_SUCCESS_CHANCE + trainerAdvantage.spotBaseBonus + (activeZone.type === 'higher' ? -0.05 : 0)) *
-        (0.68 + readiness * 0.33),
+        (0.68 + deloadReadiness * 0.33 + sessionQuality * 0.1),
       0.5,
       0.9,
     );
-    const adjustedXpGain = Math.max(1, Math.floor(adjusted * (0.75 + readiness * 0.5)));
+    const adjustedXpGain = Math.max(
+      1,
+      Math.floor(
+        adjusted *
+          (0.75 + deloadReadiness * 0.5) *
+          (0.9 + deloadLoadPressure * 0.25) *
+          (0.9 + sessionQuality * 0.18) *
+          (1 + workoutMomentumFactor(save.workoutMomentum) * 0.18),
+      ),
+    );
     const willFail = Math.random() < failChance;
     const now = nowMs();
+    const loadLoss = clamp(
+      Math.ceil(
+        activeMachine.fatigueCost * (1.1 + (1 - deloadReadiness) * 0.6) +
+          (1 - buddyProfile.movementConsistency) * 2 -
+          buddyProfile.fatigueRecoveryBonus * 0.2 +
+          Math.round(deloadLoadPressure * 5) -
+          Math.round(sessionQuality * 1.6),
+      ),
+      1,
+      activeBuddy.maxHp,
+    );
+    const hpLossOnFail = clamp(
+      loadLoss + Math.round(deloadLoadPressure * 6) + Math.round(setStress * 6),
+      1,
+      activeBuddy.maxHp,
+    );
+
+    if (deloadUsed > 0) {
+      setSave((state) => ({
+        ...state,
+        deloadTokens: clamp(state.deloadTokens - deloadUsed, 0, WORKOUT_DELOAD_MAX),
+      }));
+    }
 
     setWorkoutSession({
       id: now,
@@ -3178,18 +3773,29 @@ export default function App() {
       spotWindowEnd: 0,
       failChance,
       buddyLevelBefore: activeBuddy.level,
-      hpLossOnFail: clamp(Math.ceil(activeMachine.fatigueCost * (1.1 + (1 - readiness) * 0.6)), 1, activeBuddy.maxHp),
+      hpLossOnFail,
       xpGain: adjustedXpGain,
       spotChanceBase: spotBase,
       steroidsAwarded: Math.random() < activeMachine.steroidChance,
       staminaChange: sessionStaminaChange,
       resolved: false,
-      readiness,
+      readiness: deloadReadiness,
       readinessLabel,
+      loadPressure: deloadLoadPressure,
+      loadTier,
+      setStress,
+      movementConsistency,
+      volumePreparedness,
+      sessionQuality,
     });
+    const deloadLabel = deloadUsed > 0 ? `Deload used: ${deloadUsed} · ` : '';
 
     setMessage(
-      `${activeBuddy.nickname} starts a full-set on ${activeMachine.name}. Readiness ${readinessLabel} ${percent(readiness)}. Spot if rep form breaks!`,
+      `${activeBuddy.nickname} starts a full-set on ${activeMachine.name}: ${loadTier.toUpperCase()} load (${percent(
+        deloadLoadPressure,
+      )}). ${deloadLabel}Readiness ${readinessLabel} ${percent(deloadReadiness)} · ${workoutSetStressLabel(setStress)} strain (${percent(
+        setStress,
+      )}). Spot if rep form breaks!`,
     );
     pulseTrainerEmote('focus', 900);
     activateAudioEngine().emitSfx('train', 0.6);
@@ -3228,6 +3834,11 @@ export default function App() {
     }
 
     const result = applyXpGain(activeBuddy, 4);
+    const steroidGrowth = {
+      form: clampBuddyStats(2, MAX_BUDDY_FORM, 1),
+      mobility: clampBuddyStats(1, MAX_BUDDY_MOBILITY, 1),
+      volume: clampBuddyStats(1, MAX_BUDDY_VOLUME, 1),
+    };
     setSave((state) => ({
       ...state,
       trainer: applyTrainerGrowth(state.trainer, 'Power', 2, result.leveled ? 1 : 0),
@@ -3236,13 +3847,17 @@ export default function App() {
         index === state.activeIndex
           ? {
               ...result.buddy,
+              form: clampBuddyStats(result.buddy.form + steroidGrowth.form, MAX_BUDDY_FORM),
+              mobility: clampBuddyStats(result.buddy.mobility + steroidGrowth.mobility, MAX_BUDDY_MOBILITY),
+              volume: clampBuddyStats(result.buddy.volume + steroidGrowth.volume, MAX_BUDDY_VOLUME),
             }
           : buddy,
       ),
     }));
 
     setMessage(
-      `${activeBuddy.nickname} used 1 Steroid.${result.leveled ? ' Leveled up to Lv ' + result.buddy.level + '.' : ''}`,
+      `${activeBuddy.nickname} used 1 Steroid.${result.leveled ? ' Leveled up to Lv ' + result.buddy.level + '.' : ''} ` +
+        `Form +${steroidGrowth.form} · Mobility +${steroidGrowth.mobility} · Volume +${steroidGrowth.volume}.`,
     );
     pulseTrainerEmote('ready', 1400);
     activateAudioEngine().emitSfx('steroid', 1);
@@ -3273,22 +3888,51 @@ export default function App() {
       return;
     }
 
-    const bonusRecover = Math.round(REST_ACTION_RECOVERY * (1 - fatigueRatio));
+    const buddyProfile = workoutBuddyProfile(activeBuddy);
+    const recoverEfficiency = clamp(1 + buddyProfile.fatigueRecoveryBonus / 40, 0.72, 1.44);
+    const bonusRecover = Math.round(REST_ACTION_RECOVERY * (1 - fatigueRatio) * recoverEfficiency);
     const actualRecover = Math.max(2, bonusRecover);
+    const fatigueRecovered = Math.max(
+      0,
+      Math.min(MAX_TRAINING_FATIGUE, save.trainingFatigue) - Math.max(0, save.trainingFatigue - (REST_ACTION_RECOVERY + actualRecover)),
+    );
+    const deloadGainRaw = Math.floor(fatigueRecovered / WORKOUT_DELOAD_RECOVERY_DIVISOR);
+    const baseStatRecovery = clamp(Math.round((REST_ACTION_RECOVERY + actualRecover) / WORKOUT_REST_STAT_RECOVERY_DIVISOR), 1, 3);
+    const deloadStatRecovery = clamp(Math.round(deloadGainRaw * WORKOUT_REST_DELOAD_STAT_BONUS), 0, 2);
+    const statRecovery = clamp(baseStatRecovery + deloadStatRecovery, 1, 4);
+    const targetHeal = REST_ACTION_BUDDY_HEAL * (1 + buddyProfile.bossSteady);
     const actualHeal = Math.min(
-      REST_ACTION_BUDDY_HEAL,
+      Math.round(targetHeal),
       activeBuddy.maxHp - activeBuddy.hp + activeBuddy.hp * 0.04,
     );
 
     setSave((state) => ({
       ...state,
       trainingFatigue: clamp(state.trainingFatigue - (REST_ACTION_RECOVERY + actualRecover), 0, MAX_TRAINING_FATIGUE),
+      deloadTokens: clamp(
+        state.deloadTokens + Math.min(deloadGainRaw, WORKOUT_DELOAD_MAX - state.deloadTokens),
+        0,
+        WORKOUT_DELOAD_MAX,
+      ),
       team: state.team.map((buddy, index) =>
-        index === state.activeIndex ? { ...buddy, hp: clamp(buddy.hp + actualHeal, 1, buddy.maxHp) } : buddy,
+        index === state.activeIndex
+          ? {
+              ...buddy,
+              hp: clamp(buddy.hp + actualHeal, 1, buddy.maxHp),
+              form: clampBuddyStats(buddy.form + statRecovery, MAX_BUDDY_FORM),
+              mobility: clampBuddyStats(buddy.mobility + statRecovery, MAX_BUDDY_MOBILITY),
+              volume: clampBuddyStats(buddy.volume + Math.max(1, statRecovery - 1), MAX_BUDDY_VOLUME),
+            }
+          : buddy,
       ),
     }));
     setNextRestAvailableMs(nowMs() + REST_ACTION_COOLDOWN_MS);
-    setMessage(`${activeBuddy.nickname} takes a controlled reset. Recovery +${actualRecover} fatigue, +${actualHeal} HP.`);
+    const deloadGain = clamp(Math.min(deloadGainRaw, WORKOUT_DELOAD_MAX - save.deloadTokens), 0, WORKOUT_DELOAD_MAX);
+    const deloadText = deloadGain > 0 ? ` and +${deloadGain} Deload` : '';
+    setMessage(
+      `${activeBuddy.nickname} takes a controlled reset. Recovery +${actualRecover} fatigue, +${actualHeal} HP and +${statRecovery} load-readiness stat` +
+      `${statRecovery === 1 ? '' : 's'}${deloadText}.`,
+    );
     activateAudioEngine().emitSfx('teamFull', 0.72);
     pulseTrainerEmote('ready', 900);
   }
@@ -3338,6 +3982,17 @@ export default function App() {
     const challengeTier = bossChallengeTierFromEncounter(encounter, activeZone.type);
     const maxRounds = Math.max(4, challengeProfile.maxRounds - (encounterMachineBonus >= 4 ? 1 : 0));
     const openingBonus = encounter.isBoss ? challengeProfile.matchMachineBonus : 0;
+    const activeCaptureTarget = encounter.isBoss
+      ? bossCaptureTarget(
+          activeZone,
+          encounter,
+          challengeSummary.isAligned,
+          0,
+          0,
+          0,
+          activeBuddy,
+        )
+      : BOSS_CAPTURE_TARGET.home;
     const opening =
       encounter.isBoss && challengeMachine
         ? `${encounter.bossName} (${bossChallengeThresholdText(challengeSummary.tier, activeZone.type)}) is anchored on ${challengeMachine.name}. `
@@ -3369,6 +4024,7 @@ export default function App() {
         `${encounter.isBoss ? 'BOSS' : 'WILD'} pressure check: ${pressureSummary}.`,
         `${fatigueSummary}.`,
         `Readiness edge: ${readinessSummary}.`,
+        `Boss lock target: ${activeCaptureTarget}% (higher is tighter ${activeCaptureTarget > 74 ? 'on this gym tier' : 'for boss only'}).`,
         'The hold starts at a neutral meter. Push to your side to pin.',
       ],
     });
@@ -3388,7 +4044,16 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const zoneMachine = activeMachineForMatch;
     const modifier = matchCatchModifier(match.encounter, zone, zoneMachine, trainer, activeBuddy, meter, save.trainingFatigue);
     const challengeProfile = bossChallengeProfileForZone(zone.type, match.encounter);
-    const challengePenaltyState = bossChallengeCapturePenalty(match, zone, zoneMachine, meter);
+    const challengePenaltyState = bossChallengeCapturePenalty(match, zone, zoneMachine, meter, activeBuddy);
+    const captureTarget = bossCaptureTarget(
+      zone,
+      match.encounter,
+      challengePenaltyState.isActive ? challengePenaltyState.isAligned : null,
+      match.bossChallengeMisses,
+      match.bossChallengeNearMisses,
+      match.bossChallengeMatchStreak,
+      activeBuddy,
+    );
     const zoneCatchProfile = BOSS_CAPTURE_WEIGHTS[zone.type];
     const base = clamp(match.encounter.catchChance + modifier.meterDelta, 0.08, 0.97);
     const bonus = clamp(modifier.raw / BOSS_METER_CATCH_SCALE[zone.type], -0.24, 0.32);
@@ -3401,7 +4066,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       zoneCatchProfile.maxCatch,
     );
 
-    const passHold = meter >= 72;
+    const passHold = match.encounter.isBoss ? meter >= captureTarget : meter >= 72;
 
     const lines = [...playerWonLine];
     if (match.encounter.isBoss && challengeMachine && zoneMachine) {
@@ -3416,8 +4081,18 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
         `Challenge state: ${match.bossChallengeMatchStreak}/${challengeProfile.streakLimit} streak · ${match.bossChallengeMisses} misses · ${match.bossChallengeNearMisses} near misses.`,
       );
     }
+    if (
+      match.encounter.isBoss &&
+      match.bossChallengeMisses >= Math.max(2, challengeProfile.streakLimit + 1)
+    ) {
+      lines.push('Challenge overload: misses stacked; return to the required machine or pressure escalates.');
+    }
     if (match.encounter.isBoss && match.isBossChallengeActive && challengePenaltyState.penalty > 0.005) {
       lines.push(`Capture penalty: -${challengePenaltyState.penaltyLabel} (streak bonus ${Math.round(challengePenaltyState.streakBonus * 100)}%).`);
+    }
+    if (match.encounter.isBoss) {
+      const thresholdText = match.meter >= captureTarget ? 'met' : 'not met';
+      lines.push(`Capture target ${captureTarget}% ${thresholdText}: current ${meter}%.`);
     }
 
     if (!passHold) {
@@ -3473,6 +4148,9 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       hp: 32 + encounter!.level * 2,
       maxHp: 42 + encounter!.level * 2,
       xp: 0,
+      form: clampBuddyStats(11 + Math.round(encounter!.level * 0.45), MAX_BUDDY_FORM, 1),
+      mobility: clampBuddyStats(12 + Math.round(encounter!.level * 0.4), MAX_BUDDY_MOBILITY, 1),
+      volume: clampBuddyStats(4 + Math.round(encounter!.level * 0.08), MAX_BUDDY_VOLUME, 1),
     };
 
     const teamIsFull = save.team.length >= TEAM_SIZE;
@@ -3545,19 +4223,34 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const activeMachineForMatch = selectedMachine ?? zone.machines[0] ?? null;
     const challengeMachine = match.encounter.isBoss ? getBossChallengeMachine(match.encounter, zone) : null;
     const isChallengeMachine = !!(challengeMachine && activeMachineForMatch && activeMachineForMatch.id === challengeMachine.id);
+    const isForcedChallengeRecovery = match.encounter.isBoss && match.isBossChallengeActive && isMatchChallengeOverload && !isChallengeMachine;
     const challengeProfile = bossChallengeProfileForZone(zone.type, match.encounter);
     const challengeMove = BOSS_CHALLENGE_MOVE_MODIFIERS[move.id];
+    const battleProfile = workoutBuddyProfile(activeBuddy);
+    const overloadRecoveryPenalty = isForcedChallengeRecovery
+      ? clamp(Math.floor(activeMatchChallengeStress.percent / 10) + 8, 8, 18)
+      : 0;
+    const moveFatigueDrain = Math.max(
+      0,
+      Math.round(challengeMove.staminaDrain + (0.5 - battleProfile.movementConsistency) * 1.5 + overloadRecoveryPenalty),
+    );
     const closeControl = Math.abs(match.meter - 50);
     const moveAlignmentBonus = isChallengeMachine ? challengeMove.alignmentBonus : 0;
     const moveMismatchPenalty = isChallengeMachine
       ? 0
-      : clamp(Math.abs(challengeMove.mismatchPenalty) + Math.min(10, Math.floor((match.bossChallengeMisses + match.bossChallengeNearMisses) / 2)), 1, 16);
+      : clamp(
+          Math.abs(challengeMove.mismatchPenalty) +
+            Math.min(10, Math.floor((match.bossChallengeMisses + match.bossChallengeNearMisses) / 2)) +
+            (isForcedChallengeRecovery ? 12 : 0),
+          1,
+          30,
+        );
 
     setSave((state) => ({
       ...state,
-      trainingFatigue: clamp(state.trainingFatigue + challengeMove.staminaDrain, 0, MAX_TRAINING_FATIGUE),
+      trainingFatigue: clamp(state.trainingFatigue + moveFatigueDrain, 0, MAX_TRAINING_FATIGUE),
     }));
-    const nearMissNow = !isChallengeMachine && closeControl <= 10 ? 1 : 0;
+    const nearMissNow = !isChallengeMachine && (isForcedChallengeRecovery || closeControl <= 10) ? 1 : 0;
     const challengeAlignmentNote =
       challengeMachine && match.encounter.isBoss && match.isBossChallengeActive
         ? isChallengeMachine
@@ -3567,7 +4260,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const nextMisses = match.encounter.isBoss && match.isBossChallengeActive
       ? isChallengeMachine
         ? Math.max(0, match.bossChallengeMisses - 1)
-        : match.bossChallengeMisses + 1
+        : match.bossChallengeMisses + (isForcedChallengeRecovery ? 2 : 1)
       : match.bossChallengeMisses;
     const nextNearMisses = match.encounter.isBoss && match.isBossChallengeActive
       ? isChallengeMachine
@@ -3587,6 +4280,9 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const nearMissPenalty = isChallengeMachine
       ? 0
       : clamp(4 + (match.bossChallengeNearMisses > challengeProfile.missResetGrace ? 2 : 0), 0, 16);
+    const formEdge = clamp(Math.round((activeBuddy.form / MAX_BUDDY_FORM - 0.45) * 8), -2, 5);
+    const mobilityEdge = clamp(Math.round((activeBuddy.mobility / MAX_BUDDY_MOBILITY - 0.45) * 7), -2, 4);
+    const volumeEdge = clamp(Math.round((activeBuddy.volume / MAX_BUDDY_VOLUME - 0.55) * 10), -3, 3);
     const playerBase =
       activeBuddy.level * 1.75 +
       move.power +
@@ -3597,8 +4293,12 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       challengePressure +
       (match.encounter.isBoss && isChallengeMachine ? 4 + moveAlignmentBonus + streakPressure : match.encounter.isBoss ? -moveMismatchPenalty : 0) -
       (match.encounter.isBoss && !isChallengeMachine ? nearMissPenalty : 0) +
+      formEdge +
+      mobilityEdge +
+      volumeEdge +
       readinessShift +
       -challengeMove.staminaDrain +
+      -overloadRecoveryPenalty * (isForcedChallengeRecovery ? 2 : 1) +
       randInt(-5, 9);
     const wildBase =
       match.encounter.level * 2.05 +
@@ -3628,6 +4328,9 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
               : `${challengeAlignmentNote} -${moveMismatchPenalty} penalty.`,
           ]
         : []),
+      ...(isForcedChallengeRecovery
+        ? ['You stay in overload: only the required machine can quickly recover pressure.']
+        : []),
       ...(challengeMachine
         ? [`Challenge pressure: ${nextMisses}/${Math.max(5, challengeProfile.maxRounds)} misses · ${nextNearMisses} near-miss points.`]
         : []),
@@ -3645,6 +4348,8 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
 
     if (nextMeter >= 76) {
       pulseTrainerEmote('level', 900);
+    } else if (match.encounter.isBoss && match.bossChallengeMisses >= challengeProfile.streakLimit + 1) {
+      pulseTrainerEmote('drained', 850);
     } else if (nextMeter <= 34) {
       pulseTrainerEmote('focus', 800);
     } else {
@@ -3667,9 +4372,13 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
             bossChallengeNearMisses: nextNearMisses,
             lines: nextLines,
           }
-        : current,
+            : current,
     );
-    setMessage('Round complete. Push once more.');
+    setMessage(
+      isForcedChallengeRecovery
+        ? 'Overload lock active — return to the required machine before your next controlled pull.'
+        : 'Round complete. Push once more.',
+    );
   }
 
   function hpPercent(value: number, max: number) {
@@ -4114,7 +4823,14 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                     {machine.hpRestore ? ` · Recovery +${machine.hpRestore}` : ''}
                     {activeBuddy
                       ? ` · Readiness ${percent(
-                          workoutReadiness(machine, activeBuddy, trainer, activeZone.type, save.trainingFatigue),
+                          workoutReadiness(
+                            machine,
+                            activeBuddy,
+                            trainer,
+                            activeZone.type,
+                            save.trainingFatigue,
+                            save.workoutMomentum,
+                          ),
                         )}`
                       : ''}
                   </small>
@@ -4179,6 +4895,18 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   <div>
                     HP {activeBuddy.hp}/{activeBuddy.maxHp}
                   </div>
+                  <div className="buddy-metric-grid">
+                    <div>Form: {activeBuddy.form} / {MAX_BUDDY_FORM}</div>
+                    <div>Mobility: {activeBuddy.mobility} / {MAX_BUDDY_MOBILITY}</div>
+                    <div>Volume: {activeBuddy.volume} / {MAX_BUDDY_VOLUME}</div>
+                    <div>Band: {buddyStatBand(activeBuddy.form, MAX_BUDDY_FORM)}</div>
+                  </div>
+                  <div>
+                    Momentum: {save.workoutMomentum}/{WORKOUT_MOMENTUM_MAX} · {workoutMomentumLabel(save.workoutMomentum)}
+                  </div>
+                  <div>
+                    Deload Tokens: {save.deloadTokens}/{WORKOUT_DELOAD_MAX}
+                  </div>
                   <div>Recovery: {activeBuddy.hp >= activeBuddy.maxHp ? 'ready' : `+${REST_ACTION_BUDDY_HEAL} at next rest`}</div>
                   <div>Rest cooldown: {canRest ? 'Ready' : `${restCooldownSeconds}s`}</div>
                   <div>
@@ -4203,11 +4931,22 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                                 : 'Set stabilized')
                               : 'Set complete'}
                     </span>
+                      <span className="small-note">
+                        Fail {percent(workoutSession.failChance)} · Spot bonus {percent(workoutSession.spotChanceBase)}
+                      </span>
+                      <span className="small-note">
+                        Readiness {percent(workoutSession.readiness)} · {workoutSession.readinessLabel}
+                      </span>
+                      <span className="small-note">
+                        Quality {percent(workoutSession.sessionQuality)} · Consistency {percent(workoutSession.movementConsistency)} · Volume {percent(
+                          workoutSession.volumePreparedness,
+                        )}
+                      </span>
+                      <span className="small-note">
+                        Load {workoutSession.loadTier.toUpperCase()} · {percent(workoutSession.loadPressure)}
+                      </span>
                     <span className="small-note">
-                      Fail {percent(workoutSession.failChance)} · Spot bonus {percent(workoutSession.spotChanceBase)}
-                    </span>
-                    <span className="small-note">
-                      Readiness {percent(workoutSession.readiness)} · {workoutSession.readinessLabel}
+                      Set strain {workoutSetStressLabel(workoutSession.setStress)} · {percent(workoutSession.setStress)}
                     </span>
                   </div>
 
@@ -4331,13 +5070,17 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                 className={`combat-stage ${
                   encounter.isBoss
                     ? `combat-stage-boss ${
-                        isMatchChallengeAligned === false
-                          ? 'combat-stage-drift'
-                          : isMatchChallengeStreakReady
-                            ? 'combat-stage-lock'
-                            : isMatchChallengeAligned
-                              ? 'combat-stage-lock'
-                              : ''
+                        isMatchChallengeForcedRecovery
+                          ? 'combat-stage-overload'
+                          : isMatchChallengeAligned === false
+                            ? 'combat-stage-drift'
+                            : isMatchChallengeInDanger
+                              ? 'combat-stage-danger'
+                              : isMatchChallengeStreakReady || (match && match.meter >= activeMatchCaptureTarget - 6)
+                                ? 'combat-stage-ready'
+                              : isMatchChallengeAligned
+                                ? 'combat-stage-lock'
+                                : ''
                       } ${isMatchChallengeInDanger ? 'combat-stage-danger' : ''} `
                     : ''
                 }`}
@@ -4367,6 +5110,13 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                       {encounterMachineBonus}
                     </small>
                   ) : null}
+                  {match?.encounter?.isBoss ? <small>Boss capture target: {activeMatchCaptureTarget}%</small> : null}
+                  {match?.encounter?.isBoss && match.isBossChallengeActive ? (
+                    <small>
+                      Challenge stress: {activeMatchChallengeStress.label} · {activeMatchChallengeStress.percent}% ·{' '}
+                      {activeMatchChallengeStress.detail}
+                    </small>
+                  ) : null}
                   {activeMatchChallengeSummary?.isActive ? (
                     <small>
                       Challenge tier: {bossChallengeThresholdText(activeMatchChallengeSummary.tier, encounterZone.type)}
@@ -4384,11 +5134,25 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                       Required machine: {match.bossChallengeMachineName ?? 'locked'}
                     </small>
                   ) : null}
+                  {isMatchChallengeOverload ? <small>Boss challenge overload: return to required machine immediately.</small> : null}
+                  {isMatchChallengeForcedRecovery ? (
+                    <small className="overload-action-callout">
+                      Forced recovery lock: every non-required move increases pressure and fatigue.
+                    </small>
+                  ) : null}
                   {match?.isBossChallengeActive && activeMatchChallengeSummary?.isActive ? (
                     <small>
                       Streak {match?.bossChallengeMatchStreak ?? 0}/{activeMatchChallengeProfile.streakLimit} ·
                       Grace {activeMatchChallengeProfile.missResetGrace}
                     </small>
+                  ) : null}
+                  {match?.encounter?.isBoss && match.isBossChallengeActive ? (
+                    <div className="challenge-stress-track">
+                      <div
+                        className={`challenge-stress-fill challenge-stress-${activeMatchChallengeStress.tone}`}
+                        style={{ width: `${activeMatchChallengeStress.percent}%` }}
+                      />
+                    </div>
                   ) : null}
                 </div>
               </div>
@@ -4400,18 +5164,22 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
               ) : (
                 <>
                   <div className="meter-track">
-                    <div
+                  <div
                       className={`meter-fill ${
                         match.encounter.isBoss
-                          ? isMatchChallengeAligned === false
+                          ? isMatchChallengeOverload
+                            ? 'meter-fill-challenge-overload'
+                            : isMatchChallengeAligned === false
                             ? 'meter-fill-challenge-miss'
                             : isMatchChallengeInDanger
                               ? 'meter-fill-challenge-danger'
                               : isMatchChallengeStreakReady
                                 ? 'meter-fill-challenge-lock'
-                                : isMatchChallengeAligned
-                                  ? 'meter-fill-challenge-lock'
-                                  : ''
+                                : match.meter >= activeMatchCaptureTarget - 8
+                                  ? 'meter-fill-challenge-ready'
+                                  : isMatchChallengeAligned
+                                    ? 'meter-fill-challenge-lock'
+                                    : ''
                           : ''
                       }`}
                       style={{ width: `${match.meter}%` }}
@@ -4424,7 +5192,12 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   {match.status === 'playing' && (
                     <div className="action-grid">
                       {MOVES.map((move) => (
-                        <button key={move.id} className="primary-btn" onClick={() => performMove(move)}>
+                        <button
+                          key={move.id}
+                          className={`primary-btn ${isMatchChallengeForcedRecovery ? 'combat-move-recovery' : ''}`}
+                          onClick={() => performMove(move)}
+                          disabled={isMatchChallengeOverload && !isMatchChallengeAligned}
+                        >
                           <span>{move.title}</span>
                           <small>{move.tactic}</small>
                         </button>
