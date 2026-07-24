@@ -1025,7 +1025,7 @@ type WorldPosition = {
   y: number;
 };
 
-const WORLD_MOVE_COOLDOWN_MS = 150;
+const WORLD_MOVE_COOLDOWN_MS = 220;
 const WORLD_GRID_WIDTH = 23;
 const WORLD_GRID_HEIGHT = 10;
 const WORLD_GRID_PADDING = 8;
@@ -1976,11 +1976,13 @@ export default function App() {
   const movementHint = connectedWalks.length
     ? connectedWalks
         .map(
-          ({ direction, destinationZone, routeName, routeFatigue }) =>
+          ({ direction, destinationZone, routeName, routeFatigue, encounterBoost }) =>
             `${direction.toUpperCase()}: ${routeName} → ${destinationZone ? zoneNames[destinationZone] ?? destinationZone : 'Path'} (+${routeFatigue} fatigue)`,
         )
         .join(' · ')
     : 'No exits available';
+  const worldMovePercent = clamp01(1 - Math.max(0, worldMoveLockUntil - nowMs()) / WORLD_MOVE_COOLDOWN_MS);
+  const worldMoveBlocked = nowMs() < worldMoveLockUntil;
   const isZoneUnlocked = (zoneId: string) => unlockedZoneSet.has(zoneId);
   const workoutProgress =
     !workoutSession || workoutSession.phase === 'resolved'
@@ -2065,6 +2067,30 @@ export default function App() {
     const nextAt = save.bossSchedules[zone.id]?.nextBossAt ?? tick;
     const remaining = nextAt - tick;
     return remaining <= 0 ? 'READY' : formatRemainingTime(remaining);
+  }
+
+  function trySpawnRouteEncounter(zone: GymArea, encounterBoost = 0) {
+    const now = nowMs();
+    const wasBossDue = (save.bossSchedules[zone.id]?.nextBossAt ?? 0) <= now;
+    const encounterChance = WORLD_ROUTE_ENCOUNTER_RATE[zone.type] * (1 + encounterBoost) * (1 + clamp01(save.trainingFatigue / MAX_TRAINING_FATIGUE) * 0.2);
+    if (
+      !wasBossDue &&
+      !encounter &&
+      !match &&
+      !workoutSession &&
+      zone.type !== 'home' &&
+      Math.random() < Math.min(0.55, encounterChance)
+    ) {
+      const next = createOpponent(zone);
+      setEncounter(next);
+      setMatch(null);
+      setSave((state) => ({
+        ...state,
+        seenDex: state.seenDex.includes(next.creature.dex) ? state.seenDex : [...state.seenDex, next.creature.dex],
+      }));
+      setMessage(`A wild ${next.creature.name} stepped out near your path at ${zone.name}.`);
+      pushLog(`Scouted ${next.creature.name} Lv.${next.level} near ${zone.name}.`);
+    }
   }
 
   function triggerBossSpawn(gym: GymArea) {
@@ -2395,6 +2421,8 @@ export default function App() {
       return;
     }
 
+    const routeBoost = routeProfile?.encounterBoost ?? 0;
+
     setSave((state) => ({
       ...state,
       trainingFatigue: clamp(state.trainingFatigue + fatigueGain, 0, MAX_TRAINING_FATIGUE),
@@ -2407,6 +2435,8 @@ export default function App() {
     );
     if (nextZoneId && nextZoneId !== save.activeZoneId) {
       travelToZone(nextZoneId);
+    } else if (!isWorldMoving) {
+      trySpawnRouteEncounter(activeZone, routeBoost);
     }
   }
 
@@ -2510,30 +2540,8 @@ export default function App() {
     setMessage(`Moved to ${zone.name}. Current machine: ${machineName}.`);
     pulseTrainerEmote('focus', 1600);
     triggerBossSpawn(zone);
-
-    const now = nowMs();
-    const wasBossDue = (save.bossSchedules[id]?.nextBossAt ?? 0) <= now;
-    const encounterBoost = routeEncounterBoost(save.activeZoneId, id);
-    const fatigueBoost = clamp01(save.trainingFatigue / MAX_TRAINING_FATIGUE) * 0.2;
-    if (
-      !wasBossDue &&
-      !encounter &&
-      !match &&
-      Math.random() < Math.min(0.55, WORLD_ROUTE_ENCOUNTER_RATE[zone.type] * (1 + encounterBoost) * (1 + fatigueBoost)) &&
-      zone.type !== 'home'
-    ) {
-      const next = createOpponent(zone);
-      setEncounter(next);
-      setMatch(null);
-      setSave((state) => ({
-        ...state,
-        seenDex: state.seenDex.includes(next.creature.dex)
-          ? state.seenDex
-          : [...state.seenDex, next.creature.dex],
-      }));
-      setMessage(`A wild ${next.creature.name} stepped into ${zone.name}.`);
-      pushLog(`Scouted ${next.creature.name} Lv.${next.level} at ${zone.name}.`);
-    }
+    const routeBoost = routeEncounterBoost(save.activeZoneId, id);
+    trySpawnRouteEncounter(zone, routeBoost);
   }
 
   function selectBuddy(index: number) {
@@ -3376,24 +3384,24 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           <p className="small-note">Move with WASD or arrow keys: {movementHint || 'No exits available'}</p>
           {connectedWalks.length > 0 ? (
             <div className="world-move-controls">
-              {connectedWalks.map(({ direction, destinationZone }) => (
+              {connectedWalks.map(({ direction, destinationZone, routeName, routeFatigue, encounterBoost }) => (
                 <button
                   key={`${direction}-${destinationZone ?? 'path'}`}
                   className="secondary-btn micro-btn"
                   onClick={() => moveTrainerByDirection(direction)}
                   disabled={isTraveling || isWorldMoving}
                 >
-                  {(() => {
-                    const walk = connectedWalks.find((entry) => entry.direction === direction);
-                    const name = walk?.routeName ?? 'Route';
-                    const fatigue = walk?.routeFatigue ?? 0;
-                    const encounterBoost = walk?.encounterBoost ?? 0;
-                    const target = destinationZone ? zoneNames[destinationZone] ?? destinationZone : 'Path';
-                    const bonusText = encounterBoost ? ` · +${Math.round(encounterBoost * 100)}% encounter` : '';
-                    return `${direction.toUpperCase()} · ${name} → ${target} · +${fatigue.toFixed(1)} fatigue${bonusText}`;
-                  })()}
+                  {direction.toUpperCase()} · {routeName} → {destinationZone ? zoneNames[destinationZone] ?? destinationZone : 'Path'} · +{routeFatigue.toFixed(1)} fatigue{encounterBoost ? ` · +${Math.round(encounterBoost * 100)}% encounter` : ''}
                 </button>
               ))}
+            </div>
+          ) : null}
+          {worldMoveBlocked ? (
+            <div className="world-move-progress-wrap">
+              <div className="world-move-progress">
+                <div className="world-move-progress-fill" style={{ width: `${Math.round(worldMovePercent * 100)}%` }} />
+              </div>
+              <small className="small-note">Stride lock: {Math.max(0, Math.ceil((worldMoveLockUntil - nowMs()) / 20)) / 50}s</small>
             </div>
           ) : null}
           <div className="world-route-list">
@@ -3469,6 +3477,18 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                 const isActive = save.activeZoneId === area.id;
                 const isUnlocked = isZoneUnlocked(area.id);
                 const isHomeNode = area.id === 'home';
+                const routeProfile = routeProfileFromZones(save.activeZoneId, area.id);
+                const routeDetail = routeProfile
+                  ? `${routeProfile.routeName} • +${routeProfile.travelFatigue.toFixed(1)} fatigue · +${Math.round(routeProfile.encounterBoost * 100)}% scouting`
+                  : isActive
+                    ? 'Current location'
+                    : linked
+                      ? 'Connected'
+                      : 'Route not yet unlocked';
+                const topMachines = area.machines
+                  .slice(0, 2)
+                  .map((entry) => entry.name.split(' ').at(0))
+                  .join(' + ');
                 return (
                   <button
                     key={area.id}
@@ -3490,7 +3510,8 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   >
                     <strong>{area.name}</strong>
                     <span>{area.type.toUpperCase()} · {ZONE_VIBES[area.id]?.accent ?? area.type}</span>
-                    <small>Boss timer: {getGymBossTicker(area)}</small>
+                    <small>Route: {routeDetail}</small>
+                    <small>Machines: {topMachines || 'Mixed lifts'} · Boss {getGymBossTicker(area)}</small>
                   </button>
                 );
               })}
