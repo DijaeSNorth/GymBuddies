@@ -96,6 +96,7 @@ type GymBoss = {
 
 type SaveData = {
   version: string;
+  hasStarterSet: boolean;
   trainer: TrainerProfile;
   steroids: number;
   activeIndex: number;
@@ -936,6 +937,15 @@ const ZONE_VIBES: Record<
   'higher-3': { icon: '🏆', mood: 'Final deck', theme: 'late-game pressure', accent: 'Dominance' },
 };
 
+const WORLD_ROUTES: Record<string, string[]> = {
+  home: ['starter-a'],
+  'starter-a': ['home', 'starter-b'],
+  'starter-b': ['starter-a', 'higher-1'],
+  'higher-1': ['starter-b', 'higher-2'],
+  'higher-2': ['higher-1', 'higher-3'],
+  'higher-3': ['higher-2'],
+};
+
 function formatRemainingTime(ms: number) {
   const left = Math.max(0, Math.ceil(ms / 1000));
   if (left <= 0) return 'ready';
@@ -1459,15 +1469,16 @@ function initialSaveData(): SaveData {
   const preset = { ...TRAINER_PRESETS[0], name: 'Trainer' };
   const fallback: SaveData = {
     version: 'v7',
+    hasStarterSet: false,
     trainer: {
       ...preset,
     },
     steroids: 3,
     activeIndex: 0,
     activeZoneId: 'home',
-    team: [seedBuddy(1, CREATURES[0], 5), seedBuddy(2, CREATURES[1], 4)],
-    seenDex: [1, 2],
-    caughtDex: [1, 2],
+      team: [seedBuddy(1, CREATURES[0], 5), seedBuddy(2, CREATURES[1], 4)],
+      seenDex: [1, 2],
+      caughtDex: [1, 2],
     selectedMachineByZone: Object.fromEntries(AREAS.map((zone) => [zone.id, zone.machines[0]?.id ?? ''])),
     bossSchedules: Object.fromEntries(
       AREAS.map((zone) => [zone.id, { nextBossAt: nowMs() + bossInterval(), defeated: 0 }]),
@@ -1511,6 +1522,7 @@ function initialSaveData(): SaveData {
     return {
       ...fallback,
       ...parsed,
+      hasStarterSet: parsed.hasStarterSet ?? false,
       trainer: {
         ...fallback.trainer,
         ...parsed.trainer,
@@ -1562,6 +1574,7 @@ export default function App() {
   const [showRoadmap, setShowRoadmap] = useState(false);
   const [zoneTransit, setZoneTransit] = useState<ZoneTransit | null>(null);
   const [showTrainerPanel, setShowTrainerPanel] = useState(false);
+  const [draftTrainer, setDraftTrainer] = useState<TrainerProfile>(() => ({ ...save.trainer }));
   const [trainerEmote, setTrainerEmote] = useState<TrainerEmote>('neutral');
   const [trainerEmoteUntil, setTrainerEmoteUntil] = useState(0);
   const audioRef = useRef<AudioEngine | null>(null);
@@ -1592,6 +1605,8 @@ export default function App() {
   const zoneVibe = ZONE_VIBES[activeZone.id] ?? { icon: '🗺', mood: 'Unknown', theme: 'open gym', accent: 'Unknown' };
   const activeEmote: TrainerEmote = trainerEmoteUntil > tick ? trainerEmote : 'neutral';
   const trainerPhysique = trainerPhysiqueLevel(trainer.muscles);
+  const draftTrainerPhysique = trainerPhysiqueLevel(draftTrainer.muscles);
+  const connectedZones = WORLD_ROUTES[save.activeZoneId] ?? [];
   const workoutProgress =
     !workoutSession || workoutSession.phase === 'resolved'
       ? 0
@@ -1868,6 +1883,58 @@ export default function App() {
     setTrainerEmoteUntil(nowMs() + 900);
   }
 
+  function setDraftTrainerName(event: { target: { value: string } }) {
+    setDraftTrainer((state) => ({
+      ...state,
+      name: event.target.value.slice(0, 14) || 'Trainer',
+    }));
+  }
+
+  function setDraftTrainerColor(part: keyof Omit<TrainerProfile, 'name' | 'muscles'>, value: string) {
+    setDraftTrainer((state) => ({
+      ...state,
+      [part]: value,
+    }));
+  }
+
+  function setDraftTrainerMuscle(group: keyof TrainerProfile['muscles'], value: number) {
+    setDraftTrainer((state) => ({
+      ...state,
+      muscles: {
+        ...state.muscles,
+        [group]: clamp(Number.isFinite(value) ? value : 0, 0, MAX_MUSCLE_LEVEL),
+      },
+    }));
+  }
+
+  function setDraftTrainerPreset(profile: TrainerProfile) {
+    setDraftTrainer({
+      ...profile,
+    });
+  }
+
+  function launchTrainer() {
+    setSave((state) => ({
+      ...state,
+      hasStarterSet: true,
+      trainer: {
+        ...draftTrainer,
+        name: draftTrainer.name.trim() || 'Trainer',
+      },
+    }));
+    activateAudioEngine().emitSfx('matchStart', 0.9);
+    setMessage(`Welcome to your journey, ${draftTrainer.name || 'Trainer'}.`);
+  }
+
+  function reopenTrainerSetup() {
+    setDraftTrainer(save.trainer);
+    setSave((state) => ({
+      ...state,
+      hasStarterSet: false,
+    }));
+    setMessage('Trainer setup reopened. Finish your custom gear and build your body stats again.');
+  }
+
   function pulseTrainerEmote(state: TrainerEmote, ttl = 1800) {
     setTrainerEmote(state);
     setTrainerEmoteUntil(nowMs() + ttl);
@@ -1879,6 +1946,11 @@ export default function App() {
 
   function switchArea(id: string) {
     if (id === save.activeZoneId) return;
+    const allowed = WORLD_ROUTES[save.activeZoneId]?.includes(id) || id === save.activeZoneId;
+    if (!allowed) {
+      setMessage('No direct open-world path to that gym yet. Travel through connected routes.');
+      return;
+    }
     const zone = AREAS.find((area) => area.id === id);
     if (!zone) return;
     if (workoutSession && !workoutSession.resolved) {
@@ -1921,6 +1993,122 @@ export default function App() {
     if (machine) {
       setMessage(`Selected ${machine.name} in ${activeZone.name}.`);
     }
+  }
+
+  function renderStarterSetup() {
+    return (
+      <div className="app-shell starter-shell">
+        <header className="top-banner">
+          <h1>GYM BUDDIES</h1>
+          <p>GBA-style open-world trainer setup. Pick your character and step into the gym map.</p>
+          <div className="panel-head-row">
+            <span className="chip">Step 1: Build your trainer</span>
+          </div>
+        </header>
+
+      <main className="game-grid setup-grid">
+        <section className="panel">
+          <h2>Character Creation</h2>
+            <p className="small-note">
+              Create your trainer body build, colors, and name before entering the route map.
+            </p>
+            <div className="starter-layout">
+              <div className="trainer-panel">
+                <div className="trainer-panel-left">
+                  <TrainerSprite trainer={draftTrainer} emote={activeEmote} />
+                  <div className="trainer-fields">
+                    <label>
+                      Name:
+                      <input value={draftTrainer.name} onChange={setDraftTrainerName} maxLength={14} />
+                    </label>
+                    <div className="trainer-muscle-summary">Physique Lvl {String(draftTrainerPhysique).padStart(2, '0')}</div>
+                    <small className="small-note">
+                      You will use this body build in every gym. You can tweak in-game after the trip starts.
+                    </small>
+                  </div>
+                </div>
+
+                <div className="trainer-presets">
+                  {TRAINER_PRESETS.map((profile) => (
+                    <button
+                      key={profile.name}
+                      className={`trainer-preset ${draftTrainer.name === profile.name ? 'active' : ''}`}
+                      onClick={() => setDraftTrainerPreset(profile)}
+                    >
+                      {profile.name}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="trainer-sliders">
+                  <div className="muscle-sliders">
+                    {TRAINER_MUSCLES.map((entry) => (
+                      <label className="muscle-slider" key={entry.key}>
+                        <span>{entry.label}</span>
+                        <div className="muscle-slider-row">
+                          <input
+                            type="range"
+                            min="0"
+                            max={MAX_MUSCLE_LEVEL}
+                            value={draftTrainer.muscles[entry.key]}
+                            onChange={(event) => setDraftTrainerMuscle(entry.key, Number(event.target.value))}
+                          />
+                          <span>{draftTrainer.muscles[entry.key]}</span>
+                        </div>
+                        <small>{entry.detail}</small>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="trainer-row">
+                    <span>Hair</span>
+                    <input type="color" value={draftTrainer.hair} onChange={(event) => setDraftTrainerColor('hair', event.target.value)} />
+                    <span>Skin</span>
+                    <input type="color" value={draftTrainer.skin} onChange={(event) => setDraftTrainerColor('skin', event.target.value)} />
+                  </div>
+                  <div className="trainer-row">
+                    <span>Top</span>
+                    <input type="color" value={draftTrainer.top} onChange={(event) => setDraftTrainerColor('top', event.target.value)} />
+                    <span>Gloves</span>
+                    <input type="color" value={draftTrainer.glove} onChange={(event) => setDraftTrainerColor('glove', event.target.value)} />
+                  </div>
+                  <div className="trainer-row">
+                    <span>Shoes</span>
+                    <input
+                      type="color"
+                      value={draftTrainer.shoes}
+                      onChange={(event) => setDraftTrainerColor('shoes', event.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="action-row">
+                  <button className="primary-btn" onClick={launchTrainer} disabled={!draftTrainer.name.trim()}>
+                    Start Journey
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section className="panel">
+            <h2>Open World Preview</h2>
+            <p className="small-note">Connected routes unlock as you move zone-to-zone.</p>
+            <div className="world-map">
+              {Object.keys(WORLD_ROUTES).map((zoneId) => {
+                const zone = AREAS.find((entry) => entry.id === zoneId);
+                if (!zone) return null;
+                return (
+                  <div key={zoneId} className="world-node">
+                    <div className={`world-node-title ${zone.type}`}>
+                      {ZONE_VIBES[zoneId]?.icon ?? '🗺'} {zone.name}
+                    </div>
+                    <small>Routes: {WORLD_ROUTES[zoneId]?.join(', ') ?? 'none'}</small>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </main>
+      </div>
+    );
   }
   function resolveWorkoutSession(session: WorkoutSession, succeeded: boolean) {
     const machine = ALL_GYM_MACHINES.find((entry) => entry.id === session.machineId);
@@ -2367,6 +2555,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
   }
 
   return (
+    {!save.hasStarterSet ? renderStarterSetup() : (
     <div className="app-shell">
       {zoneTransit && (
         <div className="zone-transition">
@@ -2415,12 +2604,17 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       )}
       <header className="top-banner">
         <h1>GYM BUDDIES</h1>
-        <p>Pixel RPG clone with 6 gyms, creature captures, and gym-themed progression.</p>
+        <p>Pokémon-style world map, open-world gym travel, and capture battles.</p>
         <div className="panel-head-row">
           <span className="chip">Trainer: {trainer.name}</span>
-          <button className="secondary-btn" onClick={resetTutorial}>
-            Restart Tutorial
-          </button>
+          <div className="action-row">
+            <button className="secondary-btn micro-btn" onClick={reopenTrainerSetup}>
+              Reopen Setup
+            </button>
+            <button className="secondary-btn" onClick={resetTutorial}>
+              Restart Tutorial
+            </button>
+          </div>
         </div>
         <div className="audio-controls">
           <button
@@ -2474,18 +2668,29 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           </div>
           <p className="small-note">Current: {activeZone.name}</p>
           <p className="small-note">Boss in this gym: {bossTicker} until spawn · active interval 5-10 min</p>
-          <div className="gym-grid">
-            {AREAS.map((area) => (
-              <button
-                key={area.id}
-                className={`gym-btn ${area.type} ${save.activeZoneId === area.id ? 'active' : ''}`}
-                onClick={() => switchArea(area.id)}
-              >
-                <strong>{area.name}</strong>
-                <span>{area.type.toUpperCase()} · {ZONE_VIBES[area.id]?.accent ?? area.type}</span>
-                <small>Boss timer: {getGymBossTicker(area)}</small>
-              </button>
-            ))}
+          <div className="world-route-list">
+            <div className="world-route-pill">Available routes: {connectedZones.join(' · ') || 'none'}</div>
+            <div className="gym-grid">
+              {AREAS.map((area) => {
+                const linked = connectedZones.includes(area.id);
+                const isActive = save.activeZoneId === area.id;
+                const isHomeNode = area.id === 'home';
+                return (
+                  <button
+                    key={area.id}
+                    className={`gym-btn ${area.type} ${isActive ? 'active' : ''} ${linked ? 'route-ready' : isHomeNode ? '' : 'route-locked'}`}
+                    onClick={() => switchArea(area.id)}
+                    disabled={!linked && !isActive}
+                    aria-label={`Travel to ${area.name}`}
+                    title={linked ? `Travel to ${area.name}` : 'Explore map route to unlock this route'}
+                  >
+                    <strong>{area.name}</strong>
+                    <span>{area.type.toUpperCase()} · {ZONE_VIBES[area.id]?.accent ?? area.type}</span>
+                    <small>Boss timer: {getGymBossTicker(area)}</small>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="panel-head-row">
