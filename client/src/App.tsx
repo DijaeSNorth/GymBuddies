@@ -135,6 +135,9 @@ type ZoneTransit = {
   from: string;
   to: string;
   icon: string;
+  routeName?: string;
+  routeFatigue?: number;
+  routeEncounterBoost?: number;
 };
 
 type TrainerEmote = 'neutral' | 'grind' | 'focus' | 'level' | 'victory' | 'drained' | 'ready' | 'pump';
@@ -214,35 +217,48 @@ const REST_ACTION_COOLDOWN_MS = 12500;
 const BASE_TRAIN_FAIL_CHANCE = 0.5;
 const BASE_SPOT_SUCCESS_CHANCE = 0.5;
 const BOSS_ZONE_CATCH_SCALE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 0.95,
-  starter: 1,
+  home: 0.96,
+  starter: 1.02,
   higher: 0.73,
 };
 const BOSS_CAPTURE_WEIGHTS: Record<
   'home' | 'starter' | 'higher',
   { trainerWeight: number; buddyWeight: number; bossPenaltyScale: number; maxCatch: number; minCatch: number }
 > = {
-  home: { trainerWeight: 1.22, buddyWeight: 1.06, bossPenaltyScale: 0.44, maxCatch: 0.94, minCatch: 0.09 },
-  starter: { trainerWeight: 1.16, buddyWeight: 0.99, bossPenaltyScale: 0.62, maxCatch: 0.88, minCatch: 0.07 },
-  higher: { trainerWeight: 1.05, buddyWeight: 0.92, bossPenaltyScale: 0.9, maxCatch: 0.74, minCatch: 0.05 },
+  home: { trainerWeight: 1.2, buddyWeight: 1.03, bossPenaltyScale: 0.40, maxCatch: 0.95, minCatch: 0.1 },
+  starter: { trainerWeight: 1.13, buddyWeight: 0.98, bossPenaltyScale: 0.58, maxCatch: 0.84, minCatch: 0.07 },
+  higher: { trainerWeight: 1.05, buddyWeight: 0.94, bossPenaltyScale: 0.86, maxCatch: 0.68, minCatch: 0.04 },
 };
 const BOSS_CHALLENGE_PRESSURE: Record<
   'home' | 'starter' | 'higher',
   { matchMachineBonus: number; focusMatchBonus: number; focusMismatchPenalty: number }
 > = {
   home: { matchMachineBonus: 4, focusMatchBonus: 2, focusMismatchPenalty: -2 },
-  starter: { matchMachineBonus: 7, focusMatchBonus: 4, focusMismatchPenalty: -5 },
-  higher: { matchMachineBonus: 12, focusMatchBonus: 6, focusMismatchPenalty: -10 },
+  starter: { matchMachineBonus: 7, focusMatchBonus: 4, focusMismatchPenalty: -6 },
+  higher: { matchMachineBonus: 12, focusMatchBonus: 6, focusMismatchPenalty: -11 },
 };
 const BOSS_POWER_BONUS_SCALE: Record<'home' | 'starter' | 'higher', number> = {
   home: 0.55,
   starter: 0.72,
-  higher: 0.95,
+  higher: 1.08,
 };
 const BOSS_METER_CATCH_SCALE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 190,
-  starter: 172,
-  higher: 154,
+  home: 188,
+  starter: 174,
+  higher: 206,
+};
+const BOSS_CAPTURE_READINESS_SCALE: Record<'home' | 'starter' | 'higher', number> = {
+  home: 28,
+  starter: 26,
+  higher: 24,
+};
+
+type WorldRouteConnection = {
+  from: string;
+  to: string;
+  routeName: string;
+  travelFatigue: number;
+  encounterBoost: number;
 };
 
 function machineDifficultyMultiplier(type: 'home' | 'starter' | 'higher') {
@@ -306,6 +322,20 @@ function trainerArenaPressure(trainer: TrainerProfile, machine: GymMachine | nul
   return clamp(Math.round(base), 0, 36);
 }
 
+function matchReadinessModifier(trainer: TrainerProfile, buddy: Buddy, zoneType: 'home' | 'starter' | 'higher') {
+  const trainerForm = Object.values(trainer.muscles).reduce((sum, value) => sum + value / MAX_MUSCLE_LEVEL, 0) / 8;
+  const buddyHpRatio = clamp01(buddy.hp / Math.max(1, buddy.maxHp));
+  const trainerEdge = Math.round((trainerForm - 0.42) * 22 * (zoneType === 'higher' ? 1.15 : zoneType === 'starter' ? 1.02 : 1));
+  const buddyEdge = Math.round((buddyHpRatio - 0.5) * 14);
+  return {
+    trainerForm,
+    trainerEdge: clamp(trainerEdge, -12, 12),
+    buddyEdge: clamp(buddyEdge, -8, 8),
+    total: clamp(trainerEdge + buddyEdge, -18, 18),
+    zoneType,
+  };
+}
+
 function buddyArenaPressure(buddy: Buddy) {
   const hpRatio = clamp01(buddy.hp / Math.max(1, buddy.maxHp));
   const powerEdge = buddy.creature.power * 0.5;
@@ -343,15 +373,25 @@ function matchCatchModifier(
   const bossPenalty = encounter.isBoss ? (encounter.bossPowerBonus ?? 0) : 0;
   const profile = BOSS_CAPTURE_WEIGHTS[zone.type];
   const zonePenaltyMultiplier = encounter.isBoss ? profile.bossPenaltyScale : 0;
+  const readiness = matchReadinessModifier(trainer, buddy, zone.type);
   const trainerWeight = profile.trainerWeight;
   const buddyWeight = profile.buddyWeight;
-  const raw = trainerPressure * trainerWeight + buddyPressure * buddyWeight + machinePressure - bossPenalty * zonePenaltyMultiplier - fatiguePenalty;
+  const raw =
+    trainerPressure * trainerWeight +
+    buddyPressure * buddyWeight +
+    machinePressure -
+    bossPenalty * zonePenaltyMultiplier -
+    fatiguePenalty +
+    readiness.total;
   return {
     raw,
     meterDelta: clamp((meter - 50) / 150, -0.25, 0.22),
     bossPressure: machinePressure,
     trainerPressure,
     buddyPressure,
+    trainerEdge: readiness.trainerEdge,
+    buddyEdge: readiness.buddyEdge,
+    readinessTotal: readiness.total,
   };
 }
 
@@ -1033,14 +1073,6 @@ const WORLD_DIRECTION_VECTORS: Record<CardinalDirection, WorldPosition> = {
 
 const WORLD_TILE_KEY = (pos: WorldPosition) => `${pos.x},${pos.y}`;
 
-const WORLD_PATH_LINKS: Array<[string, string]> = [
-  ['home', 'starter-a'],
-  ['starter-a', 'starter-b'],
-  ['starter-b', 'higher-1'],
-  ['higher-1', 'higher-2'],
-  ['higher-2', 'higher-3'],
-];
-
 function addPathTile(setRef: Set<string>, from: WorldPosition, to: WorldPosition) {
   let x = from.x;
   let y = from.y;
@@ -1111,11 +1143,81 @@ function worldTileToStyle(pos: WorldPosition) {
   };
 }
 
+function routeProfileFromZones(fromZoneId: string | null, toZoneId: string | null) {
+  if (!fromZoneId || !toZoneId || fromZoneId === toZoneId) return null;
+  return WORLD_ROUTE_PATH_MAP[getOrderedRouteKey(fromZoneId, toZoneId)] ?? null;
+}
+
+function routeFatigueCost(fromZoneId: string | null, toZoneId: string | null, zoneType: 'home' | 'starter' | 'higher') {
+  const profile = routeProfileFromZones(fromZoneId, toZoneId);
+  return profile?.travelFatigue ?? WORLD_ROUTE_FATIGUE_BY_ZONETYPE[zoneType];
+}
+
+function routeEncounterBoost(fromZoneId: string | null, toZoneId: string | null) {
+  const profile = routeProfileFromZones(fromZoneId, toZoneId);
+  return profile?.encounterBoost ?? 0;
+}
+
 const WORLD_ROUTE_ENCOUNTER_RATE: Record<'home' | 'starter' | 'higher', number> = {
   home: 0,
   starter: 0.16,
   higher: 0.22,
 };
+const WORLD_ROUTE_FATIGUE_BY_ZONETYPE: Record<'home' | 'starter' | 'higher', number> = {
+  home: 0.5,
+  starter: 0.9,
+  higher: 1.2,
+};
+const WORLD_PATH_LINKS: Array<[string, string]> = [
+  ['home', 'starter-a'],
+  ['starter-a', 'starter-b'],
+  ['starter-b', 'higher-1'],
+  ['higher-1', 'higher-2'],
+  ['higher-2', 'higher-3'],
+];
+function getOrderedRouteKey(fromZoneId: string, toZoneId: string) {
+  return [fromZoneId, toZoneId].sort().join('|');
+}
+const WORLD_ROUTE_PATHS: WorldRouteConnection[] = [
+  {
+    from: 'home',
+    to: 'starter-a',
+    routeName: 'Warm Up Path',
+    travelFatigue: 0.3,
+    encounterBoost: 0,
+  },
+  {
+    from: 'starter-a',
+    to: 'starter-b',
+    routeName: 'Starter Link Road',
+    travelFatigue: 0.65,
+    encounterBoost: 0.02,
+  },
+  {
+    from: 'starter-b',
+    to: 'higher-1',
+    routeName: 'Iron Gate Trail',
+    travelFatigue: 1,
+    encounterBoost: 0.04,
+  },
+  {
+    from: 'higher-1',
+    to: 'higher-2',
+    routeName: 'Forge Stretch',
+    travelFatigue: 1.2,
+    encounterBoost: 0.05,
+  },
+  {
+    from: 'higher-2',
+    to: 'higher-3',
+    routeName: 'Champion Ascent',
+    travelFatigue: 1.6,
+    encounterBoost: 0.07,
+  },
+];
+const WORLD_ROUTE_PATH_MAP = Object.fromEntries(
+  WORLD_ROUTE_PATHS.map((entry) => [getOrderedRouteKey(entry.from, entry.to), entry]),
+) as Record<string, WorldRouteConnection>;
 
 const STARTING_ZONE_ID = 'home';
 const FALLBACK_UNLOCKED_ZONES = [STARTING_ZONE_ID, ...(WORLD_ROUTES[STARTING_ZONE_ID] ?? [])];
@@ -1858,17 +1960,24 @@ export default function App() {
       const destinationZone = worldTileZoneId(next);
       if (blocked) return null;
       if (destinationZone && !isZoneUnlocked(destinationZone)) return null;
+      const fromZone = worldTileZoneId(worldPlayerPos);
+      const routeFatigue = routeFatigueCost(fromZone, destinationZone, activeZone.type);
+      const routeInfo = routeProfileFromZones(fromZone, destinationZone);
       return {
         direction,
         next,
         destinationZone,
+        routeName: routeInfo?.routeName ?? 'Route tile',
+        routeFatigue,
+        encounterBoost: routeEncounterBoost(fromZone, destinationZone),
       };
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
   const movementHint = connectedWalks.length
     ? connectedWalks
-        .map(({ direction, destinationZone }) =>
-          `${direction.toUpperCase()}: ${destinationZone ? zoneNames[destinationZone] ?? destinationZone : 'Path'}`,
+        .map(
+          ({ direction, destinationZone, routeName, routeFatigue }) =>
+            `${direction.toUpperCase()}: ${routeName} → ${destinationZone ? zoneNames[destinationZone] ?? destinationZone : 'Path'} (+${routeFatigue} fatigue)`,
         )
         .join(' · ')
     : 'No exits available';
@@ -2270,22 +2379,32 @@ export default function App() {
       x: worldPlayerPos.x + WORLD_DIRECTION_VECTORS[direction].x,
       y: worldPlayerPos.y + WORLD_DIRECTION_VECTORS[direction].y,
     };
+    const nextZoneId = worldTileZoneId(next);
+    const fromZoneId = worldTileZoneId(worldPlayerPos) ?? save.activeZoneId;
+    const routeProfile = routeProfileFromZones(fromZoneId, nextZoneId);
+    const fatigueGain = routeFatigueCost(fromZoneId, nextZoneId, activeZone.type);
+    const routeName = routeProfile?.routeName ?? 'Route tile';
 
     if (!isWorldTileWalkable(next)) {
       setMessage(`No clear path for ${direction.toUpperCase()}.`);
       return;
     }
 
-    const nextZoneId = worldTileZoneId(next);
     if (nextZoneId && !isZoneUnlocked(nextZoneId)) {
       setMessage(`This route to ${zoneNames[nextZoneId] ?? nextZoneId} is not unlocked yet.`);
       return;
     }
 
+    setSave((state) => ({
+      ...state,
+      trainingFatigue: clamp(state.trainingFatigue + fatigueGain, 0, MAX_TRAINING_FATIGUE),
+    }));
     setTrainerFacing(direction);
     setWorldPlayerPos(next);
     setWorldMoveLockUntil(now + WORLD_MOVE_COOLDOWN_MS);
-    setMessage(`Moved ${direction.toUpperCase()}.`);
+    setMessage(
+      `Moved ${direction.toUpperCase()} via ${routeName}. Fatigue +${Math.round(fatigueGain * 10) / 10}.`,
+    );
     if (nextZoneId && nextZoneId !== save.activeZoneId) {
       travelToZone(nextZoneId);
     }
@@ -2318,6 +2437,7 @@ export default function App() {
       setMessage('That destination is not mapped yet.');
       return;
     }
+    const routeProfile = routeProfileFromZones(save.activeZoneId, zoneId);
     const currentPos = WORLD_ZONE_POSITIONS[save.activeZoneId];
     if (currentPos) {
       const directionX = Math.sign(zonePos.x - currentPos.x);
@@ -2374,10 +2494,14 @@ export default function App() {
       activeZoneId: id,
       unlockedZoneIds: unlockAdjacentZones(state.unlockedZoneIds, id),
     }));
+    const routeProfile = routeProfileFromZones(save.activeZoneId, id);
     setZoneTransit({
       from: activeZone.name,
       to: zone.name,
       icon: ZONE_VIBES[id]?.icon ?? '🗺',
+      routeName: routeProfile?.routeName,
+      routeFatigue: routeFatigueCost(activeZone.id, id, activeZone.type),
+      routeEncounterBoost: routeProfile?.encounterBoost ?? 0,
     });
     setEncounter(null);
     setMatch(null);
@@ -2389,11 +2513,13 @@ export default function App() {
 
     const now = nowMs();
     const wasBossDue = (save.bossSchedules[id]?.nextBossAt ?? 0) <= now;
+    const encounterBoost = routeEncounterBoost(save.activeZoneId, id);
+    const fatigueBoost = clamp01(save.trainingFatigue / MAX_TRAINING_FATIGUE) * 0.2;
     if (
       !wasBossDue &&
       !encounter &&
       !match &&
-      Math.random() < WORLD_ROUTE_ENCOUNTER_RATE[zone.type] &&
+      Math.random() < Math.min(0.55, WORLD_ROUTE_ENCOUNTER_RATE[zone.type] * (1 + encounterBoost) * (1 + fatigueBoost)) &&
       zone.type !== 'home'
     ) {
       const next = createOpponent(zone);
@@ -2873,6 +2999,7 @@ export default function App() {
     if (match) return;
     const trainerPressure = trainerArenaPressure(trainer, activeMachine, activeZone);
     const buddyPressure = buddyArenaPressure(activeBuddy);
+    const readiness = matchReadinessModifier(trainer, activeBuddy, activeZone.type);
     const challengeMachine = getBossChallengeMachine(encounter, activeZone);
     const machinePressure = bossChallengePressure(encounter, activeZone, activeMachine);
     const opening =
@@ -2884,6 +3011,7 @@ export default function App() {
       machinePressure >= 0 ? `+${machinePressure}` : `${machinePressure}`
     }`;
     const fatigueSummary = `Fatigue ${fatigueState}`;
+    const readinessSummary = `${readiness.total >= 0 ? '+' : ''}${readiness.total} team-readiness edge`;
 
     setMatch({
       encounter,
@@ -2896,6 +3024,7 @@ export default function App() {
         `${opening}`,
         `${encounter.isBoss ? 'BOSS' : 'WILD'} pressure check: ${pressureSummary}.`,
         `${fatigueSummary}.`,
+        `Readiness edge: ${readinessSummary}.`,
         'The hold starts at a neutral meter. Push to your side to pin.',
       ],
     });
@@ -2917,7 +3046,8 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const zoneCatchProfile = BOSS_CAPTURE_WEIGHTS[zone.type];
     const base = clamp(match.encounter.catchChance + modifier.meterDelta, 0.08, 0.97);
     const bonus = clamp(modifier.raw / BOSS_METER_CATCH_SCALE[zone.type], -0.24, 0.32);
-    const finalChance = clamp(base + bonus, zoneCatchProfile.minCatch, zoneCatchProfile.maxCatch);
+    const readinessBonus = clamp(modifier.readinessTotal / BOSS_CAPTURE_READINESS_SCALE[zone.type], -0.12, 0.12);
+    const finalChance = clamp(base + bonus + readinessBonus, zoneCatchProfile.minCatch, zoneCatchProfile.maxCatch);
 
     const passHold = meter >= 72;
 
@@ -3051,6 +3181,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const challengePressure = modifier.bossPressure;
     const bossPowerScale = BOSS_POWER_BONUS_SCALE[zone.type];
     const bossBonus = (match.encounter.bossPowerBonus ?? 0) * bossPowerScale;
+    const readinessShift = clamp(Math.round(modifier.readinessTotal * 0.6), -8, 8);
     const playerBase =
       activeBuddy.level * 1.75 +
       move.power +
@@ -3059,9 +3190,15 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       trainerPressure +
       buddyPressure +
       challengePressure +
+      readinessShift +
       randInt(-5, 9);
     const wildBase =
-      match.encounter.level * 2.05 + match.encounter.creature.power + bossBonus - challengePressure + randInt(-4, 12);
+      match.encounter.level * 2.05 +
+      match.encounter.creature.power +
+      bossBonus -
+      challengePressure +
+      randInt(-4, 12) -
+      clamp(Math.round(modifier.buddyEdge * 0.4), -4, 4);
     const delta = playerBase - wildBase;
     const nextMeter = clamp(match.meter + Math.floor(delta / 2), 20, 92);
     const round = match.round + 1;
@@ -3123,7 +3260,16 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
               <span>→</span>
               <span>{zoneTransit.to}</span>
             </div>
-            <p className="small-note">Fresh gym air, new layout, and a different pressure profile load in.</p>
+            <div className="zone-transition-subrow">
+              <p className="small-note">Fresh gym air, new layout, and a different pressure profile load in.</p>
+              {zoneTransit.routeName ? <p className="small-note">Route: {zoneTransit.routeName}</p> : null}
+              {zoneTransit.routeFatigue !== undefined ? (
+                <p className="small-note">Route fatigue: {zoneTransit.routeFatigue.toFixed(1)}</p>
+              ) : null}
+              {zoneTransit.routeEncounterBoost ? (
+                <p className="small-note">Route scouting bonus: +{Math.round(zoneTransit.routeEncounterBoost * 100)}%</p>
+              ) : null}
+            </div>
           </div>
         </div>
       )}
@@ -3231,13 +3377,21 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           {connectedWalks.length > 0 ? (
             <div className="world-move-controls">
               {connectedWalks.map(({ direction, destinationZone }) => (
-                  <button
-                    key={`${direction}-${destinationZone ?? 'path'}`}
-                    className="secondary-btn micro-btn"
-                    onClick={() => moveTrainerByDirection(direction)}
-                    disabled={isTraveling || isWorldMoving}
-                  >
-                    {direction.toUpperCase()} → {destinationZone ? zoneNames[destinationZone] : 'Path'}
+                <button
+                  key={`${direction}-${destinationZone ?? 'path'}`}
+                  className="secondary-btn micro-btn"
+                  onClick={() => moveTrainerByDirection(direction)}
+                  disabled={isTraveling || isWorldMoving}
+                >
+                  {(() => {
+                    const walk = connectedWalks.find((entry) => entry.direction === direction);
+                    const name = walk?.routeName ?? 'Route';
+                    const fatigue = walk?.routeFatigue ?? 0;
+                    const encounterBoost = walk?.encounterBoost ?? 0;
+                    const target = destinationZone ? zoneNames[destinationZone] ?? destinationZone : 'Path';
+                    const bonusText = encounterBoost ? ` · +${Math.round(encounterBoost * 100)}% encounter` : '';
+                    return `${direction.toUpperCase()} · ${name} → ${target} · +${fatigue.toFixed(1)} fatigue${bonusText}`;
+                  })()}
                 </button>
               ))}
             </div>
