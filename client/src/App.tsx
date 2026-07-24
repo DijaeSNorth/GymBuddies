@@ -208,6 +208,9 @@ const WORKOUT_AUTO_FAILURE_MS = 1250;
 const MAX_TRAINING_FATIGUE = 120;
 const FATIGUE_COOLDOWN_PER_TICK = 2;
 const FATIGUE_COOLDOWN_HOME_BONUS = 1;
+const REST_ACTION_RECOVERY = 26;
+const REST_ACTION_BUDDY_HEAL = 9;
+const REST_ACTION_COOLDOWN_MS = 12500;
 const BASE_TRAIN_FAIL_CHANCE = 0.5;
 const BASE_SPOT_SUCCESS_CHANCE = 0.5;
 const BOSS_ZONE_CATCH_SCALE: Record<'home' | 'starter' | 'higher', number> = {
@@ -1804,6 +1807,7 @@ export default function App() {
   const [draftTrainer, setDraftTrainer] = useState<TrainerProfile>(() => ({ ...save.trainer }));
   const [trainerEmote, setTrainerEmote] = useState<TrainerEmote>('neutral');
   const [trainerEmoteUntil, setTrainerEmoteUntil] = useState(0);
+  const [nextRestAvailableMs, setNextRestAvailableMs] = useState(0);
   const audioRef = useRef<AudioEngine | null>(null);
 
   const activeZone = useMemo(
@@ -1834,6 +1838,9 @@ export default function App() {
   const activeEmote: TrainerEmote = trainerEmoteUntil > tick ? trainerEmote : 'neutral';
   const trainerPhysique = trainerPhysiqueLevel(trainer.muscles);
   const draftTrainerPhysique = trainerPhysiqueLevel(draftTrainer.muscles);
+  const fatigueRatio = clamp01(save.trainingFatigue / MAX_TRAINING_FATIGUE);
+  const canRest = activeBuddy && !workoutSession && !encounter && !match && nowMs() >= nextRestAvailableMs;
+  const restCooldownSeconds = Math.max(0, Math.ceil((nextRestAvailableMs - tick) / 1000));
   const connectedZones = WORLD_ROUTES[save.activeZoneId] ?? [];
   const worldPlayerZone = worldTileZoneId(worldPlayerPos);
   const playerHasUnresolvedZoneEntry = worldPlayerZone !== null && worldPlayerZone !== save.activeZoneId;
@@ -2785,6 +2792,50 @@ export default function App() {
     pushLog(`Used Steroid on ${activeBuddy.nickname}.`);
   }
 
+  function recoverWithRest() {
+    if (!activeBuddy) {
+      setMessage('No active buddy to recover.');
+      return;
+    }
+    if (workoutSession && !workoutSession.resolved) {
+      setMessage('Finish the active set before taking a recovery break.');
+      return;
+    }
+    if (encounter || match) {
+      setMessage('Finish battle flow before resting.');
+      return;
+    }
+    if (!canRest) {
+      setMessage(
+        `Rest is in cooldown. ${Math.max(0, Math.ceil((nextRestAvailableMs - nowMs()) / 1000))}s until your next planned break.`,
+      );
+      return;
+    }
+    if (save.trainingFatigue <= 0 && activeBuddy.hp === activeBuddy.maxHp) {
+      setMessage('You already feel sharp and recovered.');
+      return;
+    }
+
+    const bonusRecover = Math.round(REST_ACTION_RECOVERY * (1 - fatigueRatio));
+    const actualRecover = Math.max(2, bonusRecover);
+    const actualHeal = Math.min(
+      REST_ACTION_BUDDY_HEAL,
+      activeBuddy.maxHp - activeBuddy.hp + activeBuddy.hp * 0.04,
+    );
+
+    setSave((state) => ({
+      ...state,
+      trainingFatigue: clamp(state.trainingFatigue - (REST_ACTION_RECOVERY + actualRecover), 0, MAX_TRAINING_FATIGUE),
+      team: state.team.map((buddy, index) =>
+        index === state.activeIndex ? { ...buddy, hp: clamp(buddy.hp + actualHeal, 1, buddy.maxHp) } : buddy,
+      ),
+    }));
+    setNextRestAvailableMs(nowMs() + REST_ACTION_COOLDOWN_MS);
+    setMessage(`${activeBuddy.nickname} takes a controlled reset. Recovery +${actualRecover} fatigue, +${actualHeal} HP.`);
+    activateAudioEngine().emitSfx('teamFull', 0.72);
+    pulseTrainerEmote('ready', 900);
+  }
+
   function beginEncounter() {
     if (activeZone.type === 'home') {
       setMessage('Leave Home Gym to scout a wild buddy.');
@@ -2994,6 +3045,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       match.meter,
       save.trainingFatigue,
     );
+    const fatiguePressure = Math.round(fatigueRatio * 8);
     const trainerPressure = Math.round(modifier.trainerPressure * 1.12);
     const buddyPressure = Math.round(modifier.buddyPressure * 0.93);
     const challengePressure = modifier.bossPressure;
@@ -3003,6 +3055,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       activeBuddy.level * 1.75 +
       move.power +
       move.control +
+      (0 - fatiguePressure) +
       trainerPressure +
       buddyPressure +
       challengePressure +
@@ -3111,6 +3164,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
         <p>Pokémon-style world map, open-world gym travel, and capture battles.</p>
         <div className="panel-head-row">
           <span className="chip">Trainer: {trainer.name}</span>
+          <span className="chip">Fatigue {trainingFatigueLevel} · {percent(1 - fatigueRatio)}</span>
           <div className="action-row">
             <button className="secondary-btn micro-btn" onClick={reopenTrainerSetup}>
               Reopen Setup
@@ -3470,6 +3524,8 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   <div>
                     HP {activeBuddy.hp}/{activeBuddy.maxHp}
                   </div>
+                  <div>Recovery: {activeBuddy.hp >= activeBuddy.maxHp ? 'ready' : `+${REST_ACTION_BUDDY_HEAL} at next rest`}</div>
+                  <div>Rest cooldown: {canRest ? 'Ready' : `${restCooldownSeconds}s`}</div>
                   <div>
                     Readiness state: {trainingFatigueLevel} ({percent(clamp01(1 - save.trainingFatigue / MAX_TRAINING_FATIGUE))})
                   </div>
@@ -3572,6 +3628,9 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                 </div>
               )}
               <div className="action-row">
+                <button className="secondary-btn" onClick={recoverWithRest} disabled={!canRest}>
+                  Recover
+                </button>
                 <button
                   className="primary-btn"
                   onClick={sendToWorkout}
