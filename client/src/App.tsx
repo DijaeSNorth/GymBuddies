@@ -2075,7 +2075,7 @@ export default function App() {
     return remaining <= 0 ? 'READY' : formatRemainingTime(remaining);
   }
 
-  function trySpawnRouteEncounter(zone: GymArea, encounterBoost = 0) {
+  function trySpawnRouteEncounter(zone: GymArea, encounterBoost = 0, routeName = 'Route') {
     const now = nowMs();
     if (zone.type === 'home') return;
     if (now - lastRouteEncounterMs < WORLD_ROUTE_ENCOUNTER_COOLDOWN_MS) {
@@ -2097,8 +2097,8 @@ export default function App() {
         ...state,
         seenDex: state.seenDex.includes(next.creature.dex) ? state.seenDex : [...state.seenDex, next.creature.dex],
       }));
-      setMessage(`A wild ${next.creature.name} stepped out near your path at ${zone.name}.`);
-      pushLog(`Scouted ${next.creature.name} Lv.${next.level} near ${zone.name}.`);
+      setMessage(`A wild ${next.creature.name} stepped out via ${routeName} near ${zone.name}.`);
+      pushLog(`Scouted ${next.creature.name} Lv.${next.level} via ${routeName} at ${zone.name}.`);
       setLastRouteEncounterMs(now);
     }
   }
@@ -2446,7 +2446,7 @@ export default function App() {
     if (nextZoneId && nextZoneId !== save.activeZoneId) {
       travelToZone(nextZoneId);
     } else if (!isWorldMoving) {
-      trySpawnRouteEncounter(activeZone, routeBoost);
+      trySpawnRouteEncounter(activeZone, routeBoost, routeName);
     }
   }
 
@@ -2563,7 +2563,7 @@ export default function App() {
     pulseTrainerEmote('focus', 1600);
     triggerBossSpawn(zone);
     const routeBoost = routeEncounterBoost(save.activeZoneId, id);
-    trySpawnRouteEncounter(zone, routeBoost);
+    trySpawnRouteEncounter(zone, routeBoost, routeProfile?.routeName ?? 'Route');
   }
 
   function selectBuddy(index: number) {
