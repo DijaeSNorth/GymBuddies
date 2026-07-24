@@ -828,6 +828,16 @@ button {
   background: linear-gradient(90deg, #22c55e, #0ea5e9);
 }
 
+.meter-fill-challenge-lock {
+  background: linear-gradient(90deg, #22c55e, #a7f3d0);
+  box-shadow: 0 0 8px rgba(129, 255, 186, 0.35);
+}
+
+.meter-fill-challenge-miss {
+  background: linear-gradient(90deg, #f97316, #f43f5e);
+  filter: saturate(1.2);
+}
+
 .meter-track {
   height: 16px;
   overflow: hidden;
@@ -1045,6 +1055,53 @@ button {
   border: 2px solid #1e4059;
   background: #07223a;
   padding: 8px;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.combat-stage-boss {
+  border-color: #6f4fa0;
+  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.2), 0 10px 20px rgba(0, 0, 0, 0.35);
+}
+
+.combat-stage-lock {
+  animation: challengeLock 0.45s steps(1) infinite;
+  box-shadow: 0 0 0 2px rgba(129, 255, 186, 0.36), 0 0 18px rgba(129, 255, 186, 0.2);
+}
+
+.combat-stage-drift {
+  animation: challengeDrift 0.28s steps(1) infinite;
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.38), 0 0 14px rgba(248, 113, 113, 0.2);
+}
+
+.combat-figure-fighter,
+.combat-figure-opponent {
+  transition: transform 0.16s ease, filter 0.16s ease;
+}
+
+.combat-figure-fighter {
+  filter: drop-shadow(0 0 0 rgba(129, 255, 186, 0));
+}
+
+.combat-figure-opponent {
+  filter: drop-shadow(0 0 0 rgba(248, 113, 113, 0));
+}
+
+.combat-stage-lock .combat-figure-fighter {
+  animation: fighterLean 0.45s steps(1) infinite;
+  filter: drop-shadow(0 0 6px rgba(129, 255, 186, 0.45));
+}
+
+.combat-stage-lock .combat-figure-opponent {
+  filter: drop-shadow(0 0 4px rgba(129, 255, 186, 0.35));
+}
+
+.combat-stage-drift .combat-figure-fighter {
+  animation: fighterLean 0.24s linear infinite alternate;
+  filter: drop-shadow(0 0 4px rgba(248, 113, 113, 0.38));
+}
+
+.combat-stage-drift .combat-figure-opponent {
+  filter: drop-shadow(0 0 3px rgba(248, 113, 113, 0.25));
 }
 
 .combat-row {
@@ -1227,6 +1284,39 @@ button {
   100% {
     transform: translateY(0) scale(1);
     opacity: 1;
+  }
+}
+
+@keyframes challengeLock {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes challengeDrift {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+
+  50% {
+    transform: translateY(-1px) translateX(-1px);
+  }
+}
+
+@keyframes fighterLean {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(1px);
   }
 }
 

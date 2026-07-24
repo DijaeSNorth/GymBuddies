@@ -65,6 +65,10 @@ type Match = {
   maxRounds: number;
   meter: number;
   lines: string[];
+  isBossChallengeActive: boolean;
+  bossChallengeMachineId: string | null;
+  bossChallengeMachineName: string | null;
+  bossChallengeMisses: number;
 };
 
 type GymMachine = {
@@ -1938,6 +1942,15 @@ export default function App() {
   const encounterBuddyPressure = encounter && activeBuddy ? buddyArenaPressure(activeBuddy) : 0;
   const encounterMachineBonus =
     encounter && encounter.isBoss && activeMachine ? bossChallengePressure(encounter, encounterZone, activeMachine) : 0;
+  const isMatchChallengeAligned = match?.isBossChallengeActive && match.bossChallengeMachineId && activeMachine
+    ? activeMachine.id === match.bossChallengeMachineId
+    : null;
+  const challengeAlignmentText =
+    match?.isBossChallengeActive && match.bossChallengeMachineId && isMatchChallengeAligned !== null
+      ? isMatchChallengeAligned
+        ? `Holding challenge machine: ${match.bossChallengeMachineName ?? 'required machine'}`
+        : `Not on required machine: ${match.bossChallengeMachineName ?? 'required machine'}`
+      : null;
   const tutorialActive = save.tutorialStep < TUTORIAL_STEPS.length;
   const currentTutorialText = TUTORIAL_STEPS[Math.min(save.tutorialStep, TUTORIAL_STEPS.length - 1)] ?? '';
   const zoneVibe = ZONE_VIBES[activeZone.id] ?? { icon: '🗺', mood: 'Unknown', theme: 'open gym', accent: 'Unknown' };
@@ -3145,6 +3158,10 @@ export default function App() {
       round: 1,
       maxRounds: 4,
       meter: 50,
+      isBossChallengeActive: encounter.isBoss && !!encounterChallengeMachine,
+      bossChallengeMachineId: encounterChallengeMachine?.id ?? null,
+      bossChallengeMachineName: encounterChallengeMachine?.name ?? null,
+      bossChallengeMisses: 0,
       lines: [
         'You and the wild buddy hit the mat, shoulders tight, and go flat on your stomachs.',
         `${opening}`,
@@ -3173,7 +3190,13 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const base = clamp(match.encounter.catchChance + modifier.meterDelta, 0.08, 0.97);
     const bonus = clamp(modifier.raw / BOSS_METER_CATCH_SCALE[zone.type], -0.24, 0.32);
     const readinessBonus = clamp(modifier.readinessTotal / BOSS_CAPTURE_READINESS_SCALE[zone.type], -0.12, 0.12);
-    const finalChance = clamp(base + bonus + readinessBonus, zoneCatchProfile.minCatch, zoneCatchProfile.maxCatch);
+    const challengeMissPenaltyFactor =
+      match.encounter.isBoss && match.isBossChallengeActive ? clamp(match.bossChallengeMisses * 0.025, 0, 0.22) : 0;
+    const finalChance = clamp(
+      base + bonus + readinessBonus - challengeMissPenaltyFactor,
+      zoneCatchProfile.minCatch,
+      zoneCatchProfile.maxCatch,
+    );
 
     const passHold = meter >= 72;
 
@@ -3184,6 +3207,9 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           ? `You stay on ${challengeMachine.name}, matching the boss challenge`
           : `The boss requested ${challengeMachine.name}; you are fighting off that angle elsewhere.`,
       );
+    }
+    if (match.encounter.isBoss && match.isBossChallengeActive && match.bossChallengeMisses > 0) {
+      lines.push(`Challenge misses: ${match.bossChallengeMisses} and counting — capture chance -${Math.round(challengeMissPenaltyFactor * 100)}%.`);
     }
 
     if (!passHold) {
@@ -3210,7 +3236,6 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       setEncounter(escape ? null : encounter);
       return;
     }
-
     const roll = Math.random();
     if (roll > finalChance) {
       setMatch((current) =>
@@ -3305,6 +3330,23 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const trainerPressure = Math.round(modifier.trainerPressure * 1.12);
     const buddyPressure = Math.round(modifier.buddyPressure * 0.93);
     const challengePressure = modifier.bossPressure;
+    const activeMachineForMatch = selectedMachine ?? zone.machines[0] ?? null;
+    const challengeMachine = match.encounter.isBoss ? getBossChallengeMachine(match.encounter, zone) : null;
+    const isChallengeMachine = !!(challengeMachine && activeMachineForMatch && activeMachineForMatch.id === challengeMachine.id);
+    const challengeMissPenalty = match.encounter.isBoss && match.isBossChallengeActive && !isChallengeMachine && challengeMachine
+      ? clamp(
+          6 + Math.min(9, match.bossChallengeMisses * 2),
+          0,
+          24,
+        )
+      : 0;
+    const challengeAlignmentNote =
+      challengeMachine && match.encounter.isBoss && match.isBossChallengeActive
+        ? isChallengeMachine
+          ? 'You stay locked on the boss challenge machine.'
+          : `Challenge break: ${challengeMachine.name} was expected.`
+        : null;
+    const nextMisses = match.bossChallengeMisses + (isChallengeMachine ? 0 : 1);
     const bossPowerScale = BOSS_POWER_BONUS_SCALE[zone.type];
     const bossBonus = (match.encounter.bossPowerBonus ?? 0) * bossPowerScale;
     const readinessShift = clamp(Math.round(modifier.readinessTotal * 0.6), -8, 8);
@@ -3316,6 +3358,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       trainerPressure +
       buddyPressure +
       challengePressure +
+      (isChallengeMachine ? 4 : -challengeMissPenalty) +
       readinessShift +
       randInt(-5, 9);
     const wildBase =
@@ -3326,7 +3369,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       randInt(-4, 12) -
       clamp(Math.round(modifier.buddyEdge * 0.4), -4, 4);
     const delta = playerBase - wildBase;
-    const nextMeter = clamp(match.meter + Math.floor(delta / 2), 20, 92);
+    const nextMeter = clamp(match.meter + Math.floor((delta - challengeMissPenalty * 0.55) / 2), 20, 92);
     const round = match.round + 1;
 
     const line =
@@ -3336,7 +3379,12 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           ? `${move.title}: pressure stays balanced; keep it up.`
           : `${move.title}: wild buddy resisted and pushed back.`;
 
-    const nextLines = [...match.lines, `${line} (${move.tactic}).`, `Round ${match.round}: meter ${nextMeter}%.`];
+    const nextLines = [
+      ...match.lines,
+      `${line} (${move.tactic}).`,
+      ...(challengeAlignmentNote ? [`${challengeAlignmentNote}${challengeMissPenalty > 0 ? ` -${challengeMissPenalty} penalty.` : ' +4 bonus.'}`] : []),
+      `Round ${match.round}: meter ${nextMeter}%${challengeMissPenalty ? ` · challenge misses ${nextMisses}` : ''}.`,
+    ];
     if (nextMeter >= 84) {
       nextLines.push('It is almost yours. One clean burst and the pin lands.');
     }
@@ -3360,10 +3408,11 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
 
     setMatch((current) =>
       current
-        ? {
+            ? {
             ...current,
             round,
             meter: nextMeter,
+            bossChallengeMisses: nextMisses,
             lines: nextLines,
           }
         : current,
@@ -4026,14 +4075,20 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
             <p className="small-note">No encounter active. Move to a gym and press Scout or wait for a boss timer.</p>
           ) : (
             <>
-              <div className="combat-stage">
+              <div
+                className={`combat-stage ${
+                  encounter.isBoss
+                    ? `combat-stage-boss ${isMatchChallengeAligned === false ? 'combat-stage-drift' : isMatchChallengeAligned ? 'combat-stage-lock' : ''}`
+                    : ''
+                }`}
+              >
                 <div className="combat-row">
-                  <div className="combat-figure">
+                  <div className={`combat-figure ${encounter.isBoss ? 'combat-figure-fighter' : ''}`}>
                     {activeBuddy ? <PixelCreature creature={activeBuddy.creature} /> : <span>None</span>}
                     <span>You</span>
                   </div>
                   <div className="combat-vs">VS</div>
-                  <div className="combat-figure">
+                  <div className={`combat-figure ${encounter.isBoss ? 'combat-figure-opponent' : ''}`}>
                     <PixelCreature creature={encounter.creature} />
                     <span>{encounter.creature.name}</span>
                   </div>
@@ -4052,9 +4107,16 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                       {encounterMachineBonus}
                     </small>
                   ) : null}
+                  {challengeAlignmentText ? <small>{challengeAlignmentText}</small> : null}
                   {activeBuddy ? (
                     <small>
                       Trainer power {encounterTrainerPressure} · Buddy power {encounterBuddyPressure}
+                    </small>
+                  ) : null}
+                  {match?.isBossChallengeActive && match.encounter?.isBoss ? (
+                    <small>
+                      Challenge misses: {match.bossChallengeMisses} ·
+                      Required machine: {match.bossChallengeMachineName ?? 'locked'}
                     </small>
                   ) : null}
                 </div>
@@ -4067,7 +4129,18 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
               ) : (
                 <>
                   <div className="meter-track">
-                    <div className="meter-fill" style={{ width: `${match.meter}%` }} />
+                    <div
+                      className={`meter-fill ${
+                        match.encounter.isBoss
+                          ? isMatchChallengeAligned === false
+                            ? 'meter-fill-challenge-miss'
+                            : isMatchChallengeAligned
+                              ? 'meter-fill-challenge-lock'
+                              : ''
+                          : ''
+                      }`}
+                      style={{ width: `${match.meter}%` }}
+                    />
                     <div className="meter-center" />
                     <div className="meter-pin" />
                   </div>
