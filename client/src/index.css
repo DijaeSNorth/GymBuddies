@@ -833,9 +833,19 @@ button {
   box-shadow: 0 0 8px rgba(129, 255, 186, 0.35);
 }
 
+.meter-fill-challenge-ready {
+  background: linear-gradient(90deg, #f59e0b, #f97316);
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.35);
+}
+
 .meter-fill-challenge-miss {
   background: linear-gradient(90deg, #f97316, #f43f5e);
   filter: saturate(1.2);
+}
+
+.meter-fill-challenge-danger {
+  background: linear-gradient(90deg, #b91c1c, #f43f5e);
+  animation: meterRattle 0.3s linear infinite alternate;
 }
 
 .meter-track {
@@ -1068,6 +1078,16 @@ button {
   box-shadow: 0 0 0 2px rgba(129, 255, 186, 0.36), 0 0 18px rgba(129, 255, 186, 0.2);
 }
 
+.combat-stage-ready {
+  animation: challengeReady 0.42s steps(1) infinite;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.4), 0 0 14px rgba(245, 158, 11, 0.24);
+}
+
+.combat-stage-danger {
+  animation: challengeDanger 0.28s linear infinite;
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.45), 0 0 16px rgba(248, 113, 113, 0.2);
+}
+
 .combat-stage-drift {
   animation: challengeDrift 0.28s steps(1) infinite;
   box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.38), 0 0 14px rgba(248, 113, 113, 0.2);
@@ -1089,6 +1109,14 @@ button {
 .combat-stage-lock .combat-figure-fighter {
   animation: fighterLean 0.45s steps(1) infinite;
   filter: drop-shadow(0 0 6px rgba(129, 255, 186, 0.45));
+}
+
+.combat-stage-ready .combat-figure-fighter {
+  animation: fighterLeanReady 0.35s ease-in-out infinite alternate;
+}
+
+.combat-stage-danger .combat-figure-fighter {
+  animation: fighterLeanDanger 0.18s ease-in-out infinite alternate;
 }
 
 .combat-stage-lock .combat-figure-opponent {
@@ -1298,6 +1326,28 @@ button {
   }
 }
 
+@keyframes challengeReady {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(1px);
+  }
+}
+
+@keyframes challengeDanger {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+
+  50% {
+    transform: rotate(-0.5deg) translateY(-1px);
+  }
+}
+
 @keyframes challengeDrift {
   0%,
   100% {
@@ -1309,6 +1359,19 @@ button {
   }
 }
 
+@keyframes meterRattle {
+  0%,
+  100% {
+    transform: translateX(0);
+    filter: saturate(1.05);
+  }
+
+  50% {
+    transform: translateX(-1px);
+    filter: saturate(1.15);
+  }
+}
+
 @keyframes fighterLean {
   0%,
   100% {
@@ -1317,6 +1380,28 @@ button {
 
   50% {
     transform: translateX(1px);
+  }
+}
+
+@keyframes fighterLeanReady {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(-1px) translateY(-0.5px);
+  }
+}
+
+@keyframes fighterLeanDanger {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(1px) rotate(-1deg);
   }
 }
 

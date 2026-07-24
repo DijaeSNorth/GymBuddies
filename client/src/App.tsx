@@ -48,6 +48,7 @@ type Encounter = {
   bossPowerBonus?: number;
   bossChallengeMachineId?: string;
   bossChallengeMachineName?: string;
+  bossChallengeTier?: 'low' | 'normal' | 'high';
 };
 
 type Move = {
@@ -69,6 +70,8 @@ type Match = {
   bossChallengeMachineId: string | null;
   bossChallengeMachineName: string | null;
   bossChallengeMisses: number;
+  bossChallengeMatchStreak: number;
+  bossChallengeNearMisses: number;
 };
 
 type GymMachine = {
@@ -226,6 +229,15 @@ const BOSS_ZONE_CATCH_SCALE: Record<'home' | 'starter' | 'higher', number> = {
   starter: 1.02,
   higher: 0.73,
 };
+type BossChallengeTier = 'low' | 'normal' | 'high';
+type BossChallengeDifficultyProfile = {
+  matchMachineBonus: number;
+  focusMatchBonus: number;
+  focusMismatchPenalty: number;
+  maxRounds: number;
+  streakLimit: number;
+  missResetGrace: number;
+};
 const BOSS_CAPTURE_WEIGHTS: Record<
   'home' | 'starter' | 'higher',
   { trainerWeight: number; buddyWeight: number; bossPenaltyScale: number; maxCatch: number; minCatch: number }
@@ -236,11 +248,26 @@ const BOSS_CAPTURE_WEIGHTS: Record<
 };
 const BOSS_CHALLENGE_PRESSURE: Record<
   'home' | 'starter' | 'higher',
-  { matchMachineBonus: number; focusMatchBonus: number; focusMismatchPenalty: number }
+  BossChallengeDifficultyProfile
 > = {
-  home: { matchMachineBonus: 4, focusMatchBonus: 2, focusMismatchPenalty: -2 },
-  starter: { matchMachineBonus: 6, focusMatchBonus: 3, focusMismatchPenalty: -7 },
-  higher: { matchMachineBonus: 9, focusMatchBonus: 5, focusMismatchPenalty: -9 },
+  home: { matchMachineBonus: 4, focusMatchBonus: 1, focusMismatchPenalty: -2, maxRounds: 4, streakLimit: 2, missResetGrace: 2 },
+  starter: { matchMachineBonus: 6, focusMatchBonus: 3, focusMismatchPenalty: -7, maxRounds: 5, streakLimit: 3, missResetGrace: 1 },
+  higher: { matchMachineBonus: 9, focusMatchBonus: 5, focusMismatchPenalty: -9, maxRounds: 6, streakLimit: 4, missResetGrace: 1 },
+};
+const BOSS_CHALLENGE_TIER: Record<BossChallengeTier, BossChallengeDifficultyProfile> = {
+  low: { matchMachineBonus: 3, focusMatchBonus: 1, focusMismatchPenalty: -2, maxRounds: 4, streakLimit: 2, missResetGrace: 2 },
+  normal: { matchMachineBonus: 5, focusMatchBonus: 2, focusMismatchPenalty: -6, maxRounds: 5, streakLimit: 3, missResetGrace: 1 },
+  high: { matchMachineBonus: 8, focusMatchBonus: 4, focusMismatchPenalty: -10, maxRounds: 6, streakLimit: 4, missResetGrace: 1 },
+};
+const BOSS_CHALLENGE_MOVE_MODIFIERS: Record<Move['id'], { alignmentBonus: number; mismatchPenalty: number; staminaDrain: number }> = {
+  burst: { alignmentBonus: 1, mismatchPenalty: 2, staminaDrain: 2 },
+  grind: { alignmentBonus: 3, mismatchPenalty: -1, staminaDrain: 1 },
+  snap: { alignmentBonus: 0, mismatchPenalty: 3, staminaDrain: 2 },
+};
+const BOSS_CHALLENGE_PENALTY_BASE: Record<'home' | 'starter' | 'higher', number> = {
+  home: 6,
+  starter: 8,
+  higher: 10,
 };
 const BOSS_POWER_BONUS_SCALE: Record<'home' | 'starter' | 'higher', number> = {
   home: 0.55,
@@ -317,6 +344,138 @@ function getBossChallengeMachine(encounter: Encounter, zone: GymArea) {
   return zone.machines.find((machine) => machine.id === encounter.bossChallengeMachineId) ?? null;
 }
 
+function bossChallengeProfileForZone(zoneType: 'home' | 'starter' | 'higher', encounter?: Encounter) {
+  if (encounter?.bossChallengeTier && BOSS_CHALLENGE_TIER[encounter.bossChallengeTier]) {
+    return BOSS_CHALLENGE_TIER[encounter.bossChallengeTier];
+  }
+  return BOSS_CHALLENGE_PRESSURE[zoneType];
+}
+
+function bossChallengeTierFromEncounter(encounter: Encounter, zoneType: 'home' | 'starter' | 'higher'): BossChallengeTier {
+  if (encounter.bossChallengeTier) return encounter.bossChallengeTier;
+  if (encounter.bossPowerBonus == null) return 'low';
+  if (zoneType === 'higher' || encounter.bossPowerBonus >= 24) return 'high';
+  if (zoneType === 'starter' || encounter.bossPowerBonus >= 16) return 'normal';
+  return 'low';
+}
+
+function bossChallengeThresholdText(tier: BossChallengeTier, zoneType: 'home' | 'starter' | 'higher') {
+  if (tier === 'high' || zoneType === 'higher') return 'high';
+  if (tier === 'normal') return 'medium';
+  return 'low';
+}
+
+function bossChallengeSummary(encounter: Encounter, zone: GymArea, machine: GymMachine | null) {
+  const machineProfile = getBossChallengeMachine(encounter, zone);
+  if (!encounter.isBoss || !machineProfile || !machine) {
+    return {
+      isActive: false,
+      isAligned: false,
+      isFocusAligned: false,
+      tier: 'low' as const,
+      profile: BOSS_CHALLENGE_PRESSURE[zone.type],
+      machineProfile: null as GymMachine | null,
+      bonus: 0,
+      bonusLabel: '+0',
+    };
+  }
+  const tier = bossChallengeTierFromEncounter(encounter, zone.type);
+  const profile = bossChallengeProfileForZone(zone.type, encounter);
+  const isAligned = machineProfile.id === machine.id;
+  const isFocusAligned = machine.focus.toLowerCase() === machineProfile.focus.toLowerCase();
+  const challengeDelta = isAligned
+    ? profile.matchMachineBonus
+    : isFocusAligned
+      ? profile.focusMatchBonus
+      : profile.focusMismatchPenalty;
+  return {
+    isActive: true,
+    isAligned,
+    isFocusAligned,
+    tier,
+    profile,
+    machineProfile,
+    bonus: challengeDelta,
+    bonusLabel: `${challengeDelta >= 0 ? '+' : ''}${challengeDelta}`,
+  };
+}
+
+function bossChallengeCapturePenalty(
+  match: Match,
+  zone: GymArea,
+  activeMachine: GymMachine | null,
+  meter: number,
+) {
+  if (!match.encounter.isBoss || !match.isBossChallengeActive) {
+    return {
+      isActive: false,
+      isAligned: false,
+      penalty: 0,
+      streakBonus: 0,
+      nearPenalty: 0,
+      nearMissOverload: 0,
+      profile: BOSS_CHALLENGE_PRESSURE[zone.type],
+      machine: null as GymMachine | null,
+      nearWarn: false,
+      penaltyLabel: '0%',
+      meterPressure: 0,
+    };
+  }
+  const summary = bossChallengeSummary(match.encounter, zone, activeMachine);
+  if (!summary.isActive || !summary.machineProfile) {
+    return {
+      isActive: false,
+      isAligned: false,
+      penalty: 0,
+      streakBonus: 0,
+      nearPenalty: 0,
+      nearMissOverload: 0,
+      profile: summary.profile,
+      machine: null as GymMachine | null,
+      nearWarn: false,
+      penaltyLabel: '0%',
+      meterPressure: 0,
+    };
+  }
+  const profile = summary.profile;
+  const nearOver = Math.max(0, match.bossChallengeNearMisses - profile.missResetGrace);
+  const missPenalty = (match.bossChallengeMisses * BOSS_CHALLENGE_PENALTY_BASE[zone.type]) / 100;
+  const nearPenalty = (nearOver * 1.9) / 100;
+  const streakMultiplier = Math.min(match.bossChallengeMatchStreak, profile.streakLimit);
+  const streakBonus = (summary.isAligned ? Math.max(0, streakMultiplier) * 0.012 : 0) + (meter > 78 ? 0.018 : 0);
+  const basePenalty = clamp(missPenalty + nearPenalty - streakBonus, 0, 0.34);
+  const nearWarn = nearOver >= 1;
+  const isAligned = summary.isAligned;
+  const pressure = isAligned ? 1 : -1;
+  return {
+    isActive: true,
+    isAligned,
+    penalty: basePenalty,
+    streakBonus,
+    nearPenalty,
+    nearMissOverload: nearOver,
+    profile,
+    machine: summary.machineProfile,
+    nearWarn,
+    penaltyLabel: `${Math.round(basePenalty * 100)}%`,
+    meterPressure: pressure,
+  };
+}
+
+function matchMovePenalty(
+  moveMismatchPenalty: number,
+  isChallengeMachine: boolean,
+  nearMisses: number,
+  streak: number,
+) {
+  if (isChallengeMachine) {
+    return 0;
+  }
+  const nearPenalty = clamp(Math.max(0, nearMisses - 1) * 1.1, 0, 8);
+  const streakShield = Math.min(streak, 3) * 1.2;
+  return clamp(Math.max(1, moveMismatchPenalty) + nearPenalty - streakShield, 0, 16);
+}
+
 function trainerArenaPressure(trainer: TrainerProfile, machine: GymMachine | null, zone: GymArea) {
   const activeMachine = machine ?? zone.machines[0] ?? null;
   if (!activeMachine) return 0;
@@ -353,13 +512,8 @@ function bossChallengePressure(encounter: Encounter, zone: GymArea, selectedMach
   if (!encounter.isBoss) return 0;
   const challengeMachine = getBossChallengeMachine(encounter, zone);
   if (!challengeMachine || !selectedMachine) return 0;
-  const difficulty = BOSS_CHALLENGE_PRESSURE[zone.type];
-  if (challengeMachine.id === selectedMachine.id) {
-    return difficulty.matchMachineBonus;
-  }
-  return selectedMachine.focus.toLowerCase() === challengeMachine.focus.toLowerCase()
-    ? difficulty.focusMatchBonus
-    : difficulty.focusMismatchPenalty;
+  const summary = bossChallengeSummary(encounter, zone, selectedMachine);
+  return summary.bonus;
 }
 
 function matchCatchModifier(
@@ -1746,6 +1900,25 @@ function createOpponent(zone: GymArea): Encounter {
   return { creature, level, zoneId: zone.id, catchChance: getCatchChance(level, creature.isExotic), isBoss: false };
 }
 
+function bossChallengeDifficultyForBoss(zone: GymArea, boss: GymBoss) {
+  const tierByPower = boss.powerBoost >= 24 || zone.type === 'higher' ? 'high' : boss.powerBoost >= 16 || zone.type === 'starter' ? 'normal' : 'low';
+  return tierByPower as BossChallengeTier;
+}
+
+function bossMachineByDifficulty(zone: GymArea, tier: BossChallengeTier) {
+  const candidates = zone.machines;
+  if (!candidates.length) return null;
+  if (tier === 'high' && candidates.length > 1) {
+    const index = randInt(0, candidates.length - 1);
+    const priority = candidates[index % candidates.length];
+    return priority;
+  }
+  if (tier === 'normal' && candidates.length > 1) {
+    return randInt(0, candidates.length - 1) % 2 === 0 ? candidates[0] : candidates[candidates.length - 1];
+  }
+  return candidates[Math.floor(candidates.length / 2)] ?? candidates[0]!;
+}
+
 function createBoss(zone: GymArea): Encounter {
   const pool = bossForZone(zone.id);
   const boss = randomChoice(pool);
@@ -1753,7 +1926,8 @@ function createBoss(zone: GymArea): Encounter {
   const level = randInt(zone.levelMin + boss.levelShift, zone.levelMax + boss.levelShift);
   const baseChance = getCatchChance(level, creature.isExotic);
   const zoneMultiplier = BOSS_ZONE_CATCH_SCALE[zone.type];
-  const machine = randomChoice(zone.machines) ?? null;
+  const tier = bossChallengeDifficultyForBoss(zone, boss);
+  const machine = bossMachineByDifficulty(zone, tier);
   return {
     creature,
     level,
@@ -1762,6 +1936,7 @@ function createBoss(zone: GymArea): Encounter {
     isBoss: true,
     bossName: `${boss.name} — ${creature.name}`,
     bossPowerBonus: boss.powerBoost,
+    bossChallengeTier: tier,
     bossChallengeMachineId: machine?.id,
     bossChallengeMachineName: machine?.name,
   };
@@ -1945,6 +2120,23 @@ export default function App() {
   const isMatchChallengeAligned = match?.isBossChallengeActive && match.bossChallengeMachineId && activeMachine
     ? activeMachine.id === match.bossChallengeMachineId
     : null;
+  const activeMatchChallengeSummary = match ? bossChallengeSummary(match.encounter, encounterZone, activeMachine ?? null) : null;
+  const activeMatchChallengeProfile = match
+    ? bossChallengeProfileForZone(encounterZone.type, match.encounter)
+    : BOSS_CHALLENGE_PRESSURE[encounterZone.type];
+  const matchChallengeMissCount = match?.bossChallengeMisses ?? 0;
+  const matchChallengeNearMissCount = match?.bossChallengeNearMisses ?? 0;
+  const isMatchChallengeStreakReady =
+    match?.isBossChallengeActive &&
+    isMatchChallengeAligned === true &&
+    (match?.bossChallengeMatchStreak ?? 0) >= activeMatchChallengeProfile.streakLimit;
+  const isMatchChallengeInDanger =
+    match?.isBossChallengeActive &&
+    !isMatchChallengeAligned &&
+    matchChallengeMissCount >= Math.max(1, Math.ceil(activeMatchChallengeProfile.streakLimit / 1.6));
+  const isMatchChallengeNearWarn =
+    match?.isBossChallengeActive &&
+    matchChallengeNearMissCount > activeMatchChallengeProfile.missResetGrace;
   const challengeAlignmentText =
     match?.isBossChallengeActive && match.bossChallengeMachineId && isMatchChallengeAligned !== null
       ? isMatchChallengeAligned
@@ -3141,9 +3333,15 @@ export default function App() {
     const readiness = matchReadinessModifier(trainer, activeBuddy, activeZone.type);
     const challengeMachine = getBossChallengeMachine(encounter, activeZone);
     const machinePressure = bossChallengePressure(encounter, activeZone, activeMachine);
+    const challengeSummary = bossChallengeSummary(encounter, activeZone, activeMachine);
+    const challengeProfile = bossChallengeProfileForZone(activeZone.type, encounter);
+    const challengeTier = bossChallengeTierFromEncounter(encounter, activeZone.type);
+    const maxRounds = Math.max(4, challengeProfile.maxRounds - (encounterMachineBonus >= 4 ? 1 : 0));
+    const openingBonus = encounter.isBoss ? challengeProfile.matchMachineBonus : 0;
     const opening =
       encounter.isBoss && challengeMachine
-        ? `${encounter.bossName} is anchored on ${challengeMachine.name}. Press the matching machine for peak control.`
+        ? `${encounter.bossName} (${bossChallengeThresholdText(challengeSummary.tier, activeZone.type)}) is anchored on ${challengeMachine.name}. `
+          + `Hold ${challengeMachine.name} ${challengeSummary.isFocusAligned ? 'with focus alignment' : 'at least consistently'} and build ${challengeProfile.streakLimit} move streak for +${openingBonus}% control recovery.`
         : 'Keep the pressure steady and rotate your grip each round.';
     const fatigueState = workoutReadinessLabel(clamp01(1 - save.trainingFatigue / MAX_TRAINING_FATIGUE));
     const pressureSummary = `Trainer pressure ${trainerPressure} · Buddy pressure ${buddyPressure} · Challenge bonus ${
@@ -3156,15 +3354,18 @@ export default function App() {
       encounter,
       status: 'playing',
       round: 1,
-      maxRounds: 4,
+      maxRounds,
       meter: 50,
-      isBossChallengeActive: encounter.isBoss && !!encounterChallengeMachine,
-      bossChallengeMachineId: encounterChallengeMachine?.id ?? null,
-      bossChallengeMachineName: encounterChallengeMachine?.name ?? null,
+      isBossChallengeActive: encounter.isBoss && !!challengeMachine,
+      bossChallengeMachineId: challengeMachine?.id ?? null,
+      bossChallengeMachineName: challengeMachine?.name ?? null,
       bossChallengeMisses: 0,
+      bossChallengeMatchStreak: 0,
+      bossChallengeNearMisses: 0,
       lines: [
         'You and the wild buddy hit the mat, shoulders tight, and go flat on your stomachs.',
         `${opening}`,
+        `Challenge difficulty: ${challengeTier.toUpperCase()} tier · ${challengeSummary.bonusLabel} machine bias.`,
         `${encounter.isBoss ? 'BOSS' : 'WILD'} pressure check: ${pressureSummary}.`,
         `${fatigueSummary}.`,
         `Readiness edge: ${readinessSummary}.`,
@@ -3186,12 +3387,14 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const challengeMachine = getBossChallengeMachine(match.encounter, zone);
     const zoneMachine = activeMachineForMatch;
     const modifier = matchCatchModifier(match.encounter, zone, zoneMachine, trainer, activeBuddy, meter, save.trainingFatigue);
+    const challengeProfile = bossChallengeProfileForZone(zone.type, match.encounter);
+    const challengePenaltyState = bossChallengeCapturePenalty(match, zone, zoneMachine, meter);
     const zoneCatchProfile = BOSS_CAPTURE_WEIGHTS[zone.type];
     const base = clamp(match.encounter.catchChance + modifier.meterDelta, 0.08, 0.97);
     const bonus = clamp(modifier.raw / BOSS_METER_CATCH_SCALE[zone.type], -0.24, 0.32);
     const readinessBonus = clamp(modifier.readinessTotal / BOSS_CAPTURE_READINESS_SCALE[zone.type], -0.12, 0.12);
-    const challengeMissPenaltyFactor =
-      match.encounter.isBoss && match.isBossChallengeActive ? clamp(match.bossChallengeMisses * 0.025, 0, 0.22) : 0;
+    const isChallengeMachine = !!(challengeMachine && zoneMachine && zoneMachine.id === challengeMachine.id);
+    const challengeMissPenaltyFactor = match.encounter.isBoss && match.isBossChallengeActive ? challengePenaltyState.penalty : 0;
     const finalChance = clamp(
       base + bonus + readinessBonus - challengeMissPenaltyFactor,
       zoneCatchProfile.minCatch,
@@ -3208,8 +3411,13 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           : `The boss requested ${challengeMachine.name}; you are fighting off that angle elsewhere.`,
       );
     }
-    if (match.encounter.isBoss && match.isBossChallengeActive && match.bossChallengeMisses > 0) {
-      lines.push(`Challenge misses: ${match.bossChallengeMisses} and counting — capture chance -${Math.round(challengeMissPenaltyFactor * 100)}%.`);
+    if (challengePenaltyState.isActive) {
+      lines.push(
+        `Challenge state: ${match.bossChallengeMatchStreak}/${challengeProfile.streakLimit} streak · ${match.bossChallengeMisses} misses · ${match.bossChallengeNearMisses} near misses.`,
+      );
+    }
+    if (match.encounter.isBoss && match.isBossChallengeActive && challengePenaltyState.penalty > 0.005) {
+      lines.push(`Capture penalty: -${challengePenaltyState.penaltyLabel} (streak bonus ${Math.round(challengePenaltyState.streakBonus * 100)}%).`);
     }
 
     if (!passHold) {
@@ -3238,6 +3446,9 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     }
     const roll = Math.random();
     if (roll > finalChance) {
+      if (match.encounter.isBoss && challengePenaltyState.isActive && challengePenaltyState.nearWarn) {
+        lines.push('Challenge discipline dropped. Re-center the required machine or your grip loses edge.');
+      }
       setMatch((current) =>
         current
           ? {
@@ -3264,7 +3475,8 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       xp: 0,
     };
 
-    if (save.team.length >= TEAM_SIZE) {
+    const teamIsFull = save.team.length >= TEAM_SIZE;
+    if (teamIsFull) {
       setMatch((current) =>
         current
           ? {
@@ -3333,23 +3545,48 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const activeMachineForMatch = selectedMachine ?? zone.machines[0] ?? null;
     const challengeMachine = match.encounter.isBoss ? getBossChallengeMachine(match.encounter, zone) : null;
     const isChallengeMachine = !!(challengeMachine && activeMachineForMatch && activeMachineForMatch.id === challengeMachine.id);
-    const challengeMissPenalty = match.encounter.isBoss && match.isBossChallengeActive && !isChallengeMachine && challengeMachine
-      ? clamp(
-          6 + Math.min(9, match.bossChallengeMisses * 2),
-          0,
-          24,
-        )
-      : 0;
+    const challengeProfile = bossChallengeProfileForZone(zone.type, match.encounter);
+    const challengeMove = BOSS_CHALLENGE_MOVE_MODIFIERS[move.id];
+    const closeControl = Math.abs(match.meter - 50);
+    const moveAlignmentBonus = isChallengeMachine ? challengeMove.alignmentBonus : 0;
+    const moveMismatchPenalty = isChallengeMachine
+      ? 0
+      : clamp(Math.abs(challengeMove.mismatchPenalty) + Math.min(10, Math.floor((match.bossChallengeMisses + match.bossChallengeNearMisses) / 2)), 1, 16);
+
+    setSave((state) => ({
+      ...state,
+      trainingFatigue: clamp(state.trainingFatigue + challengeMove.staminaDrain, 0, MAX_TRAINING_FATIGUE),
+    }));
+    const nearMissNow = !isChallengeMachine && closeControl <= 10 ? 1 : 0;
     const challengeAlignmentNote =
       challengeMachine && match.encounter.isBoss && match.isBossChallengeActive
         ? isChallengeMachine
           ? 'You stay locked on the boss challenge machine.'
           : `Challenge break: ${challengeMachine.name} was expected.`
         : null;
-    const nextMisses = match.bossChallengeMisses + (isChallengeMachine ? 0 : 1);
+    const nextMisses = match.encounter.isBoss && match.isBossChallengeActive
+      ? isChallengeMachine
+        ? Math.max(0, match.bossChallengeMisses - 1)
+        : match.bossChallengeMisses + 1
+      : match.bossChallengeMisses;
+    const nextNearMisses = match.encounter.isBoss && match.isBossChallengeActive
+      ? isChallengeMachine
+        ? Math.max(0, match.bossChallengeNearMisses - 1)
+        : match.bossChallengeNearMisses + nearMissNow
+      : match.bossChallengeNearMisses;
+    const nextMatchStreak = match.encounter.isBoss && match.isBossChallengeActive
+      ? isChallengeMachine
+        ? clamp(match.bossChallengeMatchStreak + 1, 0, challengeProfile.streakLimit)
+        : 0
+      : match.bossChallengeMatchStreak;
     const bossPowerScale = BOSS_POWER_BONUS_SCALE[zone.type];
     const bossBonus = (match.encounter.bossPowerBonus ?? 0) * bossPowerScale;
+    const streakPressure = nextMatchStreak ? nextMatchStreak : 0;
+    const moveMomentumPenalty = matchMovePenalty(moveMismatchPenalty, isChallengeMachine, nextNearMisses, nextMatchStreak);
     const readinessShift = clamp(Math.round(modifier.readinessTotal * 0.6), -8, 8);
+    const nearMissPenalty = isChallengeMachine
+      ? 0
+      : clamp(4 + (match.bossChallengeNearMisses > challengeProfile.missResetGrace ? 2 : 0), 0, 16);
     const playerBase =
       activeBuddy.level * 1.75 +
       move.power +
@@ -3358,8 +3595,10 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       trainerPressure +
       buddyPressure +
       challengePressure +
-      (isChallengeMachine ? 4 : -challengeMissPenalty) +
+      (match.encounter.isBoss && isChallengeMachine ? 4 + moveAlignmentBonus + streakPressure : match.encounter.isBoss ? -moveMismatchPenalty : 0) -
+      (match.encounter.isBoss && !isChallengeMachine ? nearMissPenalty : 0) +
       readinessShift +
+      -challengeMove.staminaDrain +
       randInt(-5, 9);
     const wildBase =
       match.encounter.level * 2.05 +
@@ -3369,7 +3608,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       randInt(-4, 12) -
       clamp(Math.round(modifier.buddyEdge * 0.4), -4, 4);
     const delta = playerBase - wildBase;
-    const nextMeter = clamp(match.meter + Math.floor((delta - challengeMissPenalty * 0.55) / 2), 20, 92);
+    const nextMeter = clamp(match.meter + Math.floor((delta - moveMomentumPenalty) / 2), 20, 92);
     const round = match.round + 1;
 
     const line =
@@ -3382,8 +3621,19 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const nextLines = [
       ...match.lines,
       `${line} (${move.tactic}).`,
-      ...(challengeAlignmentNote ? [`${challengeAlignmentNote}${challengeMissPenalty > 0 ? ` -${challengeMissPenalty} penalty.` : ' +4 bonus.'}`] : []),
-      `Round ${match.round}: meter ${nextMeter}%${challengeMissPenalty ? ` · challenge misses ${nextMisses}` : ''}.`,
+      ...(challengeAlignmentNote
+        ? [
+            isChallengeMachine
+              ? `${challengeAlignmentNote} +${moveAlignmentBonus} bonus. ${nextMatchStreak >= challengeProfile.streakLimit ? 'Streak lock active.' : ''}`
+              : `${challengeAlignmentNote} -${moveMismatchPenalty} penalty.`,
+          ]
+        : []),
+      ...(challengeMachine
+        ? [`Challenge pressure: ${nextMisses}/${Math.max(5, challengeProfile.maxRounds)} misses · ${nextNearMisses} near-miss points.`]
+        : []),
+      `Round ${match.round}: meter ${nextMeter}%${
+        isChallengeMachine ? '' : ` · challenge misses ${nextMisses}`
+      }.`,
     ];
     if (nextMeter >= 84) {
       nextLines.push('It is almost yours. One clean burst and the pin lands.');
@@ -3413,6 +3663,8 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
             round,
             meter: nextMeter,
             bossChallengeMisses: nextMisses,
+            bossChallengeMatchStreak: nextMatchStreak,
+            bossChallengeNearMisses: nextNearMisses,
             lines: nextLines,
           }
         : current,
@@ -4078,7 +4330,15 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
               <div
                 className={`combat-stage ${
                   encounter.isBoss
-                    ? `combat-stage-boss ${isMatchChallengeAligned === false ? 'combat-stage-drift' : isMatchChallengeAligned ? 'combat-stage-lock' : ''}`
+                    ? `combat-stage-boss ${
+                        isMatchChallengeAligned === false
+                          ? 'combat-stage-drift'
+                          : isMatchChallengeStreakReady
+                            ? 'combat-stage-lock'
+                            : isMatchChallengeAligned
+                              ? 'combat-stage-lock'
+                              : ''
+                      } ${isMatchChallengeInDanger ? 'combat-stage-danger' : ''} `
                     : ''
                 }`}
               >
@@ -4107,6 +4367,11 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                       {encounterMachineBonus}
                     </small>
                   ) : null}
+                  {activeMatchChallengeSummary?.isActive ? (
+                    <small>
+                      Challenge tier: {bossChallengeThresholdText(activeMatchChallengeSummary.tier, encounterZone.type)}
+                    </small>
+                  ) : null}
                   {challengeAlignmentText ? <small>{challengeAlignmentText}</small> : null}
                   {activeBuddy ? (
                     <small>
@@ -4115,8 +4380,14 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   ) : null}
                   {match?.isBossChallengeActive && match.encounter?.isBoss ? (
                     <small>
-                      Challenge misses: {match.bossChallengeMisses} ·
+                      Challenge misses: {match.bossChallengeMisses} · Near misses: {match.bossChallengeNearMisses} ·
                       Required machine: {match.bossChallengeMachineName ?? 'locked'}
+                    </small>
+                  ) : null}
+                  {match?.isBossChallengeActive && activeMatchChallengeSummary?.isActive ? (
+                    <small>
+                      Streak {match?.bossChallengeMatchStreak ?? 0}/{activeMatchChallengeProfile.streakLimit} ·
+                      Grace {activeMatchChallengeProfile.missResetGrace}
                     </small>
                   ) : null}
                 </div>
@@ -4134,9 +4405,13 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                         match.encounter.isBoss
                           ? isMatchChallengeAligned === false
                             ? 'meter-fill-challenge-miss'
-                            : isMatchChallengeAligned
-                              ? 'meter-fill-challenge-lock'
-                              : ''
+                            : isMatchChallengeInDanger
+                              ? 'meter-fill-challenge-danger'
+                              : isMatchChallengeStreakReady
+                                ? 'meter-fill-challenge-lock'
+                                : isMatchChallengeAligned
+                                  ? 'meter-fill-challenge-lock'
+                                  : ''
                           : ''
                       }`}
                       style={{ width: `${match.meter}%` }}
