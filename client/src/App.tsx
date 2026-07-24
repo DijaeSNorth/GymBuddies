@@ -226,17 +226,17 @@ const BOSS_CAPTURE_WEIGHTS: Record<
   'home' | 'starter' | 'higher',
   { trainerWeight: number; buddyWeight: number; bossPenaltyScale: number; maxCatch: number; minCatch: number }
 > = {
-  home: { trainerWeight: 1.2, buddyWeight: 1.03, bossPenaltyScale: 0.40, maxCatch: 0.95, minCatch: 0.1 },
-  starter: { trainerWeight: 1.13, buddyWeight: 0.98, bossPenaltyScale: 0.58, maxCatch: 0.84, minCatch: 0.07 },
-  higher: { trainerWeight: 1.05, buddyWeight: 0.94, bossPenaltyScale: 0.86, maxCatch: 0.68, minCatch: 0.04 },
+  home: { trainerWeight: 1.22, buddyWeight: 1.04, bossPenaltyScale: 0.34, maxCatch: 0.96, minCatch: 0.1 },
+  starter: { trainerWeight: 1.15, buddyWeight: 0.99, bossPenaltyScale: 0.55, maxCatch: 0.86, minCatch: 0.07 },
+  higher: { trainerWeight: 1.08, buddyWeight: 0.96, bossPenaltyScale: 0.68, maxCatch: 0.73, minCatch: 0.05 },
 };
 const BOSS_CHALLENGE_PRESSURE: Record<
   'home' | 'starter' | 'higher',
   { matchMachineBonus: number; focusMatchBonus: number; focusMismatchPenalty: number }
 > = {
   home: { matchMachineBonus: 4, focusMatchBonus: 2, focusMismatchPenalty: -2 },
-  starter: { matchMachineBonus: 7, focusMatchBonus: 4, focusMismatchPenalty: -6 },
-  higher: { matchMachineBonus: 12, focusMatchBonus: 6, focusMismatchPenalty: -11 },
+  starter: { matchMachineBonus: 6, focusMatchBonus: 3, focusMismatchPenalty: -7 },
+  higher: { matchMachineBonus: 9, focusMatchBonus: 5, focusMismatchPenalty: -9 },
 };
 const BOSS_POWER_BONUS_SCALE: Record<'home' | 'starter' | 'higher', number> = {
   home: 0.55,
@@ -1908,6 +1908,7 @@ export default function App() {
   const [worldPlayerPos, setWorldPlayerPos] = useState<WorldPosition>(() => WORLD_ZONE_POSITIONS[save.activeZoneId] ?? WORLD_ZONE_POSITIONS.home);
   const [worldMoveLockUntil, setWorldMoveLockUntil] = useState(0);
   const [lastRouteEncounterMs, setLastRouteEncounterMs] = useState(0);
+  const [previewZoneId, setPreviewZoneId] = useState<string | null>(null);
   const [showTrainerPanel, setShowTrainerPanel] = useState(false);
   const [draftTrainer, setDraftTrainer] = useState<TrainerProfile>(() => ({ ...save.trainer }));
   const [trainerEmote, setTrainerEmote] = useState<TrainerEmote>('neutral');
@@ -2466,6 +2467,92 @@ export default function App() {
     return {
       left: fromStyle.left + (toStyle.left - fromStyle.left) / 2,
       top: fromStyle.top + (toStyle.top - fromStyle.top) / 2,
+    };
+  }
+
+  function getRouteTransitionPreview(zoneId: string) {
+    const zone = AREAS.find((entry) => entry.id === zoneId);
+    if (!zone) return null;
+
+    const routePath = (() => {
+      if (zoneId === save.activeZoneId) return [save.activeZoneId];
+      const queue: string[] = [save.activeZoneId];
+      const previous = new Map<string, string | null>([[save.activeZoneId, null]]);
+      const visited = new Set<string>([save.activeZoneId]);
+      let pointer = 0;
+      let targetReached = false;
+
+      while (pointer < queue.length && !targetReached) {
+        const current = queue[pointer++];
+        const neighbors = WORLD_ROUTES[current] ?? [];
+
+        for (const next of neighbors) {
+          if (visited.has(next)) continue;
+          if (!isZoneUnlocked(next) && next !== zoneId) continue;
+
+          visited.add(next);
+          previous.set(next, current);
+          queue.push(next);
+
+          if (next === zoneId) {
+            targetReached = true;
+            break;
+          }
+        }
+      }
+
+      if (!targetReached) return null;
+
+      const path: string[] = [];
+      let cursor: string | null = zoneId;
+      while (cursor) {
+        path.unshift(cursor);
+        cursor = previous.get(cursor) ?? null;
+      }
+      return path;
+    })();
+
+    const routeProfile = routeProfileFromZones(save.activeZoneId, zoneId);
+    const isDirect = WORLD_ROUTES[save.activeZoneId]?.includes(zoneId);
+    const isUnlocked = isZoneUnlocked(zoneId);
+    const routePathLength = routePath?.length ?? 0;
+    const routeDistance = Math.max(0, routePathLength - 1);
+    const routePathName =
+      routePathLength > 1 ? routePath!.map((entry) => zoneNames[entry] ?? entry).join(' → ') : zoneNames[zoneId] ?? zoneId;
+    let pathFatigueCost = 0;
+    let pathEncounterBoost = 0;
+
+    if (routePath && routePathLength > 1) {
+      for (let index = 0; index < routePathLength - 1; index += 1) {
+        const from = routePath[index];
+        const to = routePath[index + 1];
+        pathFatigueCost += routeFatigueCost(from, to, activeZone.type);
+        pathEncounterBoost += routeProfileFromZones(from, to)?.encounterBoost ?? 0;
+      }
+    }
+
+    const normalizedEncounterChance = routeDistance
+      ? Math.min(
+          0.55,
+          WORLD_ROUTE_ENCOUNTER_RATE[zone.type] *
+            (1 + pathEncounterBoost / Math.max(1, routeDistance)) *
+            (1 + clamp01(save.trainingFatigue / MAX_TRAINING_FATIGUE) * 0.2),
+        )
+      : 0;
+    const fatigueCost = routeDistance > 0 ? pathFatigueCost / routeDistance : pathFatigueCost;
+    return {
+      zone,
+      isDirect,
+      isUnlocked,
+      routePath: routePath ?? null,
+      routeDistance,
+      routePathName,
+      routeName: routeDistance > 1 ? `${routeDistance}-hop route` : routeProfile?.routeName ?? 'Route',
+      fatigueCost,
+      encounterBoost: routeProfile?.encounterBoost ?? 0,
+      encounterChance: normalizedEncounterChance,
+      canTravelNow: isUnlocked && routePathLength > 0,
+      bossTicker: getGymBossTicker(zone),
     };
   }
 
@@ -3561,6 +3648,10 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                     }`}
                     onClick={() => switchArea(area.id)}
                     disabled={(!linked && !isActive) || (!isUnlocked && !isActive)}
+                    onMouseEnter={() => setPreviewZoneId(area.id)}
+                    onMouseLeave={() => setPreviewZoneId((current) => (current === area.id ? null : current))}
+                    onFocus={() => setPreviewZoneId(area.id)}
+                    onBlur={() => setPreviewZoneId((current) => (current === area.id ? null : current))}
                     aria-label={`Travel to ${area.name}`}
                     title={
                       isActive
@@ -3579,6 +3670,30 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   </button>
                 );
               })}
+              {previewZoneId && (() => {
+                const preview = getRouteTransitionPreview(previewZoneId);
+                if (!preview) return null;
+                return (
+                  <div className="route-preview-card" key={`preview-${preview.zone.id}`}>
+                    <div className="route-preview-title">
+                      {zoneNames[preview.zone.id] ?? preview.zone.id}
+                    </div>
+                    <small className="small-note">
+                      {preview.canTravelNow
+                        ? preview.isDirect
+                          ? 'Direct travel route active'
+                          : `Unlocked ${preview.routeDistance}-hop route`
+                        : 'Route not unlocked yet'}
+                    </small>
+                    <small className="small-note">Route: {preview.routeName}</small>
+                    <small className="small-note">Path: {preview.routePathName}</small>
+                    <small className="small-note">Fatigue cost: {preview.fatigueCost.toFixed(1)}</small>
+                    <small className="small-note">Scouting chance: {Math.round(preview.encounterChance * 100)}%</small>
+                    <small className="small-note">Boss timer: {preview.bossTicker}</small>
+                    {!preview.isUnlocked ? <small className="small-note route-preview-lock">Locked zone</small> : null}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

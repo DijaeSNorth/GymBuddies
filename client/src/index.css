@@ -595,6 +595,26 @@ button {
   gap: 5px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-bottom: 8px;
+  position: relative;
+}
+
+.route-preview-card {
+  grid-column: 1 / -1;
+  border: 2px solid #2f5f7f;
+  background: #0f2942;
+  padding: 6px;
+  margin-top: 2px;
+  display: grid;
+  gap: 3px;
+}
+
+.route-preview-title {
+  color: #ffd166;
+  font-size: 9px;
+}
+
+.route-preview-lock {
+  color: #fbbf24;
 }
 
 .zone-hero {
