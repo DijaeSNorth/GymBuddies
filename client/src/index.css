@@ -161,6 +161,13 @@ button {
   background: rgba(0, 19, 32, 0.45);
 }
 
+.world-move-controls {
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .world-route-pill {
   border: 2px solid #2f6e94;
   color: #e7f2ff;
@@ -191,6 +198,90 @@ button {
   margin-top: 8px;
   display: grid;
   gap: 8px;
+}
+
+.world-mini-grid {
+  position: relative;
+  margin-top: 8px;
+  min-height: 150px;
+  padding: 8px;
+  border: 2px solid #23435c;
+  background: #08192c;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.world-mini-node {
+  min-height: 34px;
+  border: 2px solid #2f5e80;
+  background: #0f2e48;
+  color: #d0e7ff;
+  padding: 4px;
+  text-align: center;
+  font-size: 7px;
+  display: grid;
+  gap: 2px;
+  align-items: center;
+}
+
+.world-mini-node small {
+  color: #8bb2cf;
+  font-size: 7px;
+}
+
+.world-mini-node.active {
+  border-color: #ffd166;
+  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.26);
+}
+
+.world-mini-node[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.world-mini-node.route-ready {
+  border-color: #3ea0c8;
+}
+
+.world-mini-node.route-locked {
+  filter: grayscale(0.42);
+}
+
+.world-mini-trainer {
+  grid-column: 1;
+  grid-row: 1;
+  width: 26px;
+  height: 26px;
+  background: #ffd166;
+  color: #1a1a1a;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: bold;
+  justify-self: center;
+  align-self: center;
+  transition: all 0.2s ease;
+  z-index: 2;
+  animation: trainerPulse 0.8s steps(1) infinite;
+}
+
+.trainer-facing-up {
+  transform: translateY(-2px);
+}
+
+.trainer-facing-down {
+  transform: translateY(2px);
+}
+
+.trainer-facing-left {
+  transform: translateX(-2px);
+}
+
+.trainer-facing-right {
+  transform: translateX(2px);
 }
 
 .world-node {
@@ -820,6 +911,17 @@ button {
 
   to {
     transform: translateX(2px);
+  }
+}
+
+@keyframes trainerPulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(255, 209, 102, 0));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 8px rgba(255, 209, 102, 0.55));
   }
 }
 

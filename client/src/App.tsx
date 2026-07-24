@@ -150,6 +150,7 @@ type SaveAudioSettings = {
 
 type MusicZoneState = 'home' | 'ambient' | 'fight' | 'boss';
 type MusicIntensity = 'home' | 'starter' | 'higher';
+type CardinalDirection = 'up' | 'down' | 'left' | 'right';
 
 type AudioEngine = {
   context: AudioContext;
@@ -946,6 +947,24 @@ const WORLD_ROUTES: Record<string, string[]> = {
   'higher-3': ['higher-2'],
 };
 
+const WORLD_NAVIGATION: Record<string, Partial<Record<CardinalDirection, string>>> = {
+  home: { right: 'starter-a' },
+  'starter-a': { left: 'home', right: 'starter-b' },
+  'starter-b': { left: 'starter-a', down: 'higher-1' },
+  'higher-1': { up: 'starter-b', right: 'higher-2' },
+  'higher-2': { left: 'higher-1', right: 'higher-3' },
+  'higher-3': { left: 'higher-2' },
+};
+
+const WORLD_MAP_LAYOUT: Record<string, { col: number; row: number }> = {
+  home: { col: 1, row: 2 },
+  'starter-a': { col: 2, row: 2 },
+  'starter-b': { col: 3, row: 2 },
+  'higher-1': { col: 3, row: 1 },
+  'higher-2': { col: 4, row: 1 },
+  'higher-3': { col: 5, row: 1 },
+};
+
 function formatRemainingTime(ms: number) {
   const left = Math.max(0, Math.ceil(ms / 1000));
   if (left <= 0) return 'ready';
@@ -1573,6 +1592,7 @@ export default function App() {
   ]);
   const [showRoadmap, setShowRoadmap] = useState(false);
   const [zoneTransit, setZoneTransit] = useState<ZoneTransit | null>(null);
+  const [trainerFacing, setTrainerFacing] = useState<CardinalDirection>('down');
   const [showTrainerPanel, setShowTrainerPanel] = useState(false);
   const [draftTrainer, setDraftTrainer] = useState<TrainerProfile>(() => ({ ...save.trainer }));
   const [trainerEmote, setTrainerEmote] = useState<TrainerEmote>('neutral');
@@ -1607,6 +1627,12 @@ export default function App() {
   const trainerPhysique = trainerPhysiqueLevel(trainer.muscles);
   const draftTrainerPhysique = trainerPhysiqueLevel(draftTrainer.muscles);
   const connectedZones = WORLD_ROUTES[save.activeZoneId] ?? [];
+  const movementOptions = WORLD_NAVIGATION[save.activeZoneId] ?? {};
+  const movementEntries = Object.entries(movementOptions) as Array<[CardinalDirection, string]>;
+  const isTraveling = Boolean(zoneTransit);
+  const movementHint = movementEntries
+    .map(([direction, zoneId]) => `${direction.toUpperCase()}: ${zoneNames[zoneId] ?? zoneId}`)
+    .join(' · ');
   const workoutProgress =
     !workoutSession || workoutSession.phase === 'resolved'
       ? 0
@@ -1810,6 +1836,36 @@ export default function App() {
   ]);
 
   useEffect(() => {
+    if (!save.hasStarterSet) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (showRoadmap) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return;
+
+      const key = event.key.toLowerCase();
+      const directionByKey: Record<string, CardinalDirection | undefined> = {
+        arrowup: 'up',
+        w: 'up',
+        arrowdown: 'down',
+        s: 'down',
+        arrowleft: 'left',
+        a: 'left',
+        arrowright: 'right',
+        d: 'right',
+      };
+      const direction = directionByKey[key];
+      if (!direction) return;
+
+      event.preventDefault();
+      moveTrainerByDirection(direction);
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [save.hasStarterSet, showRoadmap, isTraveling, moveTrainerByDirection]);
+
+  useEffect(() => {
     return () => {
       if (!audioRef.current) return;
       audioRef.current.dispose();
@@ -1933,6 +1989,20 @@ export default function App() {
       hasStarterSet: false,
     }));
     setMessage('Trainer setup reopened. Finish your custom gear and build your body stats again.');
+  }
+
+  function moveTrainerByDirection(direction: CardinalDirection) {
+    if (isTraveling) {
+      setMessage('Wait for the zone transition to finish.');
+      return;
+    }
+    setTrainerFacing(direction);
+    const nextId = WORLD_NAVIGATION[save.activeZoneId]?.[direction];
+    if (!nextId) {
+      setMessage(`No connected route for ${direction.toUpperCase()}.`);
+      return;
+    }
+    switchArea(nextId);
   }
 
   function pulseTrainerEmote(state: TrainerEmote, ttl = 1800) {
@@ -2104,6 +2174,39 @@ export default function App() {
                   </div>
                 );
               })}
+            </div>
+            <h3>Trainer Path Preview</h3>
+            <div className="world-mini-grid">
+              {AREAS.map((zone) => {
+                const position = WORLD_MAP_LAYOUT[zone.id];
+                if (!position) return null;
+                const linked = connectedZones.includes(zone.id);
+                const isActive = save.activeZoneId === zone.id;
+                const isRouteReady = linked || isActive;
+                return (
+                  <button
+                    key={`setup-${zone.id}`}
+                    className={`world-mini-node ${isActive ? 'active' : ''} ${isRouteReady ? 'route-ready' : 'route-locked'}`}
+                    style={{
+                      gridColumn: position.col,
+                      gridRow: position.row,
+                    }}
+                    onClick={() => switchArea(zone.id)}
+                    disabled={!isRouteReady}
+                  >
+                    {zone.name}
+                  </button>
+                );
+              })}
+              <div
+                className="world-mini-trainer"
+                style={{
+                  gridColumn: WORLD_MAP_LAYOUT[activeZone.id]?.col ?? 1,
+                  gridRow: WORLD_MAP_LAYOUT[activeZone.id]?.row ?? 1,
+                }}
+              >
+                {ZONE_VIBES[activeZone.id]?.icon ?? '🧍'}
+              </div>
             </div>
           </section>
         </main>
@@ -2554,8 +2657,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     return Math.round((value / max) * 100);
   }
 
-  return (
-    {!save.hasStarterSet ? renderStarterSetup() : (
+  return !save.hasStarterSet ? renderStarterSetup() : (
     <div className="app-shell">
       {zoneTransit && (
         <div className="zone-transition">
@@ -2668,8 +2770,54 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           </div>
           <p className="small-note">Current: {activeZone.name}</p>
           <p className="small-note">Boss in this gym: {bossTicker} until spawn · active interval 5-10 min</p>
+          <p className="small-note">Move with WASD or arrow keys: {movementHint || 'No exits available'}</p>
+          {movementEntries.length > 0 ? (
+            <div className="world-move-controls">
+              {movementEntries.map(([direction, zoneId]) => (
+                <button
+                  key={`${direction}-${zoneId}`}
+                  className="secondary-btn micro-btn"
+                  onClick={() => moveTrainerByDirection(direction)}
+                  disabled={isTraveling}
+                >
+                  {direction.toUpperCase()} → {zoneNames[zoneId]}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="world-route-list">
             <div className="world-route-pill">Available routes: {connectedZones.join(' · ') || 'none'}</div>
+            <div className="world-mini-grid">
+              {AREAS.map((zone) => {
+                const position = WORLD_MAP_LAYOUT[zone.id];
+                if (!position) return null;
+                const isActive = zone.id === save.activeZoneId;
+                return (
+                  <button
+                    key={`main-${zone.id}`}
+                    className={`world-mini-node ${isActive ? 'active' : ''}`}
+                    style={{
+                      gridColumn: position.col,
+                      gridRow: position.row,
+                    }}
+                    onClick={() => switchArea(zone.id)}
+                    disabled={zone.id !== save.activeZoneId && !WORLD_ROUTES[zone.id]?.includes(save.activeZoneId) && !connectedZones.includes(zone.id)}
+                  >
+                    {zone.type === 'home' ? '🏠' : '🏋'}
+                    <small>{zone.name}</small>
+                  </button>
+                );
+              })}
+              <div
+                className={`world-mini-trainer trainer-facing-${trainerFacing}`}
+                style={{
+                  gridColumn: WORLD_MAP_LAYOUT[activeZone.id]?.col ?? 1,
+                  gridRow: WORLD_MAP_LAYOUT[activeZone.id]?.row ?? 1,
+                }}
+              >
+                {trainer.name?.[0]?.toUpperCase() ?? 'T'}
+              </div>
+            </div>
             <div className="gym-grid">
               {AREAS.map((area) => {
                 const linked = connectedZones.includes(area.id);
