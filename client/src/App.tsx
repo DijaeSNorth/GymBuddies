@@ -2402,6 +2402,7 @@ export default function App() {
   const [trainerEmoteUntil, setTrainerEmoteUntil] = useState(0);
   const [nextRestAvailableMs, setNextRestAvailableMs] = useState(0);
   const [pendingTutorialRoute, setPendingTutorialRoute] = useState<string | null>(null);
+  const [showStarterSetup, setShowStarterSetup] = useState(true);
   const audioRef = useRef<AudioEngine | null>(null);
 
   const activeZone = useMemo(
@@ -2814,7 +2815,7 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    if (!save.hasStarterSet) return;
+    if (!save.hasStarterSet || showStarterSetup) return;
     function onKeyDown(event: KeyboardEvent) {
       if (showRoadmap) return;
       const target = event.target as HTMLElement | null;
@@ -2841,7 +2842,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [save.hasStarterSet, showRoadmap, isTraveling, moveTrainerByDirection]);
+  }, [save.hasStarterSet, showStarterSetup, showRoadmap, isTraveling, moveTrainerByDirection]);
 
   useEffect(() => {
     return () => {
@@ -2948,6 +2949,7 @@ export default function App() {
   }
 
   function launchTrainer(startWithTutorial = false) {
+    setShowStarterSetup(false);
     setSave((state) => ({
       ...state,
       hasStarterSet: true,
@@ -2977,17 +2979,24 @@ export default function App() {
       ...state,
       hasStarterSet: false,
     }));
+    setShowStarterSetup(true);
     setMessage('Trainer setup reopened. Finish your custom gear and build your body stats again.');
   }
 
+  function continueSavedJourney() {
+    if (!save.hasStarterSet) return;
+    setShowStarterSetup(false);
+    setMessage('Resuming your saved journey from home or latest unlocked gym.');
+  }
+
   useEffect(() => {
-    if (!save.hasStarterSet || !pendingTutorialRoute) return;
+    if (!save.hasStarterSet || showStarterSetup || !pendingTutorialRoute) return;
 
     if (save.activeZoneId === STARTING_ZONE_ID && !isTraveling && !worldMoveBlocked) {
       setPendingTutorialRoute(null);
       travelToZone(pendingTutorialRoute);
     }
-  }, [save.hasStarterSet, save.activeZoneId, isTraveling, worldMoveBlocked, pendingTutorialRoute]);
+  }, [save.hasStarterSet, showStarterSetup, save.activeZoneId, isTraveling, worldMoveBlocked, pendingTutorialRoute]);
 
   function moveTrainerByDirection(direction: CardinalDirection) {
     if (isTraveling) {
@@ -3368,6 +3377,9 @@ export default function App() {
                     disabled={!draftTrainer.name.trim()}
                   >
                     Start Tutorial to Starter Gym A
+                  </button>
+                  <button className="secondary-btn micro-btn" onClick={continueSavedJourney} disabled={!save.hasStarterSet}>
+                    Continue Saved Journey
                   </button>
                 </div>
               </div>
@@ -4413,7 +4425,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     return Math.round((value / max) * 100);
   }
 
-  return !save.hasStarterSet ? renderStarterSetup() : (
+  return showStarterSetup ? renderStarterSetup() : (
     <div className="app-shell">
       {zoneTransit && (
         <div className="zone-transition">
