@@ -2557,6 +2557,17 @@ export default function App() {
   const worldMovePercent = clamp01(1 - worldMoveCooldownRemaining / WORLD_MOVE_COOLDOWN_MS);
   const worldMoveBlocked = nowMs() < worldMoveLockUntil;
   const canMoveInWorld = !isTraveling && !worldMoveBlocked;
+  const connectedWalkByDirection = Object.fromEntries(connectedWalks.map((entry) => [entry.direction, entry])) as Record<
+    CardinalDirection,
+    {
+      direction: CardinalDirection;
+      next: WorldPosition;
+      destinationZone: string | null;
+      routeName: string;
+      routeFatigue: number;
+      encounterBoost: number;
+    }
+  >;
   const routeScoutCooldownRemaining = Math.max(0, WORLD_ROUTE_ENCOUNTER_COOLDOWN_MS - (tick - lastRouteEncounterMs));
   const isZoneUnlocked = (zoneId: string) => unlockedZoneSet.has(zoneId);
   const workoutProgress =
@@ -3435,6 +3446,41 @@ export default function App() {
               })}
             </div>
               <h3>Trainer Path Preview</h3>
+              <p className="small-note">
+                You can move with WASD / arrow keys, or use the on-screen D-pad below to test route tiles and unlock adjacent gyms.
+              </p>
+              <div className="world-dpad world-dpad-smol">
+                <div className="dpad-spacer" />
+                <button
+                  className={`dpad-btn ${connectedWalkByDirection.up ? 'dpad-available' : 'dpad-blocked'}`}
+                  onClick={() => moveTrainerByDirection('up')}
+                  disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.up}
+                >
+                  ▲
+                </button>
+                <div className="dpad-spacer" />
+                <button
+                  className={`dpad-btn ${connectedWalkByDirection.left ? 'dpad-available' : 'dpad-blocked'}`}
+                  onClick={() => moveTrainerByDirection('left')}
+                  disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.left}
+                >
+                  ◀
+                </button>
+                <button
+                  className={`dpad-btn ${connectedWalkByDirection.down ? 'dpad-available' : 'dpad-blocked'}`}
+                  onClick={() => moveTrainerByDirection('down')}
+                  disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.down}
+                >
+                  ▼
+                </button>
+                <button
+                  className={`dpad-btn ${connectedWalkByDirection.right ? 'dpad-available' : 'dpad-blocked'}`}
+                  onClick={() => moveTrainerByDirection('right')}
+                  disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.right}
+                >
+                  ▶
+                </button>
+              </div>
               <div
                 className="world-mini-grid world-overworld-map"
                 style={{
@@ -4592,11 +4638,42 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           <p className="small-note">
             Move with WASD or arrow keys: {movementHint || 'No exits available'}
           </p>
-          <p className="small-note">
-            Route scouting cooldown: {routeScoutCooldownRemaining <= 0 ? 'ready' : `${(routeScoutCooldownRemaining / 1000).toFixed(1)}s`}
-          </p>
-          {connectedWalks.length > 0 ? (
-            <div className="world-move-controls">
+           <p className="small-note">
+             Route scouting cooldown: {routeScoutCooldownRemaining <= 0 ? 'ready' : `${(routeScoutCooldownRemaining / 1000).toFixed(1)}s`}
+           </p>
+           <p className="small-note">Stride lock: {worldMoveBlocked ? `${(Math.max(0, worldMoveCooldownRemaining) / 1000).toFixed(1)}s` : 'ready'}</p>
+          <div className="world-dpad">
+            <button
+              className={`dpad-btn ${connectedWalkByDirection.up ? 'dpad-available' : 'dpad-blocked'}`}
+              onClick={() => moveTrainerByDirection('up')}
+              disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.up}
+            >
+              ▲
+            </button>
+            <button
+              className={`dpad-btn ${connectedWalkByDirection.left ? 'dpad-available' : 'dpad-blocked'}`}
+              onClick={() => moveTrainerByDirection('left')}
+              disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.left}
+            >
+              ◀
+            </button>
+            <button
+              className={`dpad-btn ${connectedWalkByDirection.down ? 'dpad-available' : 'dpad-blocked'}`}
+              onClick={() => moveTrainerByDirection('down')}
+              disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.down}
+            >
+              ▼
+            </button>
+            <button
+              className={`dpad-btn ${connectedWalkByDirection.right ? 'dpad-available' : 'dpad-blocked'}`}
+              onClick={() => moveTrainerByDirection('right')}
+              disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.right}
+            >
+              ▶
+            </button>
+          </div>
+           {connectedWalks.length > 0 ? (
+              <div className="world-move-controls">
               {connectedWalks.map(({ direction, destinationZone, routeName, routeFatigue, encounterBoost }) => (
                 <button
                   key={`${direction}-${destinationZone ?? 'path'}`}
