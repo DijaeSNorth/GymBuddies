@@ -1365,12 +1365,13 @@ const TRAINER_PRESETS: TrainerProfile[] = [
 ];
 
 const TUTORIAL_STEPS = [
-  'Move to Home Gym, pick a trainer name, and select your gear colors.',
-  'Train your active Buddy on Home Gym machines to earn XP and Steroids.',
+  'You are at Home Gym. Train one Buddy on the home machines to build first-day momentum.',
+  'Walk to Starter Gym A/B with the route from Home Gym and learn basic scouting.',
   'Scout a wild Buddy in Starter Gym A/B, then start a match.',
   'Press moves until the meter hits your side and lock in a catch.',
   'Watch for boss encounters in any gym every 5 to 10 minutes and beat them for progress.',
 ];
+const STARTING_TUTORIAL_GYM = 'starter-a';
 
 type WorldPosition = {
   x: number;
@@ -2400,6 +2401,7 @@ export default function App() {
   const [trainerEmote, setTrainerEmote] = useState<TrainerEmote>('neutral');
   const [trainerEmoteUntil, setTrainerEmoteUntil] = useState(0);
   const [nextRestAvailableMs, setNextRestAvailableMs] = useState(0);
+  const [pendingTutorialRoute, setPendingTutorialRoute] = useState<string | null>(null);
   const audioRef = useRef<AudioEngine | null>(null);
 
   const activeZone = useMemo(
@@ -2514,11 +2516,8 @@ export default function App() {
   const canRest = activeBuddy && !workoutSession && !encounter && !match && nowMs() >= nextRestAvailableMs;
   const restCooldownSeconds = Math.max(0, Math.ceil((nextRestAvailableMs - tick) / 1000));
   const connectedZones = WORLD_ROUTES[save.activeZoneId] ?? [];
-  const worldPlayerZone = worldTileZoneId(worldPlayerPos);
-  const playerHasUnresolvedZoneEntry = worldPlayerZone !== null && worldPlayerZone !== save.activeZoneId;
   const worldPlayerPixelPos = worldTileToStyle(worldPlayerPos);
   const isTraveling = Boolean(zoneTransit);
-  const isWorldMoving = playerHasUnresolvedZoneEntry || isTraveling;
   const trainingFatigueLevel = workoutReadinessLabel(clamp(1 - save.trainingFatigue / MAX_TRAINING_FATIGUE, 0, 1));
   const connectedWalks = (Object.entries(WORLD_DIRECTION_VECTORS) as Array<[CardinalDirection, WorldPosition]>)
     .map(([direction, delta]) => {
@@ -2556,6 +2555,7 @@ export default function App() {
   const worldMoveCooldownRemaining = Math.max(0, worldMoveLockUntil - tick);
   const worldMovePercent = clamp01(1 - worldMoveCooldownRemaining / WORLD_MOVE_COOLDOWN_MS);
   const worldMoveBlocked = nowMs() < worldMoveLockUntil;
+  const canMoveInWorld = !isTraveling && !worldMoveBlocked;
   const routeScoutCooldownRemaining = Math.max(0, WORLD_ROUTE_ENCOUNTER_COOLDOWN_MS - (tick - lastRouteEncounterMs));
   const isZoneUnlocked = (zoneId: string) => unlockedZoneSet.has(zoneId);
   const workoutProgress =
@@ -2947,17 +2947,28 @@ export default function App() {
     });
   }
 
-  function launchTrainer() {
+  function launchTrainer(startWithTutorial = false) {
     setSave((state) => ({
       ...state,
       hasStarterSet: true,
+      activeZoneId: STARTING_ZONE_ID,
+      unlockedZoneIds: normalizeUnlockedZones(FALLBACK_UNLOCKED_ZONES),
+      tutorialStep: 0,
       trainer: {
         ...draftTrainer,
         name: draftTrainer.name.trim() || 'Trainer',
       },
     }));
+    setWorldPlayerPos(WORLD_ZONE_POSITIONS[STARTING_ZONE_ID] ?? WORLD_ZONE_POSITIONS.home);
+    setWorldMoveLockUntil(0);
+    setTrainerFacing('down');
+    setPendingTutorialRoute(startWithTutorial ? STARTING_TUTORIAL_GYM : null);
+    setMessage(
+      startWithTutorial
+        ? `Welcome to your journey, ${draftTrainer.name || 'Trainer'}. Starting at Home Gym and guiding you to Starter Gym A...`
+        : `Welcome to your journey, ${draftTrainer.name || 'Trainer'}. You are at Home Gym.`,
+    );
     activateAudioEngine().emitSfx('matchStart', 0.9);
-    setMessage(`Welcome to your journey, ${draftTrainer.name || 'Trainer'}.`);
   }
 
   function reopenTrainerSetup() {
@@ -2969,14 +2980,24 @@ export default function App() {
     setMessage('Trainer setup reopened. Finish your custom gear and build your body stats again.');
   }
 
+  useEffect(() => {
+    if (!save.hasStarterSet || !pendingTutorialRoute) return;
+
+    if (save.activeZoneId === STARTING_ZONE_ID && !isTraveling && !worldMoveBlocked) {
+      setPendingTutorialRoute(null);
+      travelToZone(pendingTutorialRoute);
+    }
+  }, [save.hasStarterSet, save.activeZoneId, isTraveling, worldMoveBlocked, pendingTutorialRoute]);
+
   function moveTrainerByDirection(direction: CardinalDirection) {
-    if (isWorldMoving) {
+    if (isTraveling) {
       setMessage('Wait for the zone transition to settle.');
       return;
     }
 
     const now = nowMs();
     if (now < worldMoveLockUntil) {
+      setMessage('Stride lock active. Try again after a brief pause.');
       return;
     }
 
@@ -3014,7 +3035,7 @@ export default function App() {
     );
     if (nextZoneId && nextZoneId !== save.activeZoneId) {
       travelToZone(nextZoneId);
-    } else if (!isWorldMoving) {
+    } else {
       trySpawnRouteEncounter(activeZone, routeBoost, routeName);
     }
   }
@@ -3124,7 +3145,7 @@ export default function App() {
   }
 
   function travelToZone(zoneId: string) {
-    if (isTraveling || isWorldMoving) {
+    if (isTraveling || !canMoveInWorld) {
       setMessage('Keep moving with a steady stride before changing lanes again.');
       return;
     }
@@ -3338,8 +3359,15 @@ export default function App() {
                   </div>
                 </div>
                 <div className="action-row">
-                  <button className="primary-btn" onClick={launchTrainer} disabled={!draftTrainer.name.trim()}>
-                    Start Journey
+                  <button className="primary-btn" onClick={() => launchTrainer(false)} disabled={!draftTrainer.name.trim()}>
+                    Start Journey (Home Gym)
+                  </button>
+                  <button
+                    className="secondary-btn"
+                    onClick={() => launchTrainer(true)}
+                    disabled={!draftTrainer.name.trim()}
+                  >
+                    Start Tutorial to Starter Gym A
                   </button>
                 </div>
               </div>
@@ -3386,7 +3414,7 @@ export default function App() {
                       top: mapPos.top - WORLD_TILE_PX / 2,
                     }}
                     onClick={() => travelToZone(zone.id)}
-                    disabled={!isRouteReady || isTraveling || isWorldMoving}
+                    disabled={!isRouteReady || isTraveling || worldMoveBlocked}
                   >
                     {zone.name}
                     {!isUnlocked && !isActive ? ' 🔒' : ''}
@@ -4527,7 +4555,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   key={`${direction}-${destinationZone ?? 'path'}`}
                   className="secondary-btn micro-btn"
                   onClick={() => moveTrainerByDirection(direction)}
-                  disabled={isTraveling || isWorldMoving}
+                  disabled={isTraveling || worldMoveBlocked}
                 >
                   {direction.toUpperCase()} · {routeName} → {destinationZone ? zoneNames[destinationZone] ?? destinationZone : 'Path'} · +{routeFatigue.toFixed(1)} fatigue{encounterBoost ? ` · +${Math.round(encounterBoost * 100)}% encounter` : ''}
                 </button>
@@ -4594,7 +4622,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                       top: mapPos.top - (WORLD_TILE_PX / 2),
                     }}
                     onClick={() => travelToZone(zone.id)}
-                    disabled={!isRouteReady || isTraveling || isWorldMoving}
+                    disabled={!isRouteReady || isTraveling || worldMoveBlocked}
                   >
                     {zone.type === 'home' ? '🏠' : '🏋'}
                       <small>{zone.name}</small>
