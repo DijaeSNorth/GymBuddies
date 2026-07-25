@@ -782,7 +782,8 @@ const TRAINER_MUSCLES: Array<{ key: keyof TrainerProfile['muscles']; label: stri
   { key: 'calves', label: 'Calves', detail: 'Lower-leg density' },
 ];
 
-const SAVE_KEY = 'gymbuddies-save-v7';
+const SAVE_VERSION = 'v12';
+const SAVE_KEY = `gymbuddies-save-${SAVE_VERSION}`;
 const TEAM_SIZE = 6;
 const BOSS_MIN_MS = 5 * 60 * 1000;
 const BOSS_MAX_MS = 10 * 60 * 1000;
@@ -2268,7 +2269,7 @@ function applyXpGain(buddy: Buddy, bonus: number) {
 function initialSaveData(): SaveData {
   const preset = { ...TRAINER_PRESETS[0], name: 'Trainer' };
   const fallback: SaveData = {
-    version: 'v11',
+    version: SAVE_VERSION,
     trainingFatigue: 0,
     workoutMomentum: 0,
     deloadTokens: 0,
@@ -2304,20 +2305,9 @@ function initialSaveData(): SaveData {
     if (!raw) return fallback;
 
     const parsed = JSON.parse(raw) as Partial<SaveData>;
-      if (
-        !parsed ||
-        (parsed.version !== 'v3' &&
-          parsed.version !== 'v4' &&
-          parsed.version !== 'v5' &&
-          parsed.version !== 'v6' &&
-          parsed.version !== 'v7' &&
-          parsed.version !== 'v8' &&
-          parsed.version !== 'v9' &&
-          parsed.version !== 'v10' &&
-          parsed.version !== 'v11')
-      ) {
-      return fallback;
-    }
+      if (!parsed || !parsed.version || parsed.version !== SAVE_VERSION) {
+        return fallback;
+      }
 
     const team = (parsed.team ?? fallback.team).slice(0, TEAM_SIZE).map((buddy) => ({
       ...buddy,
