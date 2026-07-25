@@ -2854,6 +2854,20 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const openSetup = new URLSearchParams(window.location.search).get('setup') === '1';
+    if (openSetup) {
+      setShowStarterSetup(true);
+      return;
+    }
+    const forceSetup = window.localStorage.getItem('gymbuddies-force-setup');
+    if (forceSetup === '1') {
+      setShowStarterSetup(true);
+      window.localStorage.removeItem('gymbuddies-force-setup');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     window.localStorage.setItem(SAVE_KEY, JSON.stringify(save));
   }, [save]);
 
@@ -2981,6 +2995,21 @@ export default function App() {
     }));
     setShowStarterSetup(true);
     setMessage('Trainer setup reopened. Finish your custom gear and build your body stats again.');
+  }
+
+  function restartOpeningProcess() {
+    const fresh = initialSaveData();
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SAVE_KEY, JSON.stringify(fresh));
+      window.localStorage.setItem('gymbuddies-force-setup', '1');
+    }
+    setSave(fresh);
+    setDraftTrainer(fresh.trainer);
+    setPendingTutorialRoute(null);
+    setWorldMoveLockUntil(0);
+    setTrainerFacing('down');
+    setShowStarterSetup(true);
+    setMessage('Opening process restarted. Build your trainer and begin from Home Gym.');
   }
 
   function continueSavedJourney() {
@@ -3380,6 +3409,9 @@ export default function App() {
                   </button>
                   <button className="secondary-btn micro-btn" onClick={continueSavedJourney} disabled={!save.hasStarterSet}>
                     Continue Saved Journey
+                  </button>
+                  <button className="secondary-btn micro-btn" onClick={restartOpeningProcess}>
+                    Restart Opening Process
                   </button>
                 </div>
               </div>
@@ -4495,6 +4527,9 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           <div className="action-row">
             <button className="secondary-btn micro-btn" onClick={reopenTrainerSetup}>
               Reopen Setup
+            </button>
+            <button className="secondary-btn micro-btn" onClick={restartOpeningProcess}>
+              Reset to Opening
             </button>
             <button className="secondary-btn" onClick={resetTutorial}>
               Restart Tutorial
