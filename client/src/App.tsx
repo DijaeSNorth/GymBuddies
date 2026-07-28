@@ -1,238 +1,83 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 
-type PixelPalette = {
-  skin: string;
-  core: string;
-  detail: string;
-  accent: string;
-};
+import { BGM_NOTES } from './game/content/audio';
+import {
+  BUDDY_SPECIES as CREATURES,
+  FANCY_NAMES,
+  STARTER_BUDDIES,
+  getBuddySpeciesById,
+  resolveBuddySpeciesIdentity,
+} from './game/content/buddies';
+import { BOSS_MAX_MS, BOSS_MIN_MS, getBossesForGym } from './game/content/bosses';
+import { CAPTURE_MOVES as MOVES } from './game/content/captureMoves';
+import {
+  GYMS as AREAS,
+  STARTING_ZONE_ID,
+  WORLD_ZONE_POSITIONS,
+  ZONE_NAMES as zoneNames,
+  ZONE_VIBES,
+  getDefaultGymMachine,
+  getGymById,
+} from './game/content/gyms';
+import { ALL_TRAINING_MACHINES as ALL_GYM_MACHINES } from './game/content/machines';
+import {
+  FALLBACK_UNLOCKED_ZONES,
+  WORLD_DIRECTION_VECTORS,
+  WORLD_GRID_HEIGHT,
+  WORLD_GRID_PADDING,
+  WORLD_GRID_WIDTH,
+  WORLD_MOVE_COOLDOWN_MS,
+  WORLD_PATH_LINKS,
+  WORLD_ROUTE_ENCOUNTER_COOLDOWN_MS,
+  WORLD_ROUTE_ENCOUNTER_RATE,
+  WORLD_ROUTE_FATIGUE_BY_ZONETYPE,
+  WORLD_ROUTE_PATH_MAP,
+  WORLD_ROUTE_PATHS,
+  WORLD_ROUTES,
+  WORLD_TILE_PITCH,
+  WORLD_TILE_PX,
+  getOrderedRouteKey,
+} from './game/content/routes';
+import { SAVE_KEY, SAVE_VERSION, TEAM_SIZE } from './game/content/save';
+import {
+  DEFAULT_TRAINER_PRESET_ID,
+  FOCUSED_MUSCLES,
+  MAX_MUSCLE_LEVEL,
+  TRAINER_MUSCLES,
+  TRAINER_PRESETS,
+  getTrainerPresetById,
+} from './game/content/trainer';
+import { STARTING_TUTORIAL_GYM_ID, TUTORIAL_STEPS } from './game/content/tutorial';
+import { validateGameContentInDevelopment } from './game/content/validation';
+import { WORKOUT_DELOAD_BY_TIER, getWorkoutLoadTier } from './game/content/workoutLoads';
+import type {
+  AudioEngine,
+  BossChallengeDifficultyProfile,
+  BossChallengeStress,
+  BossChallengeTier,
+  BossSchedule,
+  Buddy,
+  BuddySpecies as Creature,
+  CardinalDirection,
+  CaptureMove as Move,
+  Encounter,
+  GymArea,
+  GymBoss,
+  GymMachine,
+  Match,
+  MusicZoneState,
+  SaveData,
+  TrainerEmote,
+  TrainerProfile,
+  WorkoutLoadTier,
+  WorkoutSession,
+  WorldPosition,
+  WorldRouteConnection,
+  ZoneTransit,
+} from './game/types';
 
-type Creature = {
-  dex: number;
-  name: string;
-  speciesHint: string;
-  flavor: string;
-  isExotic: boolean;
-  power: number;
-  sprite: string[];
-  palette: PixelPalette;
-};
+validateGameContentInDevelopment();
 
-type Buddy = {
-  id: string;
-  nickname: string;
-  creature: Creature;
-  level: number;
-  hp: number;
-  maxHp: number;
-  xp: number;
-  form: number;
-  mobility: number;
-  volume: number;
-};
-
-type GymArea = {
-  id: string;
-  name: string;
-  machines: GymMachine[];
-  type: 'home' | 'starter' | 'higher';
-  levelMin: number;
-  levelMax: number;
-  blurb: string;
-};
-
-type Encounter = {
-  creature: Creature;
-  level: number;
-  zoneId: string;
-  catchChance: number;
-  isBoss: boolean;
-  bossName?: string;
-  bossPowerBonus?: number;
-  bossChallengeMachineId?: string;
-  bossChallengeMachineName?: string;
-  bossChallengeTier?: 'low' | 'normal' | 'high';
-};
-
-type Move = {
-  id: 'burst' | 'grind' | 'snap';
-  title: string;
-  tactic: string;
-  power: number;
-  control: number;
-};
-
-type WorkoutLoadTier = 'easy' | 'steady' | 'hard' | 'max';
-
-type Match = {
-  encounter: Encounter;
-  status: 'idle' | 'playing' | 'won' | 'escape' | 'failed' | 'full';
-  round: number;
-  maxRounds: number;
-  meter: number;
-  lines: string[];
-  isBossChallengeActive: boolean;
-  bossChallengeMachineId: string | null;
-  bossChallengeMachineName: string | null;
-  bossChallengeMisses: number;
-  bossChallengeMatchStreak: number;
-  bossChallengeNearMisses: number;
-};
-
-type BossChallengeStress = {
-  percent: number;
-  tone: 'safe' | 'caution' | 'danger' | 'overload';
-  label: string;
-  detail: string;
-};
-
-type GymMachine = {
-  id: string;
-  name: string;
-  detail: string;
-  focus: string;
-  xpMin: number;
-  xpMax: number;
-  xpMultiplier: number;
-  steroidChance: number;
-  hpRestore: number;
-  fatigueCost: number;
-};
-
-type BossSchedule = {
-  nextBossAt: number;
-  defeated?: number;
-};
-
-type GymBoss = {
-  id: string;
-  name: string;
-  creature: Creature;
-  levelShift: number;
-  catchMultiplier: number;
-  powerBoost: number;
-};
-
-type SaveData = {
-  version: string;
-  trainingFatigue: number;
-  workoutMomentum: number;
-  deloadTokens: number;
-  hasStarterSet: boolean;
-  unlockedZoneIds: string[];
-  trainer: TrainerProfile;
-  steroids: number;
-  activeIndex: number;
-  activeZoneId: string;
-  team: Buddy[];
-  seenDex: number[];
-  caughtDex: number[];
-  selectedMachineByZone: Record<string, string>;
-  bossSchedules: Record<string, BossSchedule>;
-  tutorialStep: number;
-  audio: SaveAudioSettings;
-};
-
-type TrainerProfile = {
-  name: string;
-  skin: string;
-  hair: string;
-  top: string;
-  shoes: string;
-  glove: string;
-  muscles: {
-    shoulders: number;
-    chest: number;
-    arms: number;
-    triceps: number;
-    core: number;
-    quads: number;
-    calves: number;
-    back: number;
-  };
-};
-
-type ZoneTransit = {
-  from: string;
-  to: string;
-  icon: string;
-  routeName?: string;
-  routeFatigue?: number;
-  routeEncounterBoost?: number;
-  routeScoutChance?: number;
-};
-
-type TrainerEmote = 'neutral' | 'grind' | 'focus' | 'level' | 'victory' | 'drained' | 'ready' | 'pump';
-
-type FocusMuscleBoost = {
-  muscle: keyof TrainerProfile['muscles'];
-  weight: number;
-};
-
-type SaveAudioSettings = {
-  enabled: boolean;
-  musicVolume: number;
-  sfxVolume: number;
-};
-
-type MusicZoneState = 'home' | 'ambient' | 'fight' | 'boss';
-type MusicIntensity = 'home' | 'starter' | 'higher';
-type CardinalDirection = 'up' | 'down' | 'left' | 'right';
-
-type AudioEngine = {
-  context: AudioContext;
-  masterGain: GainNode;
-  musicGain: GainNode;
-  sfxGain: GainNode;
-  musicTicker: ReturnType<typeof setInterval> | null;
-  enabled: boolean;
-  zone: MusicZoneState;
-  intensity: MusicIntensity;
-  step: number;
-  stepNotes: number[];
-  setEnabled: (value: boolean) => void;
-  setVolumes: (music: number, sfx: number) => void;
-  startMusic: (zone: MusicZoneState, intensity: MusicIntensity) => void;
-  stopMusic: () => void;
-  pulseTone: (frequency: number, duration: number, gain: number, wave?: OscillatorType) => void;
-  emitSfx: (event: string, intensity?: number) => void;
-  dispose: () => void;
-};
-
-type TrainingPhase = 'running' | 'spot' | 'resolved';
-
-type WorkoutSession = {
-  id: number;
-  phase: TrainingPhase;
-  zoneType: 'home' | 'starter' | 'higher';
-  buddyId: string;
-  machineId: string;
-  willFail: boolean;
-  startedAt: number;
-  durationMs: number;
-  failCheckAt: number;
-  spotWindowMs: number;
-  spotWindowStart: number;
-  spotWindowEnd: number;
-  failChance: number;
-  buddyLevelBefore: number;
-  hpLossOnFail: number;
-  staminaChange: number;
-  xpGain: number;
-  steroidsAwarded: boolean;
-  resolved: boolean;
-  spotChanceBase: number;
-  readiness: number;
-  readinessLabel: string;
-  loadPressure: number;
-  loadTier: WorkoutLoadTier;
-  setStress: number;
-  movementConsistency: number;
-  volumePreparedness: number;
-  sessionQuality: number;
-};
-
-const MAX_MUSCLE_LEVEL = 14;
 const WORKOUT_DURATION_MS = 2800;
 const WORKOUT_SPOT_WINDOW_MS = 1600;
 const WORKOUT_AUTO_FAILURE_MS = 1250;
@@ -255,25 +100,10 @@ const WORKOUT_MOMENTUM_MAX = 30;
 const WORKOUT_MOMENTUM_RECOVERY = 1;
 const WORKOUT_REST_STAT_RECOVERY_DIVISOR = 12;
 const WORKOUT_REST_DELOAD_STAT_BONUS = 1;
-const WORKOUT_DELOAD_BY_TIER: Record<WorkoutLoadTier, number> = {
-  easy: 0,
-  steady: 1,
-  hard: 1,
-  max: 2,
-};
 const BOSS_ZONE_CATCH_SCALE: Record<'home' | 'starter' | 'higher', number> = {
   home: 0.96,
   starter: 1.02,
   higher: 0.73,
-};
-type BossChallengeTier = 'low' | 'normal' | 'high';
-type BossChallengeDifficultyProfile = {
-  matchMachineBonus: number;
-  focusMatchBonus: number;
-  focusMismatchPenalty: number;
-  maxRounds: number;
-  streakLimit: number;
-  missResetGrace: number;
 };
 const BOSS_CAPTURE_WEIGHTS: Record<
   'home' | 'starter' | 'higher',
@@ -383,13 +213,6 @@ const BOSS_CAPTURE_READINESS_SCALE: Record<'home' | 'starter' | 'higher', number
   higher: 24,
 };
 
-type WorldRouteConnection = {
-  from: string;
-  to: string;
-  routeName: string;
-  travelFatigue: number;
-  encounterBoost: number;
-};
 
 function machineDifficultyMultiplier(type: 'home' | 'starter' | 'higher') {
   if (type === 'higher') return 1.2;
@@ -579,7 +402,7 @@ function matchMovePenalty(
 }
 
 function trainerArenaPressure(trainer: TrainerProfile, machine: GymMachine | null, zone: GymArea) {
-  const activeMachine = machine ?? zone.machines[0] ?? null;
+  const activeMachine = machine ?? getDefaultGymMachine(zone);
   if (!activeMachine) return 0;
   const focusScore = machineFocusScore(activeMachine, trainer);
   const overallBody = Object.values(trainer.muscles).reduce((total, value) => total + value / MAX_MUSCLE_LEVEL, 0) / 8;
@@ -747,685 +570,6 @@ function buddyGrowthFromWorkout(
   };
 }
 
-const FOCUSED_MUSCLES: Record<string, FocusMuscleBoost[]> = {
-  recovery: [{ muscle: 'core', weight: 1 }],
-  stability: [{ muscle: 'shoulders', weight: 1 }, { muscle: 'core', weight: 1 }],
-  control: [{ muscle: 'arms', weight: 1 }, { muscle: 'triceps', weight: 1 }],
-  endurance: [{ muscle: 'quads', weight: 1 }, { muscle: 'calves', weight: 1 }],
-  power: [{ muscle: 'chest', weight: 2 }, { muscle: 'arms', weight: 2 }, { muscle: 'shoulders', weight: 1 }, { muscle: 'triceps', weight: 1 }],
-  grip: [{ muscle: 'arms', weight: 3 }],
-  lockout: [{ muscle: 'chest', weight: 1 }, { muscle: 'triceps', weight: 2 }, { muscle: 'core', weight: 1 }],
-  'pull power': [{ muscle: 'back', weight: 3 }, { muscle: 'arms', weight: 1 }],
-  'base drive': [{ muscle: 'quads', weight: 2 }, { muscle: 'core', weight: 2 }],
-  tempo: [{ muscle: 'core', weight: 1 }, { muscle: 'quads', weight: 1 }],
-  timing: [{ muscle: 'core', weight: 1 }, { muscle: 'shoulders', weight: 1 }, { muscle: 'back', weight: 1 }],
-  strength: [{ muscle: 'chest', weight: 2 }, { muscle: 'back', weight: 1 }, { muscle: 'arms', weight: 2 }],
-  durability: [{ muscle: 'quads', weight: 1 }, { muscle: 'calves', weight: 1 }, { muscle: 'core', weight: 1 }],
-  precision: [{ muscle: 'triceps', weight: 1 }, { muscle: 'shoulders', weight: 1 }, { muscle: 'core', weight: 1 }],
-  rhythm: [{ muscle: 'core', weight: 1 }, { muscle: 'calves', weight: 1 }],
-  leverage: [{ muscle: 'back', weight: 2 }, { muscle: 'chest', weight: 1 }, { muscle: 'core', weight: 1 }],
-  'back pressure': [{ muscle: 'back', weight: 3 }, { muscle: 'core', weight: 1 }],
-  'raw strength': [{ muscle: 'chest', weight: 2 }, { muscle: 'arms', weight: 2 }],
-  posture: [{ muscle: 'shoulders', weight: 1 }, { muscle: 'core', weight: 2 }],
-  'core transfer': [{ muscle: 'core', weight: 2 }, { muscle: 'quads', weight: 1 }],
-  'ground break': [{ muscle: 'quads', weight: 2 }, { muscle: 'calves', weight: 2 }, { muscle: 'core', weight: 1 }],
-};
-
-const TRAINER_MUSCLES: Array<{ key: keyof TrainerProfile['muscles']; label: string; detail: string }> = [
-  { key: 'shoulders', label: 'Shoulders', detail: 'Capsule and deltoid depth' },
-  { key: 'chest', label: 'Chest', detail: 'Upper chest and pec sweep' },
-  { key: 'arms', label: 'Biceps/Forearm', detail: 'Forearm + curl width' },
-  { key: 'triceps', label: 'Triceps', detail: 'Posterior elbow mass' },
-  { key: 'back', label: 'Back', detail: 'Lats and upper torso width' },
-  { key: 'core', label: 'Core', detail: 'Ab and oblique block' },
-  { key: 'quads', label: 'Quads', detail: 'Upper leg drive mass' },
-  { key: 'calves', label: 'Calves', detail: 'Lower-leg density' },
-];
-
-const SAVE_VERSION = 'v12';
-const SAVE_KEY = `gymbuddies-save-${SAVE_VERSION}`;
-const TEAM_SIZE = 6;
-const BOSS_MIN_MS = 5 * 60 * 1000;
-const BOSS_MAX_MS = 10 * 60 * 1000;
-
-const HOME_MACHINES: GymMachine[] = [
-  {
-    id: 'home_recovery',
-    name: 'Recovery Rack',
-    detail: 'Low-load activation, shoulder re-training, and mobility flow.',
-    focus: 'Recovery',
-    xpMin: 1,
-    xpMax: 3,
-    xpMultiplier: 1.0,
-    steroidChance: 0.26,
-    hpRestore: 5,
-    fatigueCost: 0,
-  },
-  {
-    id: 'home_dumbbells',
-    name: 'Mobility Dumbbells',
-    detail: 'Slow, controlled presses to tighten lock angles and control.',
-    focus: 'Stability',
-    xpMin: 1,
-    xpMax: 4,
-    xpMultiplier: 1.06,
-    steroidChance: 0.22,
-    hpRestore: 3,
-    fatigueCost: 1,
-  },
-  {
-    id: 'home_plate',
-    name: 'Technique Plate Stack',
-    detail: 'Mini-overload sets for clean elbow path and wrist lock.',
-    focus: 'Control',
-    xpMin: 1,
-    xpMax: 5,
-    xpMultiplier: 1.12,
-    steroidChance: 0.18,
-    hpRestore: 2,
-    fatigueCost: 1,
-  },
-  {
-    id: 'home_bike',
-    name: 'Foam Roller Bike',
-    detail: 'Light cardio + bloodflow recovery for training volume.',
-    focus: 'Endurance',
-    xpMin: 1,
-    xpMax: 4,
-    xpMultiplier: 1.05,
-    steroidChance: 0.2,
-    hpRestore: 4,
-    fatigueCost: 1,
-  },
-];
-
-const STARTER_A_MACHINES: GymMachine[] = [
-  {
-    id: 'starter_a_bench',
-    name: 'Flat Bench Press Rack',
-    detail: 'Heavy pressing intervals for shoulder-endurance.',
-    focus: 'Power',
-    xpMin: 2,
-    xpMax: 5,
-    xpMultiplier: 1.18,
-    steroidChance: 0.2,
-    hpRestore: 2,
-    fatigueCost: 2,
-  },
-  {
-    id: 'starter_a_ropes',
-    name: 'Rope Pulley Station',
-    detail: 'Cable arcs teach wrist alignment and short reset speed.',
-    focus: 'Grip',
-    xpMin: 1,
-    xpMax: 5,
-    xpMultiplier: 1.15,
-    steroidChance: 0.24,
-    hpRestore: 2,
-    fatigueCost: 2,
-  },
-  {
-    id: 'starter_a_machine',
-    name: 'Iso-Lock Cables',
-    detail: 'Isometric holds for control under compression pressure.',
-    focus: 'Lockout',
-    xpMin: 2,
-    xpMax: 6,
-    xpMultiplier: 1.2,
-    steroidChance: 0.18,
-    hpRestore: 1,
-    fatigueCost: 2,
-  },
-  {
-    id: 'starter_a_rows',
-    name: 'Hammer Strength Row',
-    detail: 'Back and elbow path work for high-pressure grapples.',
-    focus: 'Pull Power',
-    xpMin: 2,
-    xpMax: 6,
-    xpMultiplier: 1.22,
-    steroidChance: 0.2,
-    hpRestore: 1,
-    fatigueCost: 3,
-  },
-];
-
-const STARTER_B_MACHINES: GymMachine[] = [
-  {
-    id: 'starter_b_leg',
-    name: 'Hack Squat Machine',
-    detail: 'Lower-body chains for stable stance and power transfer.',
-    focus: 'Base Drive',
-    xpMin: 3,
-    xpMax: 6,
-    xpMultiplier: 1.23,
-    steroidChance: 0.2,
-    hpRestore: 1,
-    fatigueCost: 3,
-  },
-  {
-    id: 'starter_b_cable',
-    name: 'Selectorized Pulley',
-    detail: 'Continuous arcs for controlled acceleration work.',
-    focus: 'Tempo',
-    xpMin: 2,
-    xpMax: 6,
-    xpMultiplier: 1.16,
-    steroidChance: 0.18,
-    hpRestore: 2,
-    fatigueCost: 2,
-  },
-  {
-    id: 'starter_b_pulley',
-    name: 'Pulley Wall Rig',
-    detail: 'High-tension pulling with precision lockout timing.',
-    focus: 'Timing',
-    xpMin: 3,
-    xpMax: 5,
-    xpMultiplier: 1.21,
-    steroidChance: 0.22,
-    hpRestore: 2,
-    fatigueCost: 2,
-  },
-  {
-    id: 'starter_b_leg_pulse',
-    name: 'Leg Press Power Stack',
-    detail: 'Pump and recover in short rounds to raise fight-stamina.',
-    focus: 'Endurance',
-    xpMin: 3,
-    xpMax: 7,
-    xpMultiplier: 1.25,
-    steroidChance: 0.18,
-    hpRestore: 1,
-    fatigueCost: 4,
-  },
-];
-
-const IRON_MACHINES: GymMachine[] = [
-  {
-    id: 'iron_armor',
-    name: 'Smith Cage Press',
-    detail: 'Guided barbell overload for dense, repeatable max-reps.',
-    focus: 'Strength',
-    xpMin: 3,
-    xpMax: 8,
-    xpMultiplier: 1.28,
-    steroidChance: 0.2,
-    hpRestore: 1,
-    fatigueCost: 3,
-  },
-  {
-    id: 'iron_row',
-    name: 'Hammer Row Dynamo',
-    detail: 'Engine-like back cycles for long fight rounds.',
-    focus: 'Durability',
-    xpMin: 4,
-    xpMax: 7,
-    xpMultiplier: 1.14,
-    steroidChance: 0.22,
-    hpRestore: 2,
-    fatigueCost: 3,
-  },
-  {
-    id: 'iron_chain',
-    name: 'Chain Cable Stack',
-    detail: 'Variable resistance for explosive lockout simulation.',
-    focus: 'Lockout',
-    xpMin: 4,
-    xpMax: 8,
-    xpMultiplier: 1.22,
-    steroidChance: 0.17,
-    hpRestore: 1,
-    fatigueCost: 3,
-  },
-  {
-    id: 'iron_grip',
-    name: 'Fat Gripper Tower',
-    detail: 'Thick handles and squeeze holds for late-round control.',
-    focus: 'Grip',
-    xpMin: 4,
-    xpMax: 8,
-    xpMultiplier: 1.24,
-    steroidChance: 0.19,
-    hpRestore: 1,
-    fatigueCost: 4,
-  },
-];
-
-const APEX_MACHINES: GymMachine[] = [
-  {
-    id: 'apex_platform',
-    name: 'Plate-Loaded Squeeze Press',
-    detail: 'Near-perfect tension under fatigue, controlled plate microloads.',
-    focus: 'Precision',
-    xpMin: 4,
-    xpMax: 9,
-    xpMultiplier: 1.31,
-    steroidChance: 0.2,
-    hpRestore: 1,
-    fatigueCost: 4,
-  },
-  {
-    id: 'apex_blink',
-    name: 'Functional Row Matrix',
-    detail: 'Short cycles with explosive resets and reset speed.',
-    focus: 'Rhythm',
-    xpMin: 3,
-    xpMax: 9,
-    xpMultiplier: 1.23,
-    steroidChance: 0.24,
-    hpRestore: 2,
-    fatigueCost: 3,
-  },
-  {
-    id: 'apex_harness',
-    name: 'Weighted Harness',
-    detail: 'Belt-loaded leverage control for long-match carry-over.',
-    focus: 'Leverage',
-    xpMin: 5,
-    xpMax: 10,
-    xpMultiplier: 1.35,
-    steroidChance: 0.18,
-    hpRestore: 1,
-    fatigueCost: 4,
-  },
-  {
-    id: 'apex_lat',
-    name: 'Cable Lat Press',
-    detail: 'Overhead and mid-back control for high-compression resistance.',
-    focus: 'Back Pressure',
-    xpMin: 5,
-    xpMax: 10,
-    xpMultiplier: 1.34,
-    steroidChance: 0.2,
-    hpRestore: 2,
-    fatigueCost: 5,
-  },
-];
-
-const GLORY_MACHINES: GymMachine[] = [
-  {
-    id: 'glory_crusher',
-    name: 'Atlas Crusher',
-    detail: 'Maximum overload cycles meant for late-game gym leaders.',
-    focus: 'Raw Strength',
-    xpMin: 6,
-    xpMax: 10,
-    xpMultiplier: 1.4,
-    steroidChance: 0.24,
-    hpRestore: 2,
-    fatigueCost: 5,
-  },
-  {
-    id: 'glory_mill',
-    name: 'Spine Mill',
-    detail: 'Precision endurance work to stay composed under pain.',
-    focus: 'Posture',
-    xpMin: 5,
-    xpMax: 11,
-    xpMultiplier: 1.28,
-    steroidChance: 0.2,
-    hpRestore: 2,
-    fatigueCost: 4,
-  },
-  {
-    id: 'glory_torso',
-    name: 'Torso Matrix',
-    detail: 'Machine-driven carryover for repeated clutch bursts.',
-    focus: 'Core Transfer',
-    xpMin: 6,
-    xpMax: 12,
-    xpMultiplier: 1.33,
-    steroidChance: 0.23,
-    hpRestore: 2,
-    fatigueCost: 5,
-  },
-  {
-    id: 'glory_deadlift',
-    name: 'Monorail Deadlift Stack',
-    detail: 'Boss-grade deadlift paths that punish weak stance.',
-    focus: 'Ground Break',
-    xpMin: 7,
-    xpMax: 12,
-    xpMultiplier: 1.38,
-    steroidChance: 0.22,
-    hpRestore: 1,
-    fatigueCost: 6,
-  },
-];
-
-const AREAS: GymArea[] = [
-  {
-    id: 'home',
-    name: 'Home Gym',
-    machines: HOME_MACHINES,
-    type: 'home',
-    levelMin: 1,
-    levelMax: 1,
-    blurb: 'Train and heal your team before entering encounters.',
-  },
-  {
-    id: 'starter-a',
-    name: 'Starter Gym A',
-    machines: STARTER_A_MACHINES,
-    type: 'starter',
-    levelMin: 1,
-    levelMax: 15,
-    blurb: 'Low-risk captures and friendly arena pressure.',
-  },
-  {
-    id: 'starter-b',
-    name: 'Starter Gym B',
-    machines: STARTER_B_MACHINES,
-    type: 'starter',
-    levelMin: 16,
-    levelMax: 25,
-    blurb: 'Mid-game catches. Your control matters more here.',
-  },
-  {
-    id: 'higher-1',
-    name: 'Iron Gym',
-    machines: IRON_MACHINES,
-    type: 'higher',
-    levelMin: 26,
-    levelMax: 35,
-    blurb: 'Higher pressure and stronger opponents.',
-  },
-  {
-    id: 'higher-2',
-    name: 'Apex Gym',
-    machines: APEX_MACHINES,
-    type: 'higher',
-    levelMin: 36,
-    levelMax: 45,
-    blurb: 'Late-band creatures, better prediction beats brute force.',
-  },
-  {
-    id: 'higher-3',
-    name: 'Glory Gym',
-    machines: GLORY_MACHINES,
-    type: 'higher',
-    levelMin: 36,
-    levelMax: 55,
-    blurb: 'Rare encounters and mythological pressure matches.',
-  },
-];
-const ALL_GYM_MACHINES = AREAS.flatMap((area) => area.machines);
-
-const GYM_BOSSES: Record<string, GymBoss[]> = {};
-
-const MOVES: Move[] = [
-  { id: 'burst', title: 'Shoulder Burst', tactic: 'fast elbow drive', power: 16, control: -4 },
-  { id: 'grind', title: 'Iron Grind', tactic: 'constant center-line pressure', power: 10, control: 10 },
-  { id: 'snap', title: 'Snapping Hook', tactic: 'quick short push', power: 13, control: -1 },
-];
-
-const CREATURES: Creature[] = [
-  {
-    dex: 1,
-    name: 'Brawny Bear',
-    speciesHint: 'Bear',
-    flavor: 'A real bear turned into a grappler with a loud chest slam.',
-    isExotic: false,
-    power: 26,
-    sprite: ['..SSSS..', '.SSMMSS.', 'SSMMMMSS', 'SMMDDMMS', 'SMMMMMMS', 'SMMMMMMS', 'SMMSMMSM', '..SSSS..'],
-    palette: { skin: '#f2c48c', core: '#5f3a26', detail: '#f7e0a8', accent: '#7b4e24' },
-  },
-  {
-    dex: 2,
-    name: 'Titan Tortoise',
-    speciesHint: 'Tortoise',
-    flavor: 'Shell first, then a heavy shoulder lock with little mercy.',
-    isExotic: false,
-    power: 22,
-    sprite: ['..GGGG..', '.GGMMGG.', 'GGHHHHGG', 'GWWHHWWG', 'GWWHHWWG', 'GGHHHHGG', '.GGGGGG.', '..GGGG..'],
-    palette: { skin: '#dbc39e', core: '#4f7345', detail: '#f5dd8f', accent: '#8d5f2d' },
-  },
-  {
-    dex: 3,
-    name: 'Iron Wolf',
-    speciesHint: 'Wolf',
-    flavor: 'It waits until your hands tremble, then hits the center line.',
-    isExotic: false,
-    power: 24,
-    sprite: ['..EEE...', '..EHHH..', '.EHHHHH.', 'EMMHHHHE', 'EMMHHMHE', 'EEMMHHHE', '.EEMMHE.', '..EE....'],
-    palette: { skin: '#d6c8a0', core: '#4d4f58', detail: '#2f2e6b', accent: '#f1c45f' },
-  },
-  {
-    dex: 4,
-    name: 'Muscled Boar',
-    speciesHint: 'Boar',
-    flavor: 'Short range, high pressure, no room for sloppy grips.',
-    isExotic: false,
-    power: 23,
-    sprite: ['.RRRRRR.', 'RRRRRRRR', 'RRMMMMRR', 'RMMMMMMR', 'RMMMDDRR', 'RRMDDMRR', '.RRRMMR.', '..RRRR..'],
-    palette: { skin: '#f2b074', core: '#7b2d1f', detail: '#7a4f2b', accent: '#6c8b45' },
-  },
-  {
-    dex: 5,
-    name: 'Ripped Rhino',
-    speciesHint: 'Rhino',
-    flavor: 'One horn-like push can decide the entire encounter.',
-    isExotic: false,
-    power: 29,
-    sprite: ['..HHHH..', '.HHHHHH.', 'HHHHHHHH', 'HHMMMMHH', 'HHMMMMHH', 'HMMMMMMH', '.HHHHHH.', '..HHHH..'],
-    palette: { skin: '#eadbc0', core: '#7a7d84', detail: '#8e4e38', accent: '#c58a56' },
-  },
-  {
-    dex: 6,
-    name: 'Boulder Bison',
-    speciesHint: 'Bison',
-    flavor: 'Burst first, squeeze until your wrists burn, then keep it tight.',
-    isExotic: false,
-    power: 27,
-    sprite: ['..PPPP..', '.PPPPPP.', 'PPWWWWPP', 'PWWMMWWP', 'PWWMMWWP', 'PWWWWWWP', '.PWWWWP.', '..PPPP..'],
-    palette: { skin: '#efe3bc', core: '#7f5a38', detail: '#6c4d2e', accent: '#c7a84e' },
-  },
-  {
-    dex: 7,
-    name: 'Buff Otter',
-    speciesHint: 'Otter',
-    flavor: 'Looks easygoing, but its core locks are deceptive.',
-    isExotic: false,
-    power: 21,
-    sprite: ['..GGGG..', '.GGMMGG.', 'GGMWWMGG', 'GMWWWWMG', 'GMGGGGMG', 'GMGMMGMG', 'GGMMMMGG', '..GGGG..'],
-    palette: { skin: '#d3aa86', core: '#53709b', detail: '#925c37', accent: '#f6dfa1' },
-  },
-  {
-    dex: 50,
-    name: 'Slycera Griffin',
-    speciesHint: 'Griffin',
-    flavor: 'A mythic winged body that refuses cheap captures.',
-    isExotic: true,
-    power: 34,
-    sprite: ['..AAAA..', '.AAMMEE.', 'AAMMWWAA', 'AAWWWWAA', 'AAMWWWAA', 'AAWWWWAA', '.AAMWAA.', '..AAAA..'],
-    palette: { skin: '#f7d28f', core: '#c23b50', detail: '#ffefba', accent: '#5a4ed6' },
-  },
-  {
-    dex: 51,
-    name: 'Cinder Manticore',
-    speciesHint: 'Manticore',
-    flavor: 'Mythic cat-body reflexes with heavy core resistance.',
-    isExotic: true,
-    power: 38,
-    sprite: ['..FFFF..', 'FFFFFFFF', 'FFMMMMFF', 'FMMWWWFF', 'FMMWWWFF', 'FMWWWWMF', 'F.MWWWF.', '..FFFF..'],
-    palette: { skin: '#f4c67a', core: '#4c4cd9', detail: '#f8f1bf', accent: '#ad3f6c' },
-  },
-  {
-    dex: 52,
-    name: 'Hydra Lurcher',
-    speciesHint: 'Hydra',
-    flavor: 'Mythic stamina and repeated counters in the final rounds.',
-    isExotic: true,
-    power: 40,
-    sprite: ['..BBBB..', '.BBBBBB.', 'BBBBBBBB', 'BBMBBMBB', 'BBMMMMBB', 'BMMMBBMB', '.BBBBBB.', '..BBBB..'],
-    palette: { skin: '#f6ab63', core: '#302f64', detail: '#b84848', accent: '#a25f34' },
-  },
-  {
-    dex: 53,
-    name: 'Pygmy Sable Pegasus',
-    speciesHint: 'Pegasus',
-    flavor: 'It uses elegant footwork to escape until you find a seam.',
-    isExotic: true,
-    power: 36,
-    sprite: ['..CCCC..', '.CCMMCC.', 'CCMMMMCC', 'CMWWWWMC', 'CMWMMWMC', 'CMWMMWMC', '.CMWWMC.', '..CCCC..'],
-    palette: { skin: '#f3cc97', core: '#385db3', detail: '#fbe5b0', accent: '#8d71eb' },
-  },
-  {
-    dex: 54,
-    name: 'Titan Gorilla',
-    speciesHint: 'Gorilla',
-    flavor: 'Quiet, low-gear pressure. Then a brutal last pull.',
-    isExotic: false,
-    power: 30,
-    sprite: ['..BBBB..', '.BBBBBB.', 'BBMMMMBB', 'BBMDDMBB', 'BBMMMMBB', 'BBMMMMBB', '.BBBBBB.', '..BBBB..'],
-    palette: { skin: '#d6ad7b', core: '#5f4d33', detail: '#b67a46', accent: '#8b4f2e' },
-  },
-];
-
-Object.assign(GYM_BOSSES, {
-  home: [
-    { id: 'home-watchman', name: 'Mat Watchman', creature: CREATURES[0], levelShift: 4, catchMultiplier: 0.7, powerBoost: 9 },
-    { id: 'home-librarian', name: 'Steel Desk Warden', creature: CREATURES[6], levelShift: 3, catchMultiplier: 0.7, powerBoost: 7 },
-  ],
-  'starter-a': [
-    { id: 'a-rhino', name: 'Bench Rhino', creature: CREATURES[4], levelShift: 7, catchMultiplier: 0.62, powerBoost: 14 },
-    { id: 'a-bison', name: 'Redline Bison', creature: CREATURES[5], levelShift: 8, catchMultiplier: 0.58, powerBoost: 16 },
-  ],
-  'starter-b': [
-    { id: 'b-wolf', name: 'Iron Wolf Brute', creature: CREATURES[2], levelShift: 9, catchMultiplier: 0.55, powerBoost: 18 },
-    { id: 'b-boar', name: 'Bull Boar Prime', creature: CREATURES[3], levelShift: 8, catchMultiplier: 0.56, powerBoost: 17 },
-  ],
-  'higher-1': [
-    { id: 'h1-gryphon', name: 'Iron Griffon', creature: CREATURES[7], levelShift: 12, catchMultiplier: 0.52, powerBoost: 22 },
-    { id: 'h1-gorilla', name: 'Glory Gorilla Mk.I', creature: CREATURES[10], levelShift: 11, catchMultiplier: 0.5, powerBoost: 24 },
-  ],
-  'higher-2': [
-    { id: 'h2-hydra', name: 'Apex Hydra', creature: CREATURES[8], levelShift: 13, catchMultiplier: 0.5, powerBoost: 25 },
-    { id: 'h2-manticore', name: 'Apex Manticore', creature: CREATURES[9], levelShift: 12, catchMultiplier: 0.48, powerBoost: 27 },
-  ],
-  'higher-3': [
-    { id: 'h3-pegasus', name: 'Glory Pegasus', creature: CREATURES[10], levelShift: 14, catchMultiplier: 0.48, powerBoost: 28 },
-    { id: 'h3-pegas', name: 'Glory Twin Pegasus', creature: CREATURES[7], levelShift: 15, catchMultiplier: 0.45, powerBoost: 30 },
-  ],
-});
-
-const FANCY_NAMES = [
-  'Muscle Mommy',
-  'Bench Bro',
-  'Squat Siren',
-  'Curl Captain',
-  'Plate Whisperer',
-  'Wrist-Railer',
-  'Grip Guru',
-  'Dumbbell Diva',
-  'Snatch Ninja',
-  'Rope Rebel',
-  'Tough Toad',
-  'Pectoral Pete',
-  'Iron Mama',
-];
-
-const TRAINER_PRESETS: TrainerProfile[] = [
-  {
-    name: 'Rogue Rex',
-    skin: '#f2c48c',
-    hair: '#4f3a20',
-    top: '#2e66af',
-    shoes: '#252525',
-    glove: '#f3c56b',
-    muscles: { shoulders: 4, chest: 3, arms: 3, triceps: 2, back: 2, core: 2, quads: 1, calves: 1 },
-  },
-  {
-    name: 'Neon Nova',
-    skin: '#d9b88f',
-    hair: '#262626',
-    top: '#6c2f8f',
-    shoes: '#0f1020',
-    glove: '#ffd166',
-    muscles: { shoulders: 3, chest: 2, arms: 4, triceps: 3, back: 2, core: 3, quads: 1, calves: 2 },
-  },
-  {
-    name: 'Copper Coil',
-    skin: '#d6ad7b',
-    hair: '#5a3520',
-    top: '#b84f39',
-    shoes: '#26262a',
-    glove: '#ff7f50',
-    muscles: { shoulders: 2, chest: 5, arms: 2, triceps: 2, back: 3, core: 2, quads: 2, calves: 1 },
-  },
-  {
-    name: 'Iron Jade',
-    skin: '#f0d0a3',
-    hair: '#1f1f17',
-    top: '#2f8f75',
-    shoes: '#2f2f38',
-    glove: '#97d700',
-    muscles: { shoulders: 5, chest: 4, arms: 3, triceps: 3, back: 4, core: 4, quads: 3, calves: 2 },
-  },
-];
-
-const TUTORIAL_STEPS = [
-  'You are at Home Gym. Train one Buddy on the home machines to build first-day momentum.',
-  'Walk to Starter Gym A/B with the route from Home Gym and learn basic scouting.',
-  'Scout a wild Buddy in Starter Gym A/B, then start a match.',
-  'Press moves until the meter hits your side and lock in a catch.',
-  'Watch for boss encounters in any gym every 5 to 10 minutes and beat them for progress.',
-];
-const STARTING_TUTORIAL_GYM = 'starter-a';
-
-type WorldPosition = {
-  x: number;
-  y: number;
-};
-
-const WORLD_MOVE_COOLDOWN_MS = 220;
-const WORLD_ROUTE_ENCOUNTER_COOLDOWN_MS = 1800;
-const WORLD_GRID_WIDTH = 23;
-const WORLD_GRID_HEIGHT = 10;
-const WORLD_GRID_PADDING = 8;
-const WORLD_TILE_PX = 19;
-const WORLD_TILE_GAP = 2;
-const WORLD_TILE_PITCH = WORLD_TILE_PX + WORLD_TILE_GAP;
-
-const zoneNames = Object.fromEntries(AREAS.map((a) => [a.id, a.name])) as Record<string, string>;
-const ZONE_VIBES: Record<
-  string,
-  { icon: string; mood: string; theme: string; accent: string }
-> = {
-  home: { icon: '🏠', mood: 'Home warm-up hall', theme: 'calm baseline', accent: 'Recovery' },
-  'starter-a': { icon: '🏋', mood: 'Starter pressure room', theme: 'steady overload', accent: 'Momentum' },
-  'starter-b': { icon: '🛡', mood: 'Starter control pit', theme: 'grip discipline', accent: 'Tension' },
-  'higher-1': { icon: '⚔', mood: 'Higher gate', theme: 'first gauntlet', accent: 'Grip war' },
-  'higher-2': { icon: '🔥', mood: 'Higher forge', theme: 'mythic trials', accent: 'Resolve' },
-  'higher-3': { icon: '🏆', mood: 'Final deck', theme: 'late-game pressure', accent: 'Dominance' },
-};
-
-const WORLD_ROUTES: Record<string, string[]> = {
-  home: ['starter-a'],
-  'starter-a': ['home', 'starter-b'],
-  'starter-b': ['starter-a', 'higher-1'],
-  'higher-1': ['starter-b', 'higher-2'],
-  'higher-2': ['higher-1', 'higher-3'],
-  'higher-3': ['higher-2'],
-};
-
-const WORLD_ZONE_POSITIONS: Record<string, WorldPosition> = {
-  home: { x: 2, y: 6 },
-  'starter-a': { x: 6, y: 6 },
-  'starter-b': { x: 10, y: 6 },
-  'higher-1': { x: 10, y: 3 },
-  'higher-2': { x: 14, y: 3 },
-  'higher-3': { x: 18, y: 3 },
-};
-
-const WORLD_DIRECTION_VECTORS: Record<CardinalDirection, WorldPosition> = {
-  up: { x: 0, y: -1 },
-  down: { x: 0, y: 1 },
-  left: { x: -1, y: 0 },
-  right: { x: 1, y: 0 },
-};
-
 const WORLD_TILE_KEY = (pos: WorldPosition) => `${pos.x},${pos.y}`;
 
 function addPathTile(setRef: Set<string>, from: WorldPosition, to: WorldPosition) {
@@ -1512,70 +656,6 @@ function routeEncounterBoost(fromZoneId: string | null, toZoneId: string | null)
   const profile = routeProfileFromZones(fromZoneId, toZoneId);
   return profile?.encounterBoost ?? 0;
 }
-
-const WORLD_ROUTE_ENCOUNTER_RATE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 0,
-  starter: 0.16,
-  higher: 0.22,
-};
-const WORLD_ROUTE_FATIGUE_BY_ZONETYPE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 0.5,
-  starter: 0.9,
-  higher: 1.2,
-};
-const WORLD_PATH_LINKS: Array<[string, string]> = [
-  ['home', 'starter-a'],
-  ['starter-a', 'starter-b'],
-  ['starter-b', 'higher-1'],
-  ['higher-1', 'higher-2'],
-  ['higher-2', 'higher-3'],
-];
-function getOrderedRouteKey(fromZoneId: string, toZoneId: string) {
-  return [fromZoneId, toZoneId].sort().join('|');
-}
-const WORLD_ROUTE_PATHS: WorldRouteConnection[] = [
-  {
-    from: 'home',
-    to: 'starter-a',
-    routeName: 'Warm Up Path',
-    travelFatigue: 0.3,
-    encounterBoost: 0,
-  },
-  {
-    from: 'starter-a',
-    to: 'starter-b',
-    routeName: 'Starter Link Road',
-    travelFatigue: 0.65,
-    encounterBoost: 0.02,
-  },
-  {
-    from: 'starter-b',
-    to: 'higher-1',
-    routeName: 'Iron Gate Trail',
-    travelFatigue: 1,
-    encounterBoost: 0.04,
-  },
-  {
-    from: 'higher-1',
-    to: 'higher-2',
-    routeName: 'Forge Stretch',
-    travelFatigue: 1.2,
-    encounterBoost: 0.05,
-  },
-  {
-    from: 'higher-2',
-    to: 'higher-3',
-    routeName: 'Champion Ascent',
-    travelFatigue: 1.6,
-    encounterBoost: 0.07,
-  },
-];
-const WORLD_ROUTE_PATH_MAP = Object.fromEntries(
-  WORLD_ROUTE_PATHS.map((entry) => [getOrderedRouteKey(entry.from, entry.to), entry]),
-) as Record<string, WorldRouteConnection>;
-
-const STARTING_ZONE_ID = 'home';
-const FALLBACK_UNLOCKED_ZONES = [STARTING_ZONE_ID, ...(WORLD_ROUTES[STARTING_ZONE_ID] ?? [])];
 
 function uniqueStrings(items: string[]) {
   return [...new Set(items)];
@@ -1674,10 +754,7 @@ function workoutLoadPressure(
 }
 
 function workoutLoadTier(pressure: number): WorkoutLoadTier {
-  if (pressure >= 0.8) return 'max';
-  if (pressure >= 0.64) return 'hard';
-  if (pressure >= 0.47) return 'steady';
-  return 'easy';
+  return getWorkoutLoadTier(pressure);
 }
 
 function workoutSetStress(
@@ -1768,35 +845,6 @@ function workoutSpotSuccessChance(
 function roundForDisplay(value: number) {
   return `${Math.max(0, value)}`;
 }
-
-const BGM_NOTES: Record<
-  MusicIntensity,
-  {
-    ambient: number[];
-    scout: number[];
-    boss: number[];
-    interval: number;
-  }
-> = {
-  home: {
-    ambient: [110, 131, 146, 164],
-    scout: [123, 146, 164, 146],
-    boss: [88, 110, 123, 131],
-    interval: 470,
-  },
-  starter: {
-    ambient: [147, 165, 196, 175],
-    scout: [165, 196, 220, 247, 220],
-    boss: [220, 247, 262, 294, 247],
-    interval: 360,
-  },
-  higher: {
-    ambient: [196, 220, 247, 294],
-    scout: [220, 247, 262, 294, 262],
-    boss: [294, 330, 349, 392, 330],
-    interval: 255,
-  },
-};
 
 function clamp01(value: number) {
   return clamp(value, 0, 1);
@@ -1954,7 +1002,7 @@ function bossInterval() {
 }
 
 function bossForZone(zoneId: string): GymBoss[] {
-  return GYM_BOSSES[zoneId] ?? GYM_BOSSES[AREAS[1].id];
+  return getBossesForGym(zoneId);
 }
 
 function xpNeeded(level: number) {
@@ -2218,7 +1266,7 @@ function bossMachineByDifficulty(zone: GymArea, tier: BossChallengeTier) {
 function createBoss(zone: GymArea): Encounter {
   const pool = bossForZone(zone.id);
   const boss = randomChoice(pool);
-  const creature = boss.creature;
+  const creature = getBuddySpeciesById(boss.speciesId);
   const level = randInt(zone.levelMin + boss.levelShift, zone.levelMax + boss.levelShift);
   const baseChance = getCatchChance(level, creature.isExotic);
   const zoneMultiplier = BOSS_ZONE_CATCH_SCALE[zone.type];
@@ -2267,7 +1315,13 @@ function applyXpGain(buddy: Buddy, bonus: number) {
 }
 
 function initialSaveData(): SaveData {
-  const preset = { ...TRAINER_PRESETS[0], name: 'Trainer' };
+  const preset = {
+    ...getTrainerPresetById(DEFAULT_TRAINER_PRESET_ID).profile,
+    name: 'Trainer',
+  };
+  const starterTeam = STARTER_BUDDIES.map((starter) =>
+    seedBuddy(starter.seed, getBuddySpeciesById(starter.speciesId), starter.level),
+  );
   const fallback: SaveData = {
     version: SAVE_VERSION,
     trainingFatigue: 0,
@@ -2280,11 +1334,11 @@ function initialSaveData(): SaveData {
     },
     steroids: 3,
     activeIndex: 0,
-    activeZoneId: 'home',
-      team: [seedBuddy(1, CREATURES[0], 5), seedBuddy(2, CREATURES[1], 4)],
-      seenDex: [1, 2],
-      caughtDex: [1, 2],
-    selectedMachineByZone: Object.fromEntries(AREAS.map((zone) => [zone.id, zone.machines[0]?.id ?? ''])),
+    activeZoneId: STARTING_ZONE_ID,
+    team: starterTeam,
+    seenDex: starterTeam.map((buddy) => buddy.creature.dex),
+    caughtDex: starterTeam.map((buddy) => buddy.creature.dex),
+    selectedMachineByZone: Object.fromEntries(AREAS.map((zone) => [zone.id, zone.defaultMachineId])),
     bossSchedules: Object.fromEntries(
       AREAS.map((zone) => [zone.id, { nextBossAt: nowMs() + bossInterval(), defeated: 0 }]),
     ) as Record<string, BossSchedule>,
@@ -2311,6 +1365,7 @@ function initialSaveData(): SaveData {
 
     const team = (parsed.team ?? fallback.team).slice(0, TEAM_SIZE).map((buddy) => ({
       ...buddy,
+      creature: resolveBuddySpeciesIdentity(buddy.creature),
       level: Math.max(1, buddy.level),
       hp: Math.max(1, Math.min(buddy.maxHp, buddy.hp)),
       maxHp: Math.max(18, buddy.maxHp),
@@ -2396,7 +1451,7 @@ export default function App() {
   const audioRef = useRef<AudioEngine | null>(null);
 
   const activeZone = useMemo(
-    () => AREAS.find((area) => area.id === save.activeZoneId) ?? AREAS[0],
+    () => AREAS.find((area) => area.id === save.activeZoneId) ?? getGymById(STARTING_ZONE_ID),
     [save.activeZoneId],
   );
 
@@ -2405,7 +1460,7 @@ export default function App() {
   const caughtDex = useMemo(() => [...save.caughtDex].sort((a, b) => a - b), [save.caughtDex]);
   const activeMachine = useMemo(() => {
     const id = save.selectedMachineByZone[activeZone.id];
-    return activeZone.machines.find((machine) => machine.id === id) ?? activeZone.machines[0] ?? null;
+    return activeZone.machines.find((machine) => machine.id === id) ?? getDefaultGymMachine(activeZone);
   }, [activeZone, save.selectedMachineByZone]);
   const bossSchedule = save.bossSchedules[activeZone.id];
   const bossTicker = formatRemainingTime((bossSchedule?.nextBossAt ?? tick) - tick);
@@ -2498,7 +1553,8 @@ export default function App() {
         : `Not on required machine: ${match.bossChallengeMachineName ?? 'required machine'}`
       : null;
   const tutorialActive = save.tutorialStep < TUTORIAL_STEPS.length;
-  const currentTutorialText = TUTORIAL_STEPS[Math.min(save.tutorialStep, TUTORIAL_STEPS.length - 1)] ?? '';
+  const currentTutorialText =
+    TUTORIAL_STEPS[Math.min(save.tutorialStep, TUTORIAL_STEPS.length - 1)]?.text ?? '';
   const zoneVibe = ZONE_VIBES[activeZone.id] ?? { icon: '🗺', mood: 'Unknown', theme: 'open gym', accent: 'Unknown' };
   const activeEmote: TrainerEmote = trainerEmoteUntil > tick ? trainerEmote : 'neutral';
   const trainerPhysique = trainerPhysiqueLevel(trainer.muscles);
@@ -2979,7 +2035,7 @@ export default function App() {
     setWorldPlayerPos(WORLD_ZONE_POSITIONS[STARTING_ZONE_ID] ?? WORLD_ZONE_POSITIONS.home);
     setWorldMoveLockUntil(0);
     setTrainerFacing('down');
-    setPendingTutorialRoute(startWithTutorial ? STARTING_TUTORIAL_GYM : null);
+    setPendingTutorialRoute(startWithTutorial ? STARTING_TUTORIAL_GYM_ID : null);
     setMessage(
       startWithTutorial
         ? `Welcome to your journey, ${draftTrainer.name || 'Trainer'}. Starting at Home Gym and guiding you to Starter Gym A...`
@@ -3281,7 +2337,7 @@ export default function App() {
     setEncounter(null);
     setMatch(null);
     activateAudioEngine().emitSfx('zoneShift', 0.6);
-    const machineName = zone.machines[0]?.name ?? 'no machine';
+    const machineName = getDefaultGymMachine(zone).name;
     setMessage(`Moved to ${zone.name}. Current machine: ${machineName}.`);
     pulseTrainerEmote('focus', 1600);
     triggerBossSpawn(zone);
@@ -3346,13 +2402,13 @@ export default function App() {
                 </div>
 
                 <div className="trainer-presets">
-                  {TRAINER_PRESETS.map((profile) => (
+                  {TRAINER_PRESETS.map((preset) => (
                     <button
-                      key={profile.name}
-                      className={`trainer-preset ${draftTrainer.name === profile.name ? 'active' : ''}`}
-                      onClick={() => setDraftTrainerPreset(profile)}
+                      key={preset.id}
+                      className={`trainer-preset ${draftTrainer.name === preset.profile.name ? 'active' : ''}`}
+                      onClick={() => setDraftTrainerPreset(preset.profile)}
                     >
-                      {profile.name}
+                      {preset.profile.name}
                     </button>
                   ))}
                 </div>
@@ -4147,7 +3203,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     if (!activeBuddy) return;
 
     const zone = AREAS.find((entry) => entry.id === match.encounter.zoneId) ?? activeZone;
-    const activeMachineForMatch = activeMachine ?? zone.machines[0] ?? null;
+    const activeMachineForMatch = activeMachine ?? getDefaultGymMachine(zone);
     const challengeMachine = getBossChallengeMachine(match.encounter, zone);
     const zoneMachine = activeMachineForMatch;
     const modifier = matchCatchModifier(match.encounter, zone, zoneMachine, trainer, activeBuddy, meter, save.trainingFatigue);
@@ -4314,7 +3370,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     }
 
     const zone = AREAS.find((entry) => entry.id === match.encounter.zoneId) ?? activeZone;
-    const selectedMachine = activeMachine ?? zone.machines[0] ?? null;
+    const selectedMachine = activeMachine ?? getDefaultGymMachine(zone);
     const modifier = matchCatchModifier(
       match.encounter,
       zone,
@@ -4328,7 +3384,7 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     const trainerPressure = Math.round(modifier.trainerPressure * 1.12);
     const buddyPressure = Math.round(modifier.buddyPressure * 0.93);
     const challengePressure = modifier.bossPressure;
-    const activeMachineForMatch = selectedMachine ?? zone.machines[0] ?? null;
+    const activeMachineForMatch = selectedMachine ?? getDefaultGymMachine(zone);
     const challengeMachine = match.encounter.isBoss ? getBossChallengeMachine(match.encounter, zone) : null;
     const isChallengeMachine = !!(challengeMachine && activeMachineForMatch && activeMachineForMatch.id === challengeMachine.id);
     const isForcedChallengeRecovery = match.encounter.isBoss && match.isBossChallengeActive && isMatchChallengeOverload && !isChallengeMachine;
@@ -4875,13 +3931,13 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                 </div>
               </div>
               <div className="trainer-presets">
-                {TRAINER_PRESETS.map((profile) => (
+                {TRAINER_PRESETS.map((preset) => (
                   <button
-                    key={profile.name}
-                    className={`trainer-preset ${trainer.name === profile.name ? 'active' : ''}`}
-                    onClick={() => setTrainerPreset(profile)}
+                    key={preset.id}
+                    className={`trainer-preset ${trainer.name === preset.profile.name ? 'active' : ''}`}
+                    onClick={() => setTrainerPreset(preset.profile)}
                   >
-                    {profile.name}
+                    {preset.profile.name}
                   </button>
                 ))}
               </div>
