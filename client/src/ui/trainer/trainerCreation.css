@@ -1,0 +1,596 @@
+.trainer-studio-v2 {
+  --trainer-forge-ink: #061519;
+  --trainer-forge-deep: #0c2b2f;
+  --trainer-forge-panel: #102f34;
+  --trainer-forge-line: #285057;
+  --trainer-forge-copy: #b9d8c4;
+  --trainer-forge-light: #eef2d0;
+  --trainer-forge-mint: #68d39b;
+  --trainer-forge-amber: #f2c14e;
+  --trainer-forge-coral: #ef765f;
+}
+
+.trainer-studio-layout {
+  display: grid;
+  grid-template-columns:
+    minmax(240px, 0.72fr)
+    minmax(460px, 1.55fr)
+    minmax(250px, 0.72fr);
+  gap: 12px;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+}
+
+.trainer-studio-layout > * {
+  min-width: 0;
+}
+
+.trainer-studio-preview,
+.trainer-studio-finish {
+  position: sticky;
+  top: 12px;
+}
+
+.trainer-studio-v2 .trainer-preview-stage {
+  min-height: 230px;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 12px;
+  overflow: hidden;
+  padding: 12px 8px 8px;
+}
+
+.trainer-studio-v2 .trainer-preview-stage figure {
+  display: grid;
+  gap: 7px;
+  place-items: center;
+  margin: 0;
+}
+
+.trainer-studio-v2 .trainer-preview-stage figcaption {
+  color: var(--trainer-forge-amber);
+  font-size: 8px;
+  text-transform: capitalize;
+}
+
+.trainer-pixel-canvas {
+  display: block;
+  width: var(--trainer-pixel-width);
+  height: var(--trainer-pixel-height);
+  max-width: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.trainer-preview-comparison .trainer-pixel-canvas {
+  max-height: 150px;
+}
+
+.trainer-rotation-controls {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 7px;
+}
+
+.trainer-rotation-controls button,
+.trainer-compare-toggle,
+.trainer-history-toolbar button,
+.trainer-custom-tabs button,
+.trainer-pose-grid button,
+.trainer-save-preset button,
+.trainer-saved-presets button {
+  min-height: 44px;
+  border: 2px solid var(--trainer-forge-line);
+  color: var(--trainer-forge-light);
+  background: var(--trainer-forge-panel);
+  font: inherit;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.trainer-rotation-controls button:hover,
+.trainer-rotation-controls button:focus-visible,
+.trainer-compare-toggle:hover,
+.trainer-compare-toggle:focus-visible,
+.trainer-history-toolbar button:hover,
+.trainer-history-toolbar button:focus-visible,
+.trainer-custom-tabs button:hover,
+.trainer-custom-tabs button:focus-visible,
+.trainer-pose-grid button:hover,
+.trainer-pose-grid button:focus-visible {
+  border-color: var(--trainer-forge-amber);
+  background: #174148;
+}
+
+.trainer-rotation-controls span {
+  color: var(--trainer-forge-copy);
+  text-align: center;
+  text-transform: capitalize;
+  font-size: 8px;
+}
+
+.trainer-compare-toggle {
+  width: 100%;
+  margin-bottom: 9px;
+}
+
+.trainer-compare-toggle[aria-pressed='true'] {
+  border-color: var(--trainer-forge-mint);
+  box-shadow: inset 4px 0 0 var(--trainer-forge-mint);
+}
+
+.trainer-custom-tabs {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(72px, 1fr));
+  gap: 4px;
+  overflow-x: auto;
+  padding: 2px 2px 7px;
+  scrollbar-color: var(--trainer-forge-mint) var(--trainer-forge-ink);
+}
+
+.trainer-custom-tabs button {
+  min-width: 72px;
+}
+
+.trainer-custom-tabs button.active {
+  border-color: var(--trainer-forge-mint);
+  color: var(--trainer-forge-ink);
+  background: var(--trainer-forge-mint);
+  box-shadow: 2px 2px 0 var(--trainer-forge-amber);
+}
+
+.trainer-history-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+
+.trainer-history-toolbar button:disabled,
+.trainer-save-preset button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.trainer-custom-tab-panel {
+  min-height: 500px;
+  border: 1px solid var(--trainer-forge-line);
+  padding: 10px;
+  background:
+    linear-gradient(90deg, rgba(104, 211, 155, 0.025) 1px, transparent 1px),
+    linear-gradient(rgba(104, 211, 155, 0.025) 1px, transparent 1px),
+    rgba(6, 21, 25, 0.45);
+  background-size: 8px 8px;
+}
+
+.trainer-tab-stack,
+.trainer-preview-tab {
+  display: grid;
+  gap: 12px;
+}
+
+.trainer-custom-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(185, 216, 196, 0.24);
+  padding: 10px;
+  background: rgba(16, 47, 52, 0.82);
+}
+
+.trainer-custom-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.trainer-custom-copy h3,
+.trainer-custom-copy p {
+  margin: 0;
+}
+
+.trainer-custom-copy h3 {
+  color: var(--trainer-forge-light);
+  font-size: 10px;
+}
+
+.trainer-custom-copy p {
+  color: var(--trainer-forge-copy);
+  font-size: 7px;
+  line-height: 1.65;
+}
+
+.trainer-separation-label {
+  color: var(--trainer-forge-amber) !important;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+.trainer-physique-presets,
+.trainer-gameplay-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.trainer-physique-presets button,
+.trainer-gameplay-presets button {
+  min-height: 76px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  border: 2px solid var(--trainer-forge-line);
+  padding: 8px;
+  color: var(--trainer-forge-light);
+  background: #12393d;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.trainer-physique-presets button:hover,
+.trainer-physique-presets button:focus-visible,
+.trainer-gameplay-presets button:hover,
+.trainer-gameplay-presets button:focus-visible,
+.trainer-physique-presets button.active,
+.trainer-gameplay-presets button.active {
+  border-color: var(--trainer-forge-mint);
+  background: rgba(104, 211, 155, 0.14);
+}
+
+.trainer-physique-presets strong,
+.trainer-gameplay-presets strong {
+  font-size: 8px;
+}
+
+.trainer-physique-presets small,
+.trainer-gameplay-presets small {
+  color: var(--trainer-forge-copy);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.trainer-build-controls,
+.trainer-gameplay-attributes {
+  display: grid;
+  gap: 6px;
+}
+
+.trainer-build-control,
+.trainer-gameplay-attribute {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(170px, 0.9fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border-left: 3px solid rgba(104, 211, 155, 0.42);
+  background: rgba(6, 21, 25, 0.65);
+}
+
+.trainer-build-control > div:first-child,
+.trainer-gameplay-attribute > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.trainer-build-control label,
+.trainer-gameplay-attribute label {
+  color: var(--trainer-forge-light);
+  font-size: 8px;
+}
+
+.trainer-build-control small,
+.trainer-gameplay-attribute small {
+  color: var(--trainer-forge-copy);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.trainer-build-input {
+  display: grid;
+  grid-template-columns: 36px minmax(80px, 1fr) 26px 36px;
+  gap: 5px;
+  align-items: center;
+}
+
+.trainer-build-input button {
+  min-width: 36px;
+  min-height: 36px;
+  border: 1px solid var(--trainer-forge-mint);
+  color: var(--trainer-forge-light);
+  background: #12393d;
+  font: inherit;
+  cursor: pointer;
+}
+
+.trainer-build-input input[type='range'] {
+  min-width: 0;
+  height: 32px;
+  accent-color: var(--trainer-forge-mint);
+}
+
+.trainer-build-input output {
+  color: var(--trainer-forge-amber);
+  text-align: center;
+  font-size: 9px;
+}
+
+.trainer-gameplay-stat-section {
+  border-color: rgba(242, 193, 78, 0.48);
+}
+
+.trainer-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.trainer-option-field {
+  display: grid;
+  gap: 5px;
+  color: var(--trainer-forge-copy);
+  font-size: 8px;
+}
+
+.trainer-option-field select,
+.trainer-save-preset input {
+  min-width: 0;
+  min-height: 44px;
+  border: 2px solid var(--trainer-forge-line);
+  padding: 8px;
+  color: var(--trainer-forge-light);
+  background: var(--trainer-forge-ink);
+  font: inherit;
+  font-size: 8px;
+}
+
+.trainer-color-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.trainer-palette-picker {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--trainer-forge-line);
+  padding: 8px;
+}
+
+.trainer-palette-picker legend {
+  padding: 0 5px;
+  color: var(--trainer-forge-copy);
+  font-size: 8px;
+}
+
+.trainer-palette-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+  color: var(--trainer-forge-light);
+  font-size: 8px;
+}
+
+.trainer-current-color {
+  width: 24px;
+  height: 18px;
+  border: 2px solid var(--trainer-forge-light);
+  background: var(--swatch);
+}
+
+.trainer-curated-swatches {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(24px, 1fr));
+  gap: 4px;
+}
+
+.trainer-curated-swatches button {
+  position: relative;
+  min-width: 24px;
+  min-height: 32px;
+  border: 2px solid var(--trainer-forge-line);
+  background: var(--swatch);
+  cursor: pointer;
+}
+
+.trainer-curated-swatches button.active {
+  border-color: var(--trainer-forge-light);
+  box-shadow:
+    inset 0 0 0 2px var(--trainer-forge-ink),
+    0 0 0 1px var(--trainer-forge-amber);
+}
+
+.trainer-direction-gallery {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(84px, 1fr));
+  gap: 7px;
+}
+
+.trainer-direction-gallery button {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  gap: 5px;
+  border: 2px solid var(--trainer-forge-line);
+  color: var(--trainer-forge-copy);
+  background:
+    radial-gradient(circle, rgba(104, 211, 155, 0.12), transparent 60%),
+    var(--trainer-forge-ink);
+  text-transform: capitalize;
+  font: inherit;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.trainer-direction-gallery button.active {
+  border-color: var(--trainer-forge-amber);
+}
+
+.trainer-pose-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.trainer-pose-grid button.active {
+  border-color: var(--trainer-forge-mint);
+  background: rgba(104, 211, 155, 0.17);
+}
+
+.trainer-save-preset {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+.trainer-saved-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.trainer-saved-presets article {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid var(--trainer-forge-line);
+  padding: 7px;
+  background: var(--trainer-forge-ink);
+}
+
+.trainer-saved-presets .trainer-pixel-canvas {
+  grid-row: span 3;
+}
+
+.trainer-saved-presets strong {
+  color: var(--trainer-forge-light);
+  font-size: 8px;
+}
+
+.trainer-saved-presets button {
+  min-height: 34px;
+}
+
+.trainer-saved-presets .trainer-delete-preset {
+  border-color: var(--trainer-forge-coral);
+  color: #ffd5cd;
+}
+
+.trainer-empty-presets {
+  margin: 0;
+  color: var(--trainer-forge-copy);
+  font-size: 8px;
+}
+
+.trainer-separation-card {
+  margin-bottom: 10px;
+  border-left: 4px solid var(--trainer-forge-mint);
+  padding: 9px;
+  color: var(--trainer-forge-light);
+  background: rgba(104, 211, 155, 0.08);
+}
+
+.trainer-separation-card strong {
+  font-size: 8px;
+}
+
+.trainer-separation-card p {
+  margin: 6px 0 0;
+  color: var(--trainer-forge-copy);
+  font-size: 7px;
+  line-height: 1.6;
+}
+
+html[data-gb-reduced-motion='true'] .trainer-pixel-canvas {
+  animation: none !important;
+}
+
+@media (max-width: 1180px) {
+  .trainer-studio-layout {
+    grid-template-columns: minmax(220px, 0.75fr) minmax(440px, 1.5fr);
+  }
+
+  .trainer-studio-finish {
+    position: static;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .trainer-studio-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .trainer-studio-preview,
+  .trainer-studio-finish {
+    position: static;
+  }
+
+  .trainer-custom-tab-panel {
+    min-height: 0;
+    padding: 7px;
+  }
+
+  .trainer-history-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trainer-physique-presets,
+  .trainer-gameplay-presets,
+  .trainer-option-grid,
+  .trainer-color-picker-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trainer-build-control,
+  .trainer-gameplay-attribute {
+    grid-template-columns: 1fr;
+  }
+
+  .trainer-direction-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trainer-curated-swatches {
+    grid-template-columns: repeat(6, minmax(36px, 1fr));
+  }
+
+  .trainer-pose-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trainer-save-preset {
+    grid-template-columns: 1fr;
+  }
+
+  .trainer-saved-presets {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 390px) {
+  .trainer-studio-v2 {
+    padding-inline: 7px;
+  }
+
+  .trainer-studio-v2 .trainer-preview-stage {
+    min-height: 205px;
+  }
+
+  .trainer-preview-comparison {
+    gap: 4px !important;
+  }
+
+  .trainer-preview-comparison .trainer-pixel-canvas {
+    max-width: 100px;
+    height: auto;
+  }
+
+  .trainer-curated-swatches {
+    grid-template-columns: repeat(5, minmax(38px, 1fr));
+  }
+}

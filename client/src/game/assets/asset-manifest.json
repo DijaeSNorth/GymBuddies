@@ -1,0 +1,351 @@
+{
+  "version": 1,
+  "basePath": "assets/gym-buddies",
+  "palettes": {
+    "kinetic-slate": {
+      "id": "kinetic-slate",
+      "colors": [
+        "#061519",
+        "#0c2b2f",
+        "#285057",
+        "#b9d8c4",
+        "#eef2d0",
+        "#68d39b",
+        "#ef6a5b",
+        "#f2c14e"
+      ]
+    },
+    "trainer-indexed": {
+      "id": "trainer-indexed",
+      "colors": [
+        "#061519",
+        "#18343a",
+        "#f2c38b",
+        "#ef6a5b",
+        "#285057",
+        "#68d39b",
+        "#eef2d0"
+      ],
+      "slots": {
+        "outline": "#061519",
+        "hair": "#18343a",
+        "skin": "#f2c38b",
+        "top": "#ef6a5b",
+        "shoes": "#285057",
+        "glove": "#68d39b",
+        "highlight": "#eef2d0"
+      }
+    }
+  },
+  "standards": {
+    "trainer-overworld": {
+      "id": "trainer-overworld",
+      "mediaType": "image",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "columns": 3,
+      "rows": 4,
+      "frameCount": 12,
+      "durationMs": 140,
+      "anchor": "bottom-center",
+      "directions": ["down", "left", "right", "up"]
+    },
+    "buddy-overworld": {
+      "id": "buddy-overworld",
+      "mediaType": "image",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "columns": 4,
+      "rows": 1,
+      "frameCount": 4,
+      "durationMs": 180,
+      "anchor": "bottom-center"
+    },
+    "battle-portrait": {
+      "id": "battle-portrait",
+      "mediaType": "image",
+      "frameWidth": 48,
+      "frameHeight": 48,
+      "columns": 1,
+      "rows": 1,
+      "frameCount": 1,
+      "anchor": "center"
+    },
+    "machine-animation": {
+      "id": "machine-animation",
+      "mediaType": "image",
+      "frameWidth": 16,
+      "frameHeight": 24,
+      "columns": 4,
+      "rows": 1,
+      "frameCount": 4,
+      "durationMs": 120,
+      "anchor": "bottom-center"
+    },
+    "boss-portrait": {
+      "id": "boss-portrait",
+      "mediaType": "image",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "columns": 1,
+      "rows": 1,
+      "frameCount": 1,
+      "anchor": "center"
+    },
+    "environment-tiles": {
+      "id": "environment-tiles",
+      "mediaType": "image",
+      "frameWidth": 8,
+      "frameHeight": 8,
+      "columns": 4,
+      "rows": 2,
+      "frameCount": 8,
+      "anchor": "top-left"
+    },
+    "ui-icons": {
+      "id": "ui-icons",
+      "mediaType": "image",
+      "frameWidth": 8,
+      "frameHeight": 8,
+      "columns": 8,
+      "rows": 1,
+      "frameCount": 8,
+      "anchor": "center"
+    },
+    "effect-animation": {
+      "id": "effect-animation",
+      "mediaType": "image",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "columns": 6,
+      "rows": 1,
+      "frameCount": 6,
+      "durationMs": 70,
+      "anchor": "center"
+    },
+    "sfx-cue": {
+      "id": "sfx-cue",
+      "mediaType": "audio",
+      "sampleRate": 22050,
+      "channels": 1
+    }
+  },
+  "assets": [
+    {
+      "key": "trainer.overworld.base",
+      "category": "trainer",
+      "path": "trainer/overworld-base.png",
+      "standardId": "trainer-overworld",
+      "paletteId": "trainer-indexed",
+      "status": "placeholder",
+      "description": "Palette-indexed trainer walk sheet with four directions."
+    },
+    {
+      "key": "buddy.brawny-bear.overworld",
+      "category": "buddies",
+      "path": "buddies/brawny-bear-overworld.png",
+      "standardId": "buddy-overworld",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original abstract overworld placeholder for Bramblift at its legacy-stable asset path."
+    },
+    {
+      "key": "buddy.brawny-bear.battle",
+      "category": "buddies",
+      "path": "buddies/brawny-bear-battle.png",
+      "standardId": "battle-portrait",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original abstract Bramblift battle portrait placeholder."
+    },
+    {
+      "key": "buddy.titan-tortoise.overworld",
+      "category": "buddies",
+      "path": "buddies/titan-tortoise-overworld.png",
+      "standardId": "buddy-overworld",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original abstract overworld placeholder for Plastrong at its legacy-stable asset path."
+    },
+    {
+      "key": "buddy.titan-tortoise.battle",
+      "category": "buddies",
+      "path": "buddies/titan-tortoise-battle.png",
+      "standardId": "battle-portrait",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original abstract Plastrong battle portrait placeholder."
+    },
+    {
+      "key": "buddy.iron-wolf.overworld",
+      "category": "buddies",
+      "path": "buddies/iron-wolf-overworld.png",
+      "standardId": "buddy-overworld",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original abstract overworld placeholder for Rivetjack at its legacy-stable asset path."
+    },
+    {
+      "key": "buddy.iron-wolf.battle",
+      "category": "buddies",
+      "path": "buddies/iron-wolf-battle.png",
+      "standardId": "battle-portrait",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original abstract Rivetjack battle portrait placeholder."
+    },
+    {
+      "key": "buddy.muscled-boar.overworld",
+      "category": "buddies",
+      "path": "buddies/muscled-boar-overworld.png",
+      "standardId": "buddy-overworld",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original abstract overworld placeholder for Kettusk at its legacy-stable asset path."
+    },
+    {
+      "key": "buddy.muscled-boar.battle",
+      "category": "buddies",
+      "path": "buddies/muscled-boar-battle.png",
+      "standardId": "battle-portrait",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original abstract Kettusk battle portrait placeholder."
+    },
+    {
+      "key": "boss.home-watchman.portrait",
+      "category": "buddies",
+      "path": "buddies/bosses/home-watchman.png",
+      "standardId": "boss-portrait",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original boss portrait placeholder with a plate-halo motif."
+    },
+    {
+      "key": "boss.a-rhino.portrait",
+      "category": "buddies",
+      "path": "buddies/bosses/a-rhino.png",
+      "standardId": "boss-portrait",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original Railhorn boss portrait placeholder with a pressure-chevron motif."
+    },
+    {
+      "key": "environment.core-tiles",
+      "category": "environments",
+      "path": "environments/core-tiles.png",
+      "standardId": "environment-tiles",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Floor, mat, route, and equipment-base tiles."
+    },
+    {
+      "key": "environment.route-props",
+      "category": "environments",
+      "path": "environments/route-props.png",
+      "standardId": "environment-tiles",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Route seams, signs, rails, and recovery markers."
+    },
+    {
+      "key": "machine.home-recovery.animation",
+      "category": "gym-machines",
+      "path": "gym-machines/home-recovery.png",
+      "standardId": "machine-animation",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Recovery Rack four-frame activity loop."
+    },
+    {
+      "key": "machine.home-dumbbells.animation",
+      "category": "gym-machines",
+      "path": "gym-machines/home-dumbbells.png",
+      "standardId": "machine-animation",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Mobility Dumbbells four-frame activity loop."
+    },
+    {
+      "key": "machine.home-plate.animation",
+      "category": "gym-machines",
+      "path": "gym-machines/home-plate.png",
+      "standardId": "machine-animation",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Technique Plate Stack four-frame activity loop."
+    },
+    {
+      "key": "machine.home-bike.animation",
+      "category": "gym-machines",
+      "path": "gym-machines/home-bike.png",
+      "standardId": "machine-animation",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Foam Roller Bike four-frame activity loop."
+    },
+    {
+      "key": "ui.field-icons",
+      "category": "ui",
+      "path": "ui/field-icons.png",
+      "standardId": "ui-icons",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original route, fatigue, recovery, grip, and menu marks."
+    },
+    {
+      "key": "ui.dialogue-cursors",
+      "category": "ui",
+      "path": "ui/dialogue-cursors.png",
+      "standardId": "ui-icons",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Original pulse-seed dialogue indicators."
+    },
+    {
+      "key": "effect.training-burst",
+      "category": "effects",
+      "path": "effects/training-burst.png",
+      "standardId": "effect-animation",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Six-frame controlled exertion burst."
+    },
+    {
+      "key": "effect.capture-pulse",
+      "category": "effects",
+      "path": "effects/capture-pulse.png",
+      "standardId": "effect-animation",
+      "paletteId": "kinetic-slate",
+      "status": "placeholder",
+      "description": "Six-frame arm-wrestling lock pulse."
+    },
+    {
+      "key": "audio.ui-confirm",
+      "category": "audio",
+      "path": "audio/ui-confirm.wav",
+      "standardId": "sfx-cue",
+      "status": "placeholder",
+      "durationMs": 120,
+      "description": "Original two-tone confirmation cue."
+    },
+    {
+      "key": "audio.route-step",
+      "category": "audio",
+      "path": "audio/route-step.wav",
+      "standardId": "sfx-cue",
+      "status": "placeholder",
+      "durationMs": 90,
+      "description": "Original short route-step cue."
+    },
+    {
+      "key": "audio.capture-lock",
+      "category": "audio",
+      "path": "audio/capture-lock.wav",
+      "standardId": "sfx-cue",
+      "status": "placeholder",
+      "durationMs": 180,
+      "description": "Original competitive-lock confirmation cue."
+    }
+  ]
+}

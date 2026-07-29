@@ -1,0 +1,514 @@
+:root {
+  --asset-ink: #061519;
+  --asset-deep-teal: #0c2b2f;
+  --asset-iron: #285057;
+  --asset-mist: #b9d8c4;
+  --asset-chalk: #eef2d0;
+  --asset-mint: #68d39b;
+  --asset-coral: #ef6a5b;
+  --asset-amber: #f2c14e;
+}
+
+.asset-debug-shell {
+  min-height: 100vh;
+  padding: clamp(16px, 3vw, 40px);
+  display: grid;
+  align-content: start;
+  gap: 22px;
+  background:
+    linear-gradient(145deg, rgba(40, 80, 87, 0.22), transparent 46%),
+    var(--asset-ink);
+  color: var(--asset-chalk);
+  font-family: "Trebuchet MS", "Arial Narrow", system-ui, sans-serif;
+}
+
+.asset-debug-header,
+.asset-debug-toolbar,
+.asset-debug-section-heading,
+.asset-preview-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.asset-debug-header h1,
+.asset-debug-header p,
+.asset-debug-section h2,
+.asset-debug-section p {
+  margin: 0;
+}
+
+.asset-debug-header h1 {
+  margin-block: 4px 8px;
+  color: var(--asset-chalk);
+  font-size: clamp(28px, 5vw, 58px);
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+}
+
+.asset-debug-header > div > p:last-child,
+.asset-debug-section-heading > p {
+  max-width: 600px;
+  color: var(--asset-mist);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.asset-debug-kicker {
+  color: var(--asset-mint) !important;
+  font-family: "Lucida Console", "Courier New", monospace;
+  font-size: 10px !important;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.asset-debug-back {
+  flex: 0 0 auto;
+  padding: 11px 14px;
+  border: 1px solid var(--asset-mist);
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  background: var(--asset-deep-teal);
+  color: var(--asset-chalk);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.asset-debug-back:hover,
+.asset-debug-back:focus-visible {
+  border-color: var(--asset-amber);
+  outline: 2px solid var(--asset-coral);
+  outline-offset: 2px;
+}
+
+.asset-debug-toolbar {
+  align-items: end;
+  padding: 14px;
+  border: 1px solid var(--asset-iron);
+  background: rgba(12, 43, 47, 0.75);
+}
+
+.asset-debug-toolbar label {
+  min-width: min(320px, 100%);
+  display: grid;
+  gap: 6px;
+  color: var(--asset-mist);
+  font-size: 11px;
+}
+
+.asset-debug-toolbar input,
+.asset-debug-toolbar select {
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid var(--asset-iron);
+  border-radius: 0;
+  background: var(--asset-ink);
+  color: var(--asset-chalk);
+  font: inherit;
+}
+
+.asset-debug-toolbar input:focus-visible,
+.asset-debug-toolbar select:focus-visible {
+  border-color: var(--asset-amber);
+  outline: 2px solid var(--asset-coral);
+  outline-offset: 1px;
+}
+
+.asset-debug-health {
+  min-width: 190px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--asset-coral);
+  background: rgba(6, 21, 25, 0.72);
+  font-size: 11px;
+}
+
+.asset-debug-health.healthy {
+  border-left-color: var(--asset-mint);
+}
+
+.asset-debug-health span {
+  color: var(--asset-mist);
+}
+
+.asset-debug-issues {
+  padding: 14px;
+  border: 1px solid var(--asset-coral);
+  background: rgba(239, 106, 91, 0.09);
+}
+
+.asset-debug-section {
+  display: grid;
+  gap: 14px;
+}
+
+.asset-debug-section-heading {
+  align-items: end;
+}
+
+.asset-debug-section-heading h2 {
+  margin-top: 4px;
+  font-size: clamp(18px, 2.5vw, 30px);
+  text-transform: uppercase;
+}
+
+.asset-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.asset-palette-card {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  border: 1px solid var(--asset-iron);
+  background:
+    repeating-conic-gradient(rgba(185, 216, 196, 0.07) 0 25%, transparent 0 50%) 0 0 / 16px 16px,
+    var(--asset-deep-teal);
+}
+
+.asset-palette-card canvas {
+  width: min(100%, 288px);
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.asset-palette-card figcaption {
+  color: var(--asset-mist);
+  font-size: 12px;
+}
+
+.asset-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.asset-preview-card {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 180px 1fr;
+  overflow: hidden;
+  border: 1px solid var(--asset-iron);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  background: rgba(12, 43, 47, 0.68);
+}
+
+.asset-preview-stage {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  overflow: auto;
+  background:
+    repeating-conic-gradient(rgba(185, 216, 196, 0.08) 0 25%, transparent 0 50%) 0 0 / 16px 16px,
+    #081b1f;
+}
+
+.asset-preview-stage img {
+  max-width: 100%;
+  max-height: 150px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.asset-preview-stage audio {
+  width: 100%;
+}
+
+.asset-preview-copy {
+  min-width: 0;
+  padding: 14px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.asset-preview-title {
+  align-items: start;
+}
+
+.asset-preview-title strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--asset-chalk);
+  font-family: "Lucida Console", "Courier New", monospace;
+  font-size: 12px;
+}
+
+.asset-preview-title span {
+  padding: 4px 6px;
+  border: 1px solid var(--asset-amber);
+  color: var(--asset-amber);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.asset-preview-copy p {
+  min-height: 38px;
+  color: var(--asset-mist);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.asset-preview-copy dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.asset-preview-copy dl div {
+  min-width: 0;
+}
+
+.asset-preview-copy dt {
+  color: var(--asset-mint);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.asset-preview-copy dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--asset-chalk);
+  font-size: 11px;
+}
+
+.asset-preview-copy code {
+  padding-top: 9px;
+  overflow-wrap: anywhere;
+  border-top: 1px solid var(--asset-iron);
+  color: var(--asset-mist);
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .asset-debug-header,
+  .asset-debug-toolbar,
+  .asset-debug-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .asset-debug-section-heading > p {
+    max-width: none;
+  }
+
+  .asset-debug-toolbar label,
+  .asset-debug-health {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .asset-palette-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asset-debug-shell * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+.trainer-debug-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.trainer-debug-gallery article {
+  border: 2px solid #285057;
+  padding: 10px;
+  background: #061519;
+}
+
+.trainer-debug-gallery h3 {
+  margin: 0 0 8px;
+  color: #f2c14e;
+  font-size: 9px;
+}
+
+.trainer-debug-gallery article > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.trainer-debug-gallery figure {
+  display: grid;
+  place-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 6px;
+  background: rgba(104, 211, 155, 0.06);
+}
+
+.trainer-debug-gallery .trainer-pixel-canvas {
+  display: block;
+  width: var(--trainer-pixel-width);
+  height: var(--trainer-pixel-height);
+  image-rendering: pixelated;
+}
+
+.trainer-debug-gallery figcaption {
+  color: #b9d8c4;
+  font-size: 7px;
+  text-transform: capitalize;
+}
+
+.character-gallery-note {
+  min-height: 44px;
+  margin: 0 0 8px;
+  color: #9bbbc2;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.character-animation-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 8px;
+}
+
+.character-animation-gallery figure {
+  display: grid;
+  min-height: 116px;
+  margin: 0;
+  padding: 8px;
+  place-items: center;
+  border: 1px solid #285057;
+  background: #061519;
+}
+
+.character-animation-gallery figcaption {
+  color: #b9d8c4;
+  font-size: 8px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.major-character-gallery,
+.boss-character-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.major-character-gallery article,
+.boss-character-gallery article {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 9px;
+  border: 2px solid #285057;
+  background: #061519;
+}
+
+.major-character-gallery h3,
+.boss-character-gallery h3,
+.buddy-debug-gallery h3 {
+  margin: 0 0 4px;
+  color: #f2c14e;
+  font-size: 10px;
+}
+
+.major-character-gallery span,
+.boss-character-gallery span,
+.buddy-debug-gallery span {
+  color: #68d39b;
+  font-size: 8px;
+  text-transform: capitalize;
+}
+
+.major-character-gallery p,
+.boss-character-gallery p {
+  margin: 5px 0;
+  color: #b9d8c4;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.major-character-gallery small,
+.boss-character-gallery small,
+.buddy-debug-gallery small {
+  color: #8caab2;
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.major-character-gallery .trainer-pixel-canvas,
+.boss-character-gallery .buddy-pixel-canvas,
+.buddy-debug-gallery .buddy-pixel-canvas,
+.character-animation-gallery .trainer-pixel-canvas {
+  display: block;
+  width: var(--trainer-pixel-width, var(--buddy-pixel-width));
+  height: var(--trainer-pixel-height, var(--buddy-pixel-height));
+  image-rendering: pixelated;
+}
+
+.buddy-debug-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+  gap: 10px;
+}
+
+.buddy-debug-gallery article {
+  padding: 9px;
+  border: 2px solid #285057;
+  background: #061519;
+}
+
+.buddy-debug-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.buddy-debug-heading code {
+  color: #7898a0;
+  font-size: 7px;
+}
+
+.buddy-debug-variations {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin: 9px 0;
+}
+
+.buddy-debug-variations figure {
+  display: grid;
+  min-height: 76px;
+  margin: 0;
+  place-items: center;
+  background: rgba(104, 211, 155, 0.06);
+}
+
+.buddy-debug-variations figcaption {
+  color: #b9d8c4;
+  font-size: 7px;
+}
+
+@media (max-width: 760px) {
+  .trainer-debug-gallery {
+    grid-template-columns: 1fr;
+  }
+
+  .major-character-gallery,
+  .boss-character-gallery,
+  .buddy-debug-gallery {
+    grid-template-columns: 1fr;
+  }
+}

@@ -5,18 +5,34 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "typecheck": "tsc --noEmit",
-    "build": "vite build"
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run src/tests/verticalSlicePlaythrough.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:desktop": "playwright test --project=desktop-chromium",
+    "test:e2e:mobile": "playwright test --project=mobile-touch",
+    "test:e2e:pages": "playwright test --project=github-pages",
+    "smoke:deploy": "playwright test --project=github-pages",
+    "test:all": "npm run typecheck && npm run test:unit && npm run test:e2e",
+    "assets:generate-placeholders": "node scripts/generate-placeholder-assets.mjs",
+    "assets:validate": "vitest run src/tests/assetManifest.test.ts",
+    "prebuild": "npm run assets:validate",
+    "preview:pages:test": "npm run build && node scripts/serve-pages-build.mjs",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.playwright.json",
+    "build": "vite build && node scripts/generate-release-assets.mjs"
   },
   "dependencies": {
+    "phaser": "3.90.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.7.0",
     "typescript": "5.6.3",
-    "vite": "^7.3.0"
+    "vite": "^7.3.0",
+    "vitest": "^4.1.10"
   }
 }

@@ -1,0 +1,365 @@
+import { expect, test } from '@playwright/test';
+
+import {
+  createRepresentativeSaveFixtures,
+  createStartedJourneyFixture,
+} from '../src/tests/fixtures/saveFixtures';
+import { SAVE_IMPORT_MAX_BYTES } from '../src/game/content/save';
+import { createDefaultSaveData } from '../src/game/save/saveDefaults';
+import {
+  collectRuntimeErrors,
+  expectHealthyGameShell,
+  readCurrentSaveState,
+  startWithCorruptedPrimary,
+  startWithCurrentSave,
+  startWithEmptyStorage,
+  startWithLegacySave,
+} from './support/gameTestSupport';
+
+test('new-game onboarding creates a versioned guided-journey save', async ({
+  page,
+}) => {
+  await startWithEmptyStorage(page);
+  const runtimeErrors = collectRuntimeErrors(page);
+
+  await page.goto('/');
+  await expectHealthyGameShell(page);
+  await expect(
+    page.getByRole('heading', { name: 'GYM BUDDIES' }),
+  ).toBeVisible();
+
+  await page.getByLabel('Trainer name').fill('Morgan');
+  await page.getByRole('button', { name: /Control Specialist/i }).click();
+  await page.locator('#root').evaluate((root) => {
+    root.scrollTo(0, root.scrollHeight);
+  });
+  await page
+    .getByRole('button', { name: 'Confirm & Start Guided Journey' })
+    .click();
+
+  await expect(page.getByRole('heading', { name: 'Live route view' })).toBeVisible();
+  await expect
+    .poll(() => page.locator('#root').evaluate((root) => root.scrollTop))
+    .toBe(0);
+  await expect(page.locator('.tutorial-card')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Next' })).toBeVisible();
+
+  await expect
+    .poll(async () => {
+      const state = await readCurrentSaveState(page);
+      return {
+        hasStarterSet: state?.hasStarterSet,
+        name: (state?.trainer as { name?: string } | undefined)?.name,
+        schemaVersion: state?.schemaVersion,
+        tutorialStep: state?.tutorialStep,
+      };
+    }, { timeout: 8_000 })
+    .toEqual({
+      hasStarterSet: true,
+      name: 'Morgan',
+      schemaVersion: 16,
+      tutorialStep: 0,
+    });
+
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect
+    .poll(async () => (await readCurrentSaveState(page))?.tutorialStep)
+    .toBe(1);
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('legacy saves migrate in the rendered application', async ({
+  page,
+}) => {
+  const fixtures = createRepresentativeSaveFixtures();
+  await startWithLegacySave(page, fixtures.legacyV12);
+
+  await page.goto('/');
+  await expectHealthyGameShell(page);
+  await expect(page.getByRole('heading', { name: 'Live route view' })).toBeVisible();
+  await expect
+    .poll(async () => (await readCurrentSaveState(page))?.schemaVersion)
+    .toBe(16);
+});
+
+test('detailed trainer customization persists stable IDs and saved looks', async ({
+  page,
+}) => {
+  await startWithEmptyStorage(page);
+  const runtimeErrors = collectRuntimeErrors(page);
+
+  await page.goto('/');
+  await expectHealthyGameShell(page);
+  await page.getByLabel('Trainer name').fill('Forge Avery');
+
+  await page
+    .getByRole('button', { name: /Classic Bodybuilder/i })
+    .click();
+  await expect(page.locator('#trainer-build-shoulderWidth')).toHaveValue('9');
+  await page.locator('#trainer-build-shoulderWidth').fill('10');
+
+  await page.getByRole('tab', { name: 'Face' }).click();
+  await page.getByLabel('Face shape').selectOption('diamond-defined');
+  await page.getByLabel('Face paint').selectOption('split-chevron');
+
+  await page.getByRole('tab', { name: 'Hair' }).click();
+  await page.getByLabel('Hair style').selectOption('bald');
+
+  await page.getByRole('tab', { name: 'Outfit' }).click();
+  await page
+    .getByLabel('Top')
+    .selectOption('compression-long');
+  await page
+    .getByLabel('Bottoms')
+    .selectOption('leggings-panel');
+
+  await page.getByRole('tab', { name: 'Colors' }).click();
+  await page
+    .getByRole('button', { name: 'Top primary: Plum' })
+    .click();
+
+  await page.getByRole('tab', { name: 'Accessories' }).click();
+  await page
+    .getByLabel('Headband or hat')
+    .selectOption('wide-headband');
+  await page.getByLabel('Gym bag').selectOption('duffel-small');
+
+  await page.getByRole('button', { name: 'Randomize' }).click();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByLabel('Headband or hat')).toHaveValue(
+    'wide-headband',
+  );
+
+  await page.getByRole('tab', { name: 'Preview' }).click();
+  await page.getByRole('button', { name: /right trainer/i }).click();
+  await page.getByRole('button', { name: 'Victory' }).click();
+  await page
+    .getByRole('button', { name: 'Compare Before & After' })
+    .click();
+  await expect(page.getByText('Before', { exact: true })).toBeVisible();
+  await page.getByLabel('Appearance preset name').fill('Arena Look');
+  await page.getByRole('button', { name: 'Save Current Look' }).click();
+  await expect(page.getByText('Arena Look', { exact: true })).toBeVisible();
+
+  await page.getByText('Normal Start', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Confirm & Start Journey' })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Live route view' }))
+    .toBeVisible();
+
+  await expect
+    .poll(async () => {
+      const state = await readCurrentSaveState(page);
+      const trainer = state?.trainer as
+        | {
+            appearance?: {
+              build?: { shoulderWidth?: number };
+              face?: { shapeId?: string; facePaintId?: string };
+              hair?: { styleId?: string; lengthId?: string };
+              outfit?: { topId?: string; bottomsId?: string };
+              colors?: { topPrimaryId?: string };
+              accessories?: {
+                headwearId?: string;
+                gymBagId?: string;
+              };
+            };
+            appearancePresets?: Array<{ id?: string; name?: string }>;
+          }
+        | undefined;
+      return {
+        schemaVersion: state?.schemaVersion,
+        shoulderWidth: trainer?.appearance?.build?.shoulderWidth,
+        faceShape: trainer?.appearance?.face?.shapeId,
+        facePaint: trainer?.appearance?.face?.facePaintId,
+        hairStyle: trainer?.appearance?.hair?.styleId,
+        hairLength: trainer?.appearance?.hair?.lengthId,
+        top: trainer?.appearance?.outfit?.topId,
+        bottoms: trainer?.appearance?.outfit?.bottomsId,
+        topColor: trainer?.appearance?.colors?.topPrimaryId,
+        headwear: trainer?.appearance?.accessories?.headwearId,
+        bag: trainer?.appearance?.accessories?.gymBagId,
+        presetName: trainer?.appearancePresets?.[0]?.name,
+        presetHasStableId: Boolean(
+          trainer?.appearancePresets?.[0]?.id?.startsWith(
+            'trainer-look-',
+          ),
+        ),
+      };
+    })
+    .toEqual({
+        schemaVersion: 16,
+      shoulderWidth: 10,
+      faceShape: 'diamond-defined',
+      facePaint: 'split-chevron',
+      hairStyle: 'bald',
+      hairLength: 'none',
+      top: 'compression-long',
+      bottoms: 'leggings-panel',
+      topColor: 'plum',
+      headwear: 'wide-headband',
+      bag: 'duffel-small',
+      presetName: 'Arena Look',
+      presetHasStableId: true,
+    });
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('Buddy customization stays species-readable and persists cosmetic-only IDs', async ({
+  page,
+}, testInfo) => {
+  await startWithCurrentSave(
+    page,
+    createStartedJourneyFixture('Buddy Stylist'),
+  );
+  const runtimeErrors = collectRuntimeErrors(page);
+
+  await page.goto('/');
+  await expectHealthyGameShell(page);
+  const customize = page.getByRole('button', { name: 'Customize Buddy' });
+  await customize.scrollIntoViewIfNeeded();
+  await customize.click();
+
+  await expect(
+    page.getByRole('heading', { name: /Customize/i }),
+  ).toBeVisible();
+  await page.getByLabel('Nickname').fill('Moss Atlas');
+  await page.getByLabel('Primary palette').selectOption('violet');
+  await page.getByLabel('Secondary palette').selectOption('chalk');
+  await page.getByLabel('Accent palette').selectOption('amber');
+  await page.getByLabel('Markings').selectOption('pattern-shoulder-bands');
+  await page.getByLabel('Muscle definition').selectOption('etched');
+  await page.getByLabel('Body variation').selectOption('broad');
+  await page
+    .getByRole('button', { name: 'Ceremonial Chain' })
+    .click();
+  await page.getByLabel('Preview animation').selectOption('victory');
+  await page.getByRole('button', { name: 'Rotate Buddy right' }).click();
+
+  const canvas = page.locator('.buddy-customizer .buddy-pixel-canvas');
+  await expect(canvas).toBeVisible();
+  const pixels = await canvas.evaluate((element) => {
+    const context = (element as HTMLCanvasElement).getContext('2d');
+    const data = context?.getImageData(0, 0, 24, 24).data ?? [];
+    let opaque = 0;
+    const colors = new Set<string>();
+    for (let index = 0; index < data.length; index += 4) {
+      if ((data[index + 3] ?? 0) === 0) continue;
+      opaque += 1;
+      colors.add(
+        `${data[index]},${data[index + 1]},${data[index + 2]}`,
+      );
+    }
+    return { colors: colors.size, opaque };
+  });
+  expect(pixels.opaque).toBeGreaterThan(30);
+  expect(pixels.colors).toBeGreaterThan(3);
+
+  await page.screenshot({
+    path: testInfo.outputPath('buddy-customizer.png'),
+    fullPage: true,
+  });
+
+  await expect
+    .poll(async () => {
+      const state = await readCurrentSaveState(page);
+      const buddy = (
+        state?.team as
+          | Array<{
+              nickname?: string;
+              cosmetics?: Record<string, unknown>;
+              level?: number;
+            }>
+          | undefined
+      )?.[0];
+      return {
+        bodySizeId: buddy?.cosmetics?.bodySizeId,
+        level: buddy?.level,
+        nickname: buddy?.nickname,
+        patternId: buddy?.cosmetics?.patternId,
+        primaryPaletteId: buddy?.cosmetics?.primaryPaletteId,
+      };
+    }, { timeout: 8_000 })
+    .toEqual({
+      bodySizeId: 'broad',
+      level: createStartedJourneyFixture().team[0]!.level,
+      nickname: 'Moss Atlas',
+      patternId: 'pattern-shoulder-bands',
+      primaryPaletteId: 'violet',
+    });
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('a corrupted primary loads the valid previous save without a blank screen', async ({
+  page,
+}) => {
+  const fixtures = createRepresentativeSaveFixtures();
+  await startWithCorruptedPrimary(
+    page,
+    fixtures.corruptedPrimary,
+    fixtures.storage.validBackupJson,
+  );
+
+  await page.goto('/');
+  await expectHealthyGameShell(page);
+  await expect(page.getByText(/Backup Avery · Physique Level/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Live route view' })).toBeVisible();
+});
+
+test('an oversized save file is rejected before confirmation', async ({
+  page,
+}) => {
+  const save = createDefaultSaveData();
+  save.hasStarterSet = true;
+  save.tutorialStep = 5;
+  await startWithCurrentSave(page, save);
+
+  await page.goto('/');
+  await expectHealthyGameShell(page);
+  await page.getByText('Save Management').click();
+  await page
+    .getByLabel('Choose Gym Buddies save JSON')
+    .evaluate((element, size) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(
+        new File(
+          [new Uint8Array(size)],
+          'oversized-save.json',
+          { type: 'application/json' },
+        ),
+      );
+      Object.defineProperty(element, 'files', {
+        configurable: true,
+        value: transfer.files,
+      });
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    }, SAVE_IMPORT_MAX_BYTES + 1);
+
+  await expect(page.getByText(/larger than the 1 MiB save import limit/i))
+    .toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('storage denial in the optional setup flag does not break startup', async ({
+  page,
+}) => {
+  const save = createDefaultSaveData();
+  save.hasStarterSet = true;
+  save.tutorialStep = 5;
+  await startWithCurrentSave(page, save);
+  await page.addInitScript(() => {
+    const originalGetItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function guardedGetItem(key: string) {
+      if (key === 'gymbuddies-force-setup') {
+        throw new DOMException('Storage denied for test.', 'SecurityError');
+      }
+      return originalGetItem.call(this, key);
+    };
+  });
+  const runtimeErrors = collectRuntimeErrors(page);
+
+  await page.goto('/');
+  await expectHealthyGameShell(page);
+  await expect(page.getByRole('heading', { name: 'Live route view' })).toBeVisible();
+  expect(runtimeErrors).toEqual([]);
+});

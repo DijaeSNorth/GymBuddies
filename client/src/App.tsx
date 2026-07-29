@@ -1,14 +1,45 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { BGM_NOTES } from './game/content/audio';
+import { createRetroAudioEngine } from './game/audio/retroAudioEngine';
+import { GamePresentation } from './ui/game/GamePresentation';
+import { AudioTestPanel } from './ui/debug/AudioTestPanel';
+import {
+  SaveManagementPanel,
+  type SaveUiActionResult,
+} from './ui/save/SaveManagementPanel';
+import { WorkoutMiniGame } from './ui/workout/WorkoutMiniGame';
+import {
+  JourneyRestartDialog,
+  TrainerCreationScreen,
+} from './ui/trainer/TrainerCreationScreen';
+import { BuddyIndex } from './ui/buddies/BuddyIndex';
+import { BuddySprite as PixelCreature } from './ui/buddies/BuddySprite';
+import { BuddyCustomizer } from './ui/buddies/BuddyCustomizer';
+import {
+  BUDDY_STAT_LIMITS,
+  FATIGUE_BALANCE,
+  WORKOUT_BALANCE,
+} from './game/content/balance';
+import {
+  CAPTURE_BATTLE_SPEEDS,
+  CAPTURE_METER_MAX,
+  CAPTURE_METER_MIN,
+  WILD_CAPTURE_CONTROL_TARGET,
+} from './game/content/captureBalance';
 import {
   BUDDY_SPECIES as CREATURES,
   FANCY_NAMES,
-  STARTER_BUDDIES,
-  getBuddySpeciesById,
-  resolveBuddySpeciesIdentity,
 } from './game/content/buddies';
-import { BOSS_MAX_MS, BOSS_MIN_MS, getBossesForGym } from './game/content/bosses';
+import {
+  BOSS_MAX_MS,
+  BOSS_MIN_MS,
+  getBossById,
+  getBossesForGym,
+} from './game/content/bosses';
+import {
+  bossBuddyCosmetics,
+  getBossCharacterDesign,
+} from './game/content/bossCharacters';
 import { CAPTURE_MOVES as MOVES } from './game/content/captureMoves';
 import {
   GYMS as AREAS,
@@ -19,6 +50,20 @@ import {
   getDefaultGymMachine,
   getGymById,
 } from './game/content/gyms';
+import {
+  getOverworldMap,
+  locationIdForZone,
+} from './game/content/maps/journeyMaps';
+import {
+  PRESENTATION_EFFECT_TIMING,
+  getPresentationSequenceDuration,
+  type BossEntranceCue,
+  type DialoguePortrait,
+  type PresentationEffectCue,
+  type PresentationEffectKind,
+  type PresentationEffectTone,
+} from './game/phaser/presentationEffects';
+import type { GamePresentationSnapshot } from './game/phaser/presentationConfig';
 import { ALL_TRAINING_MACHINES as ALL_GYM_MACHINES } from './game/content/machines';
 import {
   FALLBACK_UNLOCKED_ZONES,
@@ -29,46 +74,167 @@ import {
   WORLD_MOVE_COOLDOWN_MS,
   WORLD_PATH_LINKS,
   WORLD_ROUTE_ENCOUNTER_COOLDOWN_MS,
-  WORLD_ROUTE_ENCOUNTER_RATE,
-  WORLD_ROUTE_FATIGUE_BY_ZONETYPE,
-  WORLD_ROUTE_PATH_MAP,
   WORLD_ROUTE_PATHS,
   WORLD_ROUTES,
   WORLD_TILE_PITCH,
   WORLD_TILE_PX,
-  getOrderedRouteKey,
 } from './game/content/routes';
-import { SAVE_KEY, SAVE_VERSION, TEAM_SIZE } from './game/content/save';
+import { TEAM_SIZE } from './game/content/save';
 import {
-  DEFAULT_TRAINER_PRESET_ID,
-  FOCUSED_MUSCLES,
-  MAX_MUSCLE_LEVEL,
-  TRAINER_MUSCLES,
-  TRAINER_PRESETS,
-  getTrainerPresetById,
+  inferVisitedZoneIds,
+  JOURNEY_GYM_ZONE_IDS,
+} from './game/content/worldGraph';
+import {
+  DEFAULT_TRAINER_BODY_PRESET_ID,
+  getTrainerBodyPresetById,
 } from './game/content/trainer';
-import { STARTING_TUTORIAL_GYM_ID, TUTORIAL_STEPS } from './game/content/tutorial';
+import {
+  getTrainerPhysiquePresetById,
+} from './game/content/trainerAppearance';
+import { TUTORIAL_STEPS } from './game/content/tutorial';
 import { validateGameContentInDevelopment } from './game/content/validation';
-import { WORKOUT_DELOAD_BY_TIER, getWorkoutLoadTier } from './game/content/workoutLoads';
+import {
+  inputActionToDirection,
+  keyboardEventToAction,
+  type InputAction,
+} from './game/input/actionMap';
+import {
+  calculateBossCaptureTarget as bossCaptureTarget,
+  calculateBossChallengePressure as bossChallengePressure,
+  calculateBossChallengeStress,
+  calculateBossChallengeSummary as bossChallengeSummary,
+  calculateBossInterval,
+  createBossEncounter,
+  getBossChallengeMachine,
+  getBossChallengeProfile as bossChallengeProfileForZone,
+  getBossChallengeTier as bossChallengeTierFromEncounter,
+} from './game/systems/bossChallenges';
+import {
+  advanceBossGameplayTime,
+  claimBossSchedule,
+  getBossAvailability,
+  markBossCycleRewarded,
+} from './game/systems/bossScheduling';
+import {
+  clampBuddyStat as clampBuddyStats,
+  createCapturedBuddy,
+  getBuddyStatBand as buddyStatBand,
+} from './game/systems/buddyProgression';
+import {
+  calculateBuddyArenaPressure as buddyArenaPressure,
+  calculateCaptureMovePrediction,
+  calculateCaptureStartingStamina,
+  calculateCaptureAttempt,
+  calculateCaptureMove,
+  calculateOpponentStartingStamina,
+  calculateMatchReadinessModifier as matchReadinessModifier,
+  calculateTrainerArenaPressure as trainerArenaPressure,
+  selectCaptureOpponentIntent,
+} from './game/systems/captureBattles';
+import {
+  planCapturePartyPlacement,
+  replacePartyBuddy,
+} from './game/systems/captureParty';
+import {
+  applyFatigueChange,
+  applyPassiveRecovery,
+  calculateRestRecovery,
+  getFatigueRatio,
+} from './game/systems/fatigueRecovery';
+import { clamp, clamp01 } from './game/systems/math';
+import {
+  AUTOSAVE_MIN_INTERVAL_MS,
+  getAutosaveDelayMs,
+  hasOnlyAllowedTopLevelChanges,
+} from './game/save/autosavePolicy';
+import { createDefaultSaveData } from './game/save/saveDefaults';
+import {
+  getBrowserSaveStorage,
+  hasPreviousSave,
+  importSaveJson,
+  loadGameSave,
+  loadPreviousSave,
+  writeGameSave,
+  type SaveLoadResult,
+} from './game/save/saveService';
+import { recordMachineMastery } from './game/systems/progressionModel';
+import {
+  createOverworldState,
+  findFacingInteractable,
+  getOverworldDirectionAvailability,
+  resolveOverworldAction,
+} from './game/systems/overworldMovement';
+import {
+  createRandomState,
+  createRuntimeSeed,
+  type RandomState,
+} from './game/systems/random';
+import {
+  applySteroidReward,
+  getExperienceNeeded,
+  resolveBossVictoryReward,
+} from './game/systems/rewards';
+import {
+  calculateRouteEncounterBoost as routeEncounterBoost,
+  calculateRouteEncounterChance,
+  calculateRouteFatigueCost as routeFatigueCost,
+  createWildEncounter,
+  getRouteProfile as routeProfileFromZones,
+  rollRouteEncounter,
+} from './game/systems/routeEncounters';
+import {
+  applyTrainerBodyPreset,
+  applyTrainerPhysiquePreset,
+  createTrainerCreationDraft,
+  replaceTrainerDraftAppearance,
+  saveTrainerProfileToJourney,
+  trainerProfileFromCreationDraft,
+  updateTrainerDraftMuscle,
+  validateTrainerCreationDraft,
+} from './game/systems/trainerCreation';
+import {
+  calculateTrainerPhysiqueLevel as trainerPhysiqueLevel,
+} from './game/systems/trainerProgression';
+import {
+  normalizeUnlockedZones as normalizeUnlockedZoneIds,
+  unlockAdjacentZones as unlockAdjacentZoneIds,
+} from './game/systems/unlockProgression';
+import {
+  advanceWorkoutSession,
+  calculateWorkoutPreview,
+  calculateWorkoutReadiness,
+  calculateWorkoutResolution,
+  createWorkoutSession,
+  getWorkoutMomentumLabel as workoutMomentumLabel,
+  getWorkoutReadinessLabel as workoutReadinessLabel,
+  getWorkoutSetStressLabel as workoutSetStressLabel,
+  resolveWorkoutRep,
+  resolveWorkoutSpot,
+  shiftWorkoutSessionTiming,
+} from './game/systems/workoutResolution';
 import type {
   AudioEngine,
-  BossChallengeDifficultyProfile,
+  AudioCueId,
   BossChallengeStress,
   BossChallengeTier,
-  BossSchedule,
   Buddy,
   BuddySpecies as Creature,
   CardinalDirection,
   CaptureMove as Move,
+  CaptureBattleSpeed,
   Encounter,
   GymArea,
-  GymBoss,
-  GymMachine,
+  GymZoneId,
   Match,
-  MusicZoneState,
+  MusicTrackId,
+  OverworldState,
   SaveData,
+  TrainerAppearance,
+  TrainerAppearancePreset,
+  TrainerCreationDraft,
   TrainerEmote,
-  TrainerProfile,
+  TrainerMuscleId,
+  TrainerStartMode,
   WorkoutLoadTier,
   WorkoutSession,
   WorldPosition,
@@ -78,496 +244,17 @@ import type {
 
 validateGameContentInDevelopment();
 
-const WORKOUT_DURATION_MS = 2800;
-const WORKOUT_SPOT_WINDOW_MS = 1600;
-const WORKOUT_AUTO_FAILURE_MS = 1250;
-const MAX_BUDDY_FORM = 24;
-const MAX_BUDDY_MOBILITY = 24;
-const MAX_BUDDY_VOLUME = 12;
-const MAX_TRAINING_FATIGUE = 120;
-const FATIGUE_COOLDOWN_PER_TICK = 2;
-const FATIGUE_COOLDOWN_HOME_BONUS = 1;
-const REST_ACTION_RECOVERY = 26;
-const REST_ACTION_BUDDY_HEAL = 9;
-const REST_ACTION_COOLDOWN_MS = 12500;
-const BASE_TRAIN_FAIL_CHANCE = 0.5;
-const BASE_SPOT_SUCCESS_CHANCE = 0.5;
-const WORKOUT_DELOAD_MAX = 4;
-const WORKOUT_DELOAD_RECOVERY_DIVISOR = 28;
-const WORKOUT_DELOAD_LOAD_REDUCTION = 0.18;
-const WORKOUT_DELOAD_READINESS_BONUS = 0.035;
-const WORKOUT_MOMENTUM_MAX = 30;
-const WORKOUT_MOMENTUM_RECOVERY = 1;
-const WORKOUT_REST_STAT_RECOVERY_DIVISOR = 12;
-const WORKOUT_REST_DELOAD_STAT_BONUS = 1;
-const BOSS_ZONE_CATCH_SCALE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 0.96,
-  starter: 1.02,
-  higher: 0.73,
-};
-const BOSS_CAPTURE_WEIGHTS: Record<
-  'home' | 'starter' | 'higher',
-  { trainerWeight: number; buddyWeight: number; bossPenaltyScale: number; maxCatch: number; minCatch: number }
-> = {
-  home: { trainerWeight: 1.2, buddyWeight: 1.03, bossPenaltyScale: 0.34, maxCatch: 0.96, minCatch: 0.1 },
-  starter: { trainerWeight: 1.16, buddyWeight: 1.0, bossPenaltyScale: 0.46, maxCatch: 0.88, minCatch: 0.08 },
-  higher: { trainerWeight: 1.11, buddyWeight: 0.98, bossPenaltyScale: 0.58, maxCatch: 0.78, minCatch: 0.06 },
-};
-const BOSS_CAPTURE_ALIGNMENT: Record<
-  'home' | 'starter' | 'higher',
-  {
-    alignedShift: number;
-    misalignedShift: number;
-    unknownShift: number;
-    consistencyScale: number;
-    missShift: number;
-    nearShift: number;
-    streakShift: number;
-    zoneShift: number;
-  }
-> = {
-  home: {
-    alignedShift: -6,
-    misalignedShift: 5,
-    unknownShift: 3,
-    consistencyScale: 7,
-    missShift: 1.3,
-    nearShift: 1.6,
-    streakShift: 2.2,
-    zoneShift: 0,
-  },
-  starter: {
-    alignedShift: -5,
-    misalignedShift: 7,
-    unknownShift: 4,
-    consistencyScale: 6.3,
-    missShift: 1.7,
-    nearShift: 2.0,
-    streakShift: 2.5,
-    zoneShift: 2,
-  },
-  higher: {
-    alignedShift: -4,
-    misalignedShift: 10,
-    unknownShift: 5,
-    consistencyScale: 8.2,
-    missShift: 2.2,
-    nearShift: 2.3,
-    streakShift: 3.1,
-    zoneShift: 3,
-  },
-};
-const BOSS_CHALLENGE_PRESSURE: Record<
-  'home' | 'starter' | 'higher',
-  BossChallengeDifficultyProfile
-> = {
-  home: { matchMachineBonus: 4, focusMatchBonus: 1, focusMismatchPenalty: -2, maxRounds: 4, streakLimit: 2, missResetGrace: 2 },
-  starter: { matchMachineBonus: 6, focusMatchBonus: 3, focusMismatchPenalty: -7, maxRounds: 5, streakLimit: 3, missResetGrace: 1 },
-  higher: { matchMachineBonus: 9, focusMatchBonus: 5, focusMismatchPenalty: -9, maxRounds: 6, streakLimit: 4, missResetGrace: 1 },
-};
-const BOSS_CHALLENGE_TIER: Record<BossChallengeTier, BossChallengeDifficultyProfile> = {
-  low: { matchMachineBonus: 3, focusMatchBonus: 1, focusMismatchPenalty: -2, maxRounds: 4, streakLimit: 2, missResetGrace: 2 },
-  normal: { matchMachineBonus: 5, focusMatchBonus: 2, focusMismatchPenalty: -6, maxRounds: 5, streakLimit: 3, missResetGrace: 1 },
-  high: { matchMachineBonus: 8, focusMatchBonus: 4, focusMismatchPenalty: -10, maxRounds: 6, streakLimit: 4, missResetGrace: 1 },
-};
-const BOSS_CAPTURE_TARGET: Record<'home' | 'starter' | 'higher', number> = {
-  home: 70,
-  starter: 74,
-  higher: 78,
-};
-const BOSS_CAPTURE_TARGET_FLOOR = 64;
-const BOSS_CAPTURE_TARGET_CEILING = 92;
-const BOSS_CHALLENGE_MOVE_MODIFIERS: Record<Move['id'], { alignmentBonus: number; mismatchPenalty: number; staminaDrain: number }> = {
-  burst: { alignmentBonus: 1, mismatchPenalty: 2, staminaDrain: 2 },
-  grind: { alignmentBonus: 3, mismatchPenalty: -1, staminaDrain: 1 },
-  snap: { alignmentBonus: 0, mismatchPenalty: 3, staminaDrain: 2 },
-};
-const BOSS_CHALLENGE_PENALTY_BASE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 6,
-  starter: 8,
-  higher: 10,
-};
-const BOSS_CHALLENGE_PENALTY_SCALE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 0.82,
-  starter: 0.94,
-  higher: 1.16,
-};
-const BOSS_MATCH_FATIGUE_SCALE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 0.75,
-  starter: 1,
-  higher: 1.25,
-};
-const BOSS_POWER_BONUS_SCALE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 0.55,
-  starter: 0.72,
-  higher: 1.08,
-};
-const BOSS_METER_CATCH_SCALE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 188,
-  starter: 174,
-  higher: 206,
-};
-const BOSS_CAPTURE_READINESS_SCALE: Record<'home' | 'starter' | 'higher', number> = {
-  home: 28,
-  starter: 26,
-  higher: 24,
-};
-
-
-function machineDifficultyMultiplier(type: 'home' | 'starter' | 'higher') {
-  if (type === 'higher') return 1.2;
-  if (type === 'starter') return 1.08;
-  return 0.95;
-}
-
-function spotCurveMultiplier(type: 'home' | 'starter' | 'higher') {
-  if (type === 'higher') return 0.36;
-  if (type === 'starter') return 0.42;
-  return 0.48;
-}
-
-function machineFocusScore(machine: GymMachine, trainer: TrainerProfile) {
-  const focusBoosts = FOCUSED_MUSCLES[machine.focus.toLowerCase()] ?? [];
-  const totalWeight = focusBoosts.reduce((sum, focus) => sum + focus.weight, 0);
-  if (!focusBoosts.length || !totalWeight) {
-    return 0.1;
-  }
-
-  const focusScore =
-    focusBoosts.reduce((sum, focus) => {
-      const value = trainer.muscles[focus.muscle] / MAX_MUSCLE_LEVEL;
-      return sum + value * focus.weight;
-    }, 0) / totalWeight;
-
-  return clamp(focusScore, 0, 1);
-}
-
-function trainerWorkoutAdvantage(machine: GymMachine, trainer: TrainerProfile, type: 'home' | 'starter' | 'higher') {
-  const focusScore = machineFocusScore(machine, trainer);
-  const focusVariance = 1 - focusScore;
-
-  const overallBody = Object.values(trainer.muscles).reduce((total, value) => total + value / MAX_MUSCLE_LEVEL, 0) / 8;
-  const tierScale = type === 'higher' ? 1.22 : type === 'starter' ? 1.05 : 0.95;
-
-  const failReduction = clamp((focusScore * 0.2 + overallBody * 0.12) * (1 + focusVariance * 0.08), 0, 0.3) * tierScale;
-  const spotBonus = clamp((focusScore * 0.22 + overallBody * 0.12), 0.02, 0.3) * (type === 'home' ? 0.9 : 1);
-
-  return {
-    failReduction: clamp(failReduction * 0.9, 0, 0.35),
-    spotBaseBonus: clamp(spotBonus * tierScale, 0, 0.35),
-  };
-}
-
-function getBossChallengeMachine(encounter: Encounter, zone: GymArea) {
-  if (!encounter.bossChallengeMachineId) {
-    return null;
-  }
-  return zone.machines.find((machine) => machine.id === encounter.bossChallengeMachineId) ?? null;
-}
-
-function bossChallengeProfileForZone(zoneType: 'home' | 'starter' | 'higher', encounter?: Encounter) {
-  if (encounter?.bossChallengeTier && BOSS_CHALLENGE_TIER[encounter.bossChallengeTier]) {
-    return BOSS_CHALLENGE_TIER[encounter.bossChallengeTier];
-  }
-  return BOSS_CHALLENGE_PRESSURE[zoneType];
-}
-
-function bossChallengeTierFromEncounter(encounter: Encounter, zoneType: 'home' | 'starter' | 'higher'): BossChallengeTier {
-  if (encounter.bossChallengeTier) return encounter.bossChallengeTier;
-  if (encounter.bossPowerBonus == null) return 'low';
-  if (zoneType === 'higher' || encounter.bossPowerBonus >= 24) return 'high';
-  if (zoneType === 'starter' || encounter.bossPowerBonus >= 16) return 'normal';
-  return 'low';
-}
+const MAX_BUDDY_FORM = BUDDY_STAT_LIMITS.form;
+const MAX_BUDDY_MOBILITY = BUDDY_STAT_LIMITS.mobility;
+const MAX_BUDDY_VOLUME = BUDDY_STAT_LIMITS.volume;
+const MAX_TRAINING_FATIGUE = FATIGUE_BALANCE.maximum;
+const WORKOUT_DELOAD_MAX = WORKOUT_BALANCE.maximumDeloadTokens;
+const WORKOUT_MOMENTUM_MAX = WORKOUT_BALANCE.maximumMomentum;
 
 function bossChallengeThresholdText(tier: BossChallengeTier, zoneType: 'home' | 'starter' | 'higher') {
   if (tier === 'high' || zoneType === 'higher') return 'high';
   if (tier === 'normal') return 'medium';
   return 'low';
-}
-
-function bossChallengeSummary(encounter: Encounter, zone: GymArea, machine: GymMachine | null) {
-  const machineProfile = getBossChallengeMachine(encounter, zone);
-  if (!encounter.isBoss || !machineProfile || !machine) {
-    return {
-      isActive: false,
-      isAligned: false,
-      isFocusAligned: false,
-      tier: 'low' as const,
-      profile: BOSS_CHALLENGE_PRESSURE[zone.type],
-      machineProfile: null as GymMachine | null,
-      bonus: 0,
-      bonusLabel: '+0',
-    };
-  }
-  const tier = bossChallengeTierFromEncounter(encounter, zone.type);
-  const profile = bossChallengeProfileForZone(zone.type, encounter);
-  const isAligned = machineProfile.id === machine.id;
-  const isFocusAligned = machine.focus.toLowerCase() === machineProfile.focus.toLowerCase();
-  const challengeDelta = isAligned
-    ? profile.matchMachineBonus
-    : isFocusAligned
-      ? profile.focusMatchBonus
-      : profile.focusMismatchPenalty;
-  return {
-    isActive: true,
-    isAligned,
-    isFocusAligned,
-    tier,
-    profile,
-    machineProfile,
-    bonus: challengeDelta,
-    bonusLabel: `${challengeDelta >= 0 ? '+' : ''}${challengeDelta}`,
-  };
-}
-
-function bossChallengeCapturePenalty(
-  match: Match,
-  zone: GymArea,
-  activeMachine: GymMachine | null,
-  meter: number,
-  buddy?: Buddy,
-) {
-  if (!match.encounter.isBoss || !match.isBossChallengeActive) {
-    return {
-      isActive: false,
-      isAligned: false,
-      penalty: 0,
-      streakBonus: 0,
-      nearPenalty: 0,
-      nearMissOverload: 0,
-      profile: BOSS_CHALLENGE_PRESSURE[zone.type],
-      machine: null as GymMachine | null,
-      nearWarn: false,
-      penaltyLabel: '0%',
-      meterPressure: 0,
-    };
-  }
-  const summary = bossChallengeSummary(match.encounter, zone, activeMachine);
-  if (!summary.isActive || !summary.machineProfile) {
-    return {
-      isActive: false,
-      isAligned: false,
-      penalty: 0,
-      streakBonus: 0,
-      nearPenalty: 0,
-      nearMissOverload: 0,
-      profile: summary.profile,
-      machine: null as GymMachine | null,
-      nearWarn: false,
-      penaltyLabel: '0%',
-      meterPressure: 0,
-    };
-  }
-  const profile = summary.profile;
-  const nearOver = Math.max(0, match.bossChallengeNearMisses - profile.missResetGrace);
-  const penaltyScale = BOSS_CHALLENGE_PENALTY_SCALE[zone.type];
-  const missPenalty = (match.bossChallengeMisses * BOSS_CHALLENGE_PENALTY_BASE[zone.type] * penaltyScale) / 100;
-  const nearPenalty = (nearOver * 1.9 * penaltyScale) / 100;
-  const streakMultiplier = Math.min(match.bossChallengeMatchStreak, profile.streakLimit);
-  const streakBonus = (summary.isAligned ? Math.max(0, streakMultiplier) * 0.012 : 0) + (meter > 78 ? 0.018 : 0);
-  const buddyProfile = buddy ? workoutBuddyProfile(buddy) : null;
-  const buddyShield = buddyProfile ? buddyProfile.bossSteady + buddyProfile.failureSafety * 0.2 : 0;
-  const basePenalty = clamp(missPenalty + nearPenalty - streakBonus - buddyShield, 0, 0.34);
-  const nearWarn = nearOver >= 1;
-  const isAligned = summary.isAligned;
-  const pressure = isAligned ? 1 : -1;
-  return {
-    isActive: true,
-    isAligned,
-    penalty: basePenalty,
-    streakBonus,
-    nearPenalty,
-    nearMissOverload: nearOver,
-    profile,
-    machine: summary.machineProfile,
-    nearWarn,
-    penaltyLabel: `${Math.round(basePenalty * 100)}%`,
-    meterPressure: pressure,
-  };
-}
-
-function matchMovePenalty(
-  moveMismatchPenalty: number,
-  isChallengeMachine: boolean,
-  nearMisses: number,
-  streak: number,
-) {
-  if (isChallengeMachine) {
-    return 0;
-  }
-  const nearPenalty = clamp(Math.max(0, nearMisses - 1) * 1.1, 0, 8);
-  const streakShield = Math.min(streak, 3) * 1.2;
-  return clamp(Math.max(1, moveMismatchPenalty) + nearPenalty - streakShield, 0, 16);
-}
-
-function trainerArenaPressure(trainer: TrainerProfile, machine: GymMachine | null, zone: GymArea) {
-  const activeMachine = machine ?? getDefaultGymMachine(zone);
-  if (!activeMachine) return 0;
-  const focusScore = machineFocusScore(activeMachine, trainer);
-  const overallBody = Object.values(trainer.muscles).reduce((total, value) => total + value / MAX_MUSCLE_LEVEL, 0) / 8;
-  const zoneScale = zone.type === 'higher' ? 1.18 : zone.type === 'starter' ? 1.06 : 0.95;
-  const base = 10 + focusScore * 18 + overallBody * 17 + (zoneScale - 1) * 12;
-  return clamp(Math.round(base), 0, 36);
-}
-
-function matchReadinessModifier(trainer: TrainerProfile, buddy: Buddy, zoneType: 'home' | 'starter' | 'higher') {
-  const buddyFormRatio = clamp01(buddy.form / MAX_BUDDY_FORM);
-  const buddyMobilityRatio = clamp01(buddy.mobility / MAX_BUDDY_MOBILITY);
-  const buddyVolumeRatio = clamp01(buddy.volume / MAX_BUDDY_VOLUME);
-  const trainerForm = Object.values(trainer.muscles).reduce((sum, value) => sum + value / MAX_MUSCLE_LEVEL, 0) / 8;
-  const buddyHpRatio = clamp01(buddy.hp / Math.max(1, buddy.maxHp));
-  const trainerEdge = Math.round((trainerForm - 0.42) * 22 * (zoneType === 'higher' ? 1.15 : zoneType === 'starter' ? 1.02 : 1));
-  const buddyReadinessEdge = Math.round((buddyFormRatio - 0.55) * 12 + (buddyMobilityRatio - 0.5) * 8 + (buddyVolumeRatio - 0.5) * 5);
-  const buddyEdge = clamp(Math.round((buddyHpRatio - 0.5) * 10 + buddyReadinessEdge), -12, 12);
-  return {
-    trainerForm,
-    trainerEdge: clamp(trainerEdge, -12, 12),
-    buddyEdge: clamp(buddyEdge, -8, 8),
-    total: clamp(trainerEdge + buddyEdge, -18, 18),
-    zoneType,
-  };
-}
-
-function buddyArenaPressure(buddy: Buddy) {
-  const hpRatio = clamp01(buddy.hp / Math.max(1, buddy.maxHp));
-  const formRatio = clamp01(buddy.form / MAX_BUDDY_FORM);
-  const mobilityRatio = clamp01(buddy.mobility / MAX_BUDDY_MOBILITY);
-  const volumeRatio = clamp01(buddy.volume / MAX_BUDDY_VOLUME);
-  const powerEdge = buddy.creature.power * 0.5;
-  const healthEdge = hpRatio * 10;
-  const fatiguePenalty = (1 - hpRatio) * 6;
-  return clamp(
-    Math.round(
-      buddy.level * 1.4 +
-        powerEdge +
-        healthEdge +
-        formRatio * 12 +
-        mobilityRatio * 10 +
-        volumeRatio * 6 -
-        fatiguePenalty,
-    ),
-    8,
-    58,
-  );
-}
-
-function bossChallengePressure(encounter: Encounter, zone: GymArea, selectedMachine: GymMachine | null) {
-  if (!encounter.isBoss) return 0;
-  const challengeMachine = getBossChallengeMachine(encounter, zone);
-  if (!challengeMachine || !selectedMachine) return 0;
-  const summary = bossChallengeSummary(encounter, zone, selectedMachine);
-  return summary.bonus;
-}
-
-function matchCatchModifier(
-  encounter: Encounter,
-  zone: GymArea,
-  machine: GymMachine | null,
-  trainer: TrainerProfile,
-  buddy: Buddy,
-  meter: number,
-  trainingFatigue = 0,
-) {
-  const trainerPressure = trainerArenaPressure(trainer, machine, zone);
-  const buddyPressure = buddyArenaPressure(buddy);
-  const fatigueScale = BOSS_MATCH_FATIGUE_SCALE[zone.type];
-  const fatiguePenalty = clamp01(trainingFatigue / MAX_TRAINING_FATIGUE) * 3 * fatigueScale;
-  const machinePressure = bossChallengePressure(encounter, zone, machine);
-  const bossPenalty = encounter.isBoss ? (encounter.bossPowerBonus ?? 0) : 0;
-  const profile = BOSS_CAPTURE_WEIGHTS[zone.type];
-  const zonePenaltyMultiplier = encounter.isBoss ? profile.bossPenaltyScale : 0;
-  const readiness = matchReadinessModifier(trainer, buddy, zone.type);
-  const trainerWeight = profile.trainerWeight;
-  const buddyWeight = profile.buddyWeight;
-  const raw =
-    trainerPressure * trainerWeight +
-    buddyPressure * buddyWeight +
-    machinePressure -
-    bossPenalty * zonePenaltyMultiplier -
-    fatiguePenalty +
-    readiness.total;
-  return {
-    raw,
-    meterDelta: clamp((meter - 50) / 150, -0.25, 0.22),
-    bossPressure: machinePressure,
-    trainerPressure,
-    buddyPressure,
-    trainerEdge: readiness.trainerEdge,
-    buddyEdge: readiness.buddyEdge,
-    readinessTotal: readiness.total,
-  };
-}
-
-function bossCaptureTarget(
-  zone: GymArea,
-  encounter: Encounter,
-  isChallengeAligned: boolean | null,
-  missCount = 0,
-  nearMissCount = 0,
-  matchStreak = 0,
-  buddy?: Buddy,
-) {
-  if (!encounter.isBoss) {
-    return BOSS_CAPTURE_TARGET.home;
-  }
-  const alignmentProfile = BOSS_CAPTURE_ALIGNMENT[zone.type];
-  const profile = BOSS_CHALLENGE_PRESSURE[zone.type];
-  const base = BOSS_CAPTURE_TARGET[zone.type];
-  const consistencyShift = buddy
-    ? Math.round((0.55 - workoutBuddyProfile(buddy).movementConsistency) * alignmentProfile.consistencyScale)
-    : 0;
-  const alignmentShift = isChallengeAligned
-    ? alignmentProfile.alignedShift
-    : isChallengeAligned === false
-      ? alignmentProfile.misalignedShift
-      : alignmentProfile.unknownShift;
-  const missShift = missCount * alignmentProfile.missShift;
-  const nearShift = Math.max(0, nearMissCount - profile.missResetGrace) * alignmentProfile.nearShift;
-  const streakShift = matchStreak * alignmentProfile.streakShift;
-  const zoneShift = alignmentProfile.zoneShift;
-  return clamp(
-    Math.round(base + zoneShift + alignmentShift + consistencyShift + missShift + nearShift - streakShift),
-    BOSS_CAPTURE_TARGET_FLOOR,
-    BOSS_CAPTURE_TARGET_CEILING,
-  );
-}
-
-function clampBuddyStats(value: number, max: number, min = 0) {
-  return clamp(Math.round(value), min, max);
-}
-
-function buddyStatBand(value: number, max: number) {
-  if (value <= 0) return 'Raw';
-  if (value >= max * 0.82) return 'Explosive';
-  if (value >= max * 0.64) return 'Strong';
-  if (value >= max * 0.46) return 'Ready';
-  if (value >= max * 0.28) return 'Steady';
-  return 'Raw';
-}
-
-function buddyGrowthFromWorkout(
-  machine: GymMachine,
-  readiness: number,
-  zoneType: 'home' | 'starter' | 'higher',
-  succeeded: boolean,
-) {
-  const focus = machine.focus.toLowerCase();
-  const zoneScale = zoneType === 'higher' ? 1.15 : zoneType === 'starter' ? 1.05 : 0.95;
-  const formBias = focus.includes('precision') ? 1.25 : focus.includes('control') ? 0.85 : 0.38;
-  const mobilityBias = focus.includes('mobility') || focus.includes('stability') ? 1.1 : 0.4;
-  const volumeBias = zoneType === 'higher' ? 0.95 : zoneType === 'starter' ? 0.7 : 0.55;
-  const form = (succeeded ? 4.1 : -2.1) + readiness * 4.8 + formBias;
-  const mobility = (succeeded ? 3.4 : -1.8) + readiness * 3.8 + mobilityBias;
-  const volume = (succeeded ? volumeBias * 2.6 : -0.8);
-  const fatigueSafety = succeeded ? 0.7 : -0.6;
-  const multiplier = zoneScale * (succeeded ? 0.8 : 0.6);
-
-  return {
-    form: clampBuddyStats(form * multiplier, MAX_BUDDY_FORM, succeeded ? 0 : -6),
-    mobility: clampBuddyStats(mobility * multiplier + fatigueSafety, MAX_BUDDY_MOBILITY, succeeded ? 0 : -5),
-    volume: clampBuddyStats(volume * multiplier, MAX_BUDDY_VOLUME, succeeded ? 0 : -4),
-  };
 }
 
 const WORLD_TILE_KEY = (pos: WorldPosition) => `${pos.x},${pos.y}`;
@@ -642,34 +329,41 @@ function worldTileToStyle(pos: WorldPosition) {
   };
 }
 
-function routeProfileFromZones(fromZoneId: string | null, toZoneId: string | null) {
-  if (!fromZoneId || !toZoneId || fromZoneId === toZoneId) return null;
-  return WORLD_ROUTE_PATH_MAP[getOrderedRouteKey(fromZoneId, toZoneId)] ?? null;
-}
-
-function routeFatigueCost(fromZoneId: string | null, toZoneId: string | null, zoneType: 'home' | 'starter' | 'higher') {
-  const profile = routeProfileFromZones(fromZoneId, toZoneId);
-  return profile?.travelFatigue ?? WORLD_ROUTE_FATIGUE_BY_ZONETYPE[zoneType];
-}
-
-function routeEncounterBoost(fromZoneId: string | null, toZoneId: string | null) {
-  const profile = routeProfileFromZones(fromZoneId, toZoneId);
-  return profile?.encounterBoost ?? 0;
-}
-
-function uniqueStrings(items: string[]) {
-  return [...new Set(items)];
-}
-
 function normalizeUnlockedZones(raw: string[] | undefined, fallback: string[] = FALLBACK_UNLOCKED_ZONES) {
-  const zoneSet = new Set(AREAS.map((zone) => zone.id));
-  const normalized = uniqueStrings([...fallback, ...(raw ?? [])]).filter((zoneId) => zoneSet.has(zoneId));
-  return normalized.length > 0 ? normalized : [STARTING_ZONE_ID];
+  return normalizeUnlockedZoneIds({
+    raw,
+    fallback,
+    validZoneIds: AREAS.map((zone) => zone.id),
+    startingZoneId: STARTING_ZONE_ID,
+  });
+}
+
+function normalizeVisitedZones(
+  raw: readonly string[] | undefined,
+  unlockedZoneIds: readonly string[],
+  activeZoneId: string,
+) {
+  const valid = new Set<GymZoneId>(JOURNEY_GYM_ZONE_IDS);
+  const inferred = inferVisitedZoneIds(unlockedZoneIds, activeZoneId);
+  return [
+    ...new Set([
+      ...inferred,
+      ...(raw ?? []).filter((zoneId): zoneId is GymZoneId =>
+        valid.has(zoneId as GymZoneId),
+      ),
+    ]),
+  ];
 }
 
 function unlockAdjacentZones(known: string[], zoneId: string) {
-  const expanded = [...(known ?? []), zoneId, ...(WORLD_ROUTES[zoneId] ?? [])];
-  return normalizeUnlockedZones(expanded, FALLBACK_UNLOCKED_ZONES);
+  return unlockAdjacentZoneIds({
+    known,
+    zoneId,
+    routes: WORLD_ROUTES,
+    fallback: FALLBACK_UNLOCKED_ZONES,
+    validZoneIds: AREAS.map((zone) => zone.id),
+    startingZoneId: STARTING_ZONE_ID,
+  });
 }
 
 function formatRemainingTime(ms: number) {
@@ -680,317 +374,18 @@ function formatRemainingTime(ms: number) {
   return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
 }
 
-function randInt(min: number, max: number) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+let runtimeRandomState: RandomState = createRandomState(createRuntimeSeed());
 
-function randomChoice<T>(items: T[]) {
-  return items[randInt(0, items.length - 1)];
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
+function consumeRandomResult<T extends { randomState: RandomState }>(
+  operation: (randomState: RandomState) => T,
+) {
+  const result = operation(runtimeRandomState);
+  runtimeRandomState = result.randomState;
+  return result;
 }
 
 function percent(value: number) {
   return `${Math.round(value * 100)}%`;
-}
-
-function workoutFailureChance(
-  machine: GymMachine,
-  buddy: Buddy,
-  zoneType: 'home' | 'starter' | 'higher',
-  trainerBonus: number,
-  readiness = 1,
-) {
-  const buddyProfile = workoutBuddyProfile(buddy);
-  const stress = clamp((machine.fatigueCost - machine.hpRestore + 1) / 8, 0, 0.25);
-  const wear = buddy.hp <= 0 ? 0.25 : clamp((buddy.maxHp - buddy.hp) / buddy.maxHp, 0, 0.28);
-  const readinessFactor = clamp(1.4 - readiness * 0.6, 0.6, 1.4);
-  const base =
-    (BASE_TRAIN_FAIL_CHANCE + stress + wear) * machineDifficultyMultiplier(zoneType) * readinessFactor -
-    trainerBonus -
-    buddyProfile.failureSafety;
-  return clamp(base, 0.15, 0.85);
-}
-
-function workoutReadinessLabel(readiness: number) {
-  if (readiness >= 0.85) return 'Peak';
-  if (readiness >= 0.68) return 'Solid';
-  if (readiness >= 0.52) return 'Worn';
-  return 'Depleted';
-}
-
-function workoutMomentumFactor(workoutMomentum = 0) {
-  return clamp01(workoutMomentum / WORKOUT_MOMENTUM_MAX);
-}
-
-function workoutMomentumLabel(workoutMomentum = 0) {
-  if (workoutMomentum >= 24) return 'Flow state';
-  if (workoutMomentum >= 16) return 'Strong rhythm';
-  if (workoutMomentum >= 8) return 'Building';
-  if (workoutMomentum >= 4) return 'Warming up';
-  return 'Cold';
-}
-
-function workoutLoadPressure(
-  machine: GymMachine,
-  buddy: Buddy,
-  zoneType: 'home' | 'starter' | 'higher',
-  readiness: number,
-  trainingFatigue = 0,
-  workoutMomentum = 0,
-) {
-  const profile = workoutBuddyProfile(buddy);
-  const momentumFactor = workoutMomentumFactor(workoutMomentum);
-  const fatigueRatio = clamp01(trainingFatigue / MAX_TRAINING_FATIGUE);
-  const baseEffort = clamp((machine.fatigueCost + machine.xpMultiplier) / 10, 0.09, 0.85);
-  const recoveryDrag = clamp((machine.fatigueCost - machine.hpRestore) / 10, 0, 0.5);
-  const zoneDrag = zoneType === 'higher' ? 0.22 : zoneType === 'starter' ? 0.11 : 0.05;
-  const movementDrag = clamp(0.42 - profile.movementConsistency, 0, 0.36);
-  const volumeDrag = clamp((MAX_BUDDY_VOLUME - buddy.volume) / MAX_BUDDY_VOLUME, 0, 0.14);
-  const readinessBuffer = readiness * 0.45;
-  return clamp(baseEffort + recoveryDrag + zoneDrag + movementDrag + volumeDrag - readinessBuffer - momentumFactor * 0.24 + fatigueRatio * 0.18, 0, 1);
-}
-
-function workoutLoadTier(pressure: number): WorkoutLoadTier {
-  return getWorkoutLoadTier(pressure);
-}
-
-function workoutSetStress(
-  loadPressure: number,
-  readiness: number,
-  trainingFatigue = 0,
-  zoneType: 'home' | 'starter' | 'higher' = 'starter',
-  loadTier: WorkoutLoadTier = 'easy',
-) {
-  const fatigueRatio = clamp01(trainingFatigue / MAX_TRAINING_FATIGUE);
-  const zoneDrag = zoneType === 'higher' ? 0.09 : zoneType === 'starter' ? 0.03 : 0;
-  const tierDrag = loadTier === 'max' ? 0.22 : loadTier === 'hard' ? 0.11 : 0;
-  const readinessRecovery = readiness * 0.35;
-  return clamp(loadPressure + fatigueRatio * 0.3 + zoneDrag + tierDrag - readinessRecovery, 0, 1);
-}
-
-function workoutSetStressLabel(setStress: number) {
-  if (setStress >= 0.86) return 'Critical overload';
-  if (setStress >= 0.7) return 'High strain';
-  if (setStress >= 0.52) return 'Moderate strain';
-  if (setStress >= 0.34) return 'Controlled';
-  return 'Light';
-}
-
-function workoutReadiness(
-  machine: GymMachine,
-  buddy: Buddy,
-  trainer: TrainerProfile,
-  zoneType: 'home' | 'starter' | 'higher',
-  trainingFatigue = 0,
-  workoutMomentum = 0,
-) {
-  const buddyProfile = workoutBuddyProfile(buddy);
-  const hpRatio = clamp01(buddy.hp / Math.max(1, buddy.maxHp));
-  const formRatio = clamp01(buddy.form / MAX_BUDDY_FORM);
-  const mobilityRatio = clamp01(buddy.mobility / MAX_BUDDY_MOBILITY);
-  const machineRecoveryBias = clamp((machine.hpRestore - machine.fatigueCost + 4) / 10, -0.6, 0.6);
-  const trainerDensity = Object.values(trainer.muscles).reduce((sum, value) => sum + value, 0) / (8 * MAX_MUSCLE_LEVEL);
-  const focusMatch = machineFocusScore(machine, trainer) * 0.16;
-  const zoneDifficulty = zoneType === 'higher' ? 0.16 : zoneType === 'starter' ? 0.08 : 0;
-  const fatiguePenalty = clamp01(trainingFatigue / MAX_TRAINING_FATIGUE) * 0.34;
-  const buddyFormBonus = formRatio * 0.14 + mobilityRatio * 0.1;
-  const momentumBonus = workoutMomentumFactor(workoutMomentum) * 0.12;
-
-  return clamp01(
-    0.22 +
-      hpRatio * 0.48 +
-      machineRecoveryBias * 0.32 +
-      trainerDensity * 0.24 +
-      focusMatch +
-      buddyFormBonus +
-      buddyProfile.readinessSupport -
-      zoneDifficulty +
-      momentumBonus -
-      fatiguePenalty,
-  );
-}
-
-function workoutBuddyProfile(buddy: Buddy) {
-  const formRatio = clamp01(buddy.form / MAX_BUDDY_FORM);
-  const mobilityRatio = clamp01(buddy.mobility / MAX_BUDDY_MOBILITY);
-  const volumeRatio = clamp01(buddy.volume / MAX_BUDDY_VOLUME);
-  const movementConsistency = clamp01(formRatio * 0.45 + mobilityRatio * 0.4 + volumeRatio * 0.15);
-
-  return {
-    formRatio,
-    mobilityRatio,
-    volumeRatio,
-    movementConsistency,
-    failureSafety: clamp((movementConsistency - 0.45) * 0.34, -0.14, 0.16),
-    readinessSupport: clamp((movementConsistency - 0.4) * 0.08, -0.03, 0.08),
-    fatigueRecoveryBonus: clamp((movementConsistency - 0.45) * 11, -5, 10),
-    hpLossResistance: clamp((movementConsistency - 0.45) * 0.28, -0.22, 0.3),
-    bossSteady: clamp((mobilityRatio - 0.45) * 0.12, -0.06, 0.06),
-  };
-}
-
-function workoutSpotSuccessChance(
-  windowMsRemaining: number,
-  base = BASE_SPOT_SUCCESS_CHANCE,
-  zoneType: 'home' | 'starter' | 'higher' = 'starter',
-) {
-  const ratio = clamp01(windowMsRemaining / WORKOUT_SPOT_WINDOW_MS);
-  const multiplier = spotCurveMultiplier(zoneType);
-  return clamp(base + ratio * multiplier, zoneType === 'higher' ? 0.35 : 0.4, 0.95);
-}
-
-function roundForDisplay(value: number) {
-  return `${Math.max(0, value)}`;
-}
-
-function clamp01(value: number) {
-  return clamp(value, 0, 1);
-}
-
-function createTone() {
-  const audioCtx = window.AudioContext || (window as any).webkitAudioContext;
-  return new audioCtx();
-}
-
-function scheduleTone(context: AudioContext, destination: GainNode, frequency: number, duration: number, intensity: number, wave: OscillatorType = 'triangle') {
-  const now = context.currentTime;
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-  const amp = clamp01(intensity);
-  oscillator.type = wave;
-  oscillator.frequency.value = frequency;
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(amp * 0.26, now + 0.05);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-  oscillator.connect(gain);
-  gain.connect(destination);
-  oscillator.start(now);
-  oscillator.stop(now + duration + 0.05);
-}
-
-function createAudioEngine(): AudioEngine {
-  const context = createTone() as AudioContext;
-  const masterGain = context.createGain();
-  const musicGain = context.createGain();
-  const sfxGain = context.createGain();
-  masterGain.connect(context.destination);
-  musicGain.connect(masterGain);
-  sfxGain.connect(masterGain);
-  masterGain.gain.value = 1;
-  musicGain.gain.value = 0.48;
-  sfxGain.gain.value = 0.82;
-
-  const engine: AudioEngine = {
-    context,
-    masterGain,
-    musicGain,
-    sfxGain,
-    musicTicker: null,
-    enabled: true,
-    zone: 'ambient',
-    intensity: 'starter',
-    step: 0,
-    stepNotes: BGM_NOTES.starter.ambient,
-    setEnabled(value) {
-      this.enabled = value;
-      this.masterGain.gain.value = value ? 1 : 0;
-      if (!value) {
-        this.stopMusic();
-      }
-    },
-    setVolumes(music, sfx) {
-      this.musicGain.gain.value = clamp01(music);
-      this.sfxGain.gain.value = clamp01(sfx);
-    },
-    stopMusic() {
-      if (this.musicTicker) {
-        clearInterval(this.musicTicker);
-      }
-      this.musicTicker = null;
-      this.step = 0;
-    },
-    startMusic(zone, intensity) {
-      this.stopMusic();
-      if (!this.enabled) return;
-      this.zone = zone;
-      this.intensity = intensity;
-      const profile = BGM_NOTES[intensity];
-      const base = zone === 'home' ? profile.ambient : zone === 'boss' ? profile.boss : profile.scout;
-      this.stepNotes = zone === 'fight' ? profile.scout : base;
-      this.context.resume();
-      if (this.context.state !== 'running') {
-        return;
-      }
-      this.musicTicker = setInterval(() => {
-        if (this.context.state !== 'running' || !this.enabled) {
-          return;
-        }
-        const current = this.stepNotes[this.step % this.stepNotes.length];
-        scheduleTone(this.context, this.musicGain, current * (zone === 'boss' ? 1.12 : 1), 0.15, 0.4, this.intensity === 'home' ? 'sine' : 'triangle');
-        scheduleTone(this.context, this.musicGain, current * 1.9, 0.09, 0.22, 'sawtooth');
-        if (this.intensity === 'higher' || zone === 'boss') {
-          scheduleTone(this.context, this.musicGain, current * 1.18, 0.065, 0.16, 'triangle');
-        }
-        this.step += 1;
-      }, this.intensity === 'higher' ? 230 : profile.interval);
-    },
-    pulseTone(frequency, duration, gainValue, wave = 'triangle') {
-      if (!this.enabled || this.context.state !== 'running') return;
-      scheduleTone(this.context, this.sfxGain, frequency, duration, gainValue, wave);
-    },
-    emitSfx(event, intensity = 1) {
-      if (!this.enabled || this.context.state !== 'running') return;
-      const baseGain = 0.2 + Math.min(intensity, 1.4);
-      if (event === 'train') {
-        this.pulseTone(220, 0.06, baseGain * 0.6, 'triangle');
-        this.pulseTone(275, 0.08, baseGain * 0.4, 'triangle');
-      } else if (event === 'steroid') {
-        this.pulseTone(330, 0.14, baseGain * 0.55, 'sawtooth');
-        this.pulseTone(440, 0.09, baseGain * 0.4, 'triangle');
-      } else if (event === 'matchStart') {
-        this.pulseTone(164, 0.12, baseGain * 0.52, 'sine');
-        this.pulseTone(220, 0.12, baseGain * 0.55, 'sine');
-        this.pulseTone(294, 0.09, baseGain * 0.44, 'triangle');
-      } else if (event === 'moveGood') {
-        this.pulseTone(349, 0.05, baseGain * 0.45, 'triangle');
-      } else if (event === 'moveBad') {
-        this.pulseTone(196, 0.07, baseGain * 0.38, 'triangle');
-      } else if (event === 'catchAlmost') {
-        this.pulseTone(262, 0.12, baseGain * 0.5, 'triangle');
-      } else if (event === 'catchWin') {
-        scheduleTone(this.context, this.sfxGain, 330, 0.1, baseGain * 0.5, 'triangle');
-        scheduleTone(this.context, this.sfxGain, 392, 0.1, baseGain * 0.55, 'triangle');
-        scheduleTone(this.context, this.sfxGain, 523, 0.17, baseGain * 0.35, 'sine');
-      } else if (event === 'bossAlert') {
-        this.pulseTone(523, 0.16, baseGain * 0.35, 'square');
-        this.pulseTone(466, 0.11, baseGain * 0.32, 'square');
-      } else if (event === 'teamFull') {
-        this.pulseTone(147, 0.11, baseGain * 0.36, 'triangle');
-      } else if (event === 'escape') {
-        this.pulseTone(164, 0.09, baseGain * 0.4, 'sine');
-      } else if (event === 'zoneShift') {
-        this.pulseTone(246, 0.09, baseGain * 0.3, 'sine');
-        this.pulseTone(185, 0.07, baseGain * 0.33, 'triangle');
-      }
-    },
-    dispose() {
-      this.stopMusic();
-      this.context.close();
-    },
-  };
-
-  return engine;
-}
-
-function getCatchChance(level: number, isExotic: boolean) {
-  if (isExotic) return 0.4;
-  if (level <= 15) return 0.9;
-  if (level <= 25) return 0.85;
-  if (level <= 35) return 0.8;
-  return 0.7;
 }
 
 function nowMs() {
@@ -998,435 +393,79 @@ function nowMs() {
 }
 
 function bossInterval() {
-  return randInt(Math.floor(BOSS_MIN_MS / 60000), Math.floor(BOSS_MAX_MS / 60000)) * 60 * 1000;
-}
-
-function bossForZone(zoneId: string): GymBoss[] {
-  return getBossesForGym(zoneId);
-}
-
-function xpNeeded(level: number) {
-  return Math.max(8, level * 5);
-}
-
-function seedBuddy(seed: number, creature: Creature, level = 4): Buddy {
-  const maxHp = 34 + level * 4;
-  return {
-    id: `seed-${seed}`,
-    nickname: `${randomChoice(FANCY_NAMES)} #${seed}`,
-    creature,
-    level,
-    hp: maxHp,
-    maxHp,
-    xp: 0,
-    form: clampBuddyStats(8 + Math.min(8, level), MAX_BUDDY_FORM),
-    mobility: clampBuddyStats(9 + Math.min(6, level), MAX_BUDDY_MOBILITY),
-    volume: clampBuddyStats(1 + Math.max(1, Math.floor(level / 2)), MAX_BUDDY_VOLUME),
-  };
-}
-
-function classForPixel(cell: string) {
-  switch (cell) {
-    case 'M':
-    case 'S':
-      return 'pixel-main';
-    case 'D':
-      return 'pixel-core';
-    case 'E':
-      return 'pixel-detail';
-    case 'W':
-      return 'pixel-core';
-    case 'H':
-    case 'P':
-      return 'pixel-accent';
-    case 'R':
-      return 'pixel-detail';
-    default:
-      return 'pixel-empty';
-  }
-}
-
-function trainerTemplate() {
-  return [
-    '.HHH.....',
-    'HHSHH....',
-    '.SSCCSS..',
-    'SSSTTCC.',
-    '.UUBBB..',
-    '.UGGGA..',
-    '.PAA....',
-    '.P..AA..',
-  ];
-}
-
-function hexToRgb(hex: string) {
-  const sanitized = hex.replace('#', '');
-  const value = parseInt(sanitized.length === 3 ? sanitized.split('').map((c) => c + c).join('') : sanitized, 16);
-  return {
-    r: (value >> 16) & 255,
-    g: (value >> 8) & 255,
-    b: value & 255,
-  };
-}
-
-function rgbToHex(value: number) {
-  return `#${value.toString(16).padStart(6, '0')}`;
-}
-
-function blendHex(base: string, blend: string, ratio: number) {
-  const source = hexToRgb(base);
-  const target = hexToRgb(blend);
-  const mixed = {
-    r: Math.round(source.r + (target.r - source.r) * ratio),
-    g: Math.round(source.g + (target.g - source.g) * ratio),
-    b: Math.round(source.b + (target.b - source.b) * ratio),
-  };
-  return rgbToHex(((mixed.r << 16) | (mixed.g << 8) | mixed.b) >>> 0);
-}
-
-function clampMuscles(muscles: TrainerProfile['muscles']) {
-  const next = { ...muscles } as TrainerProfile['muscles'];
-  (Object.keys(next) as Array<keyof TrainerProfile['muscles']>).forEach((key) => {
-    next[key] = clamp(next[key], 0, MAX_MUSCLE_LEVEL);
-  });
-  return next;
-}
-
-function trainerFromFocus(focus: string) {
-  const key = focus.toLowerCase();
-  return FOCUSED_MUSCLES[key] ?? FOCUSED_MUSCLES[Object.keys(FOCUSED_MUSCLES).find((k) => key.includes(k)) ?? 'control'];
-}
-
-function applyTrainerGrowth(trainer: TrainerProfile, focus: string, intensity: number, bonus: number) {
-  const gains = trainerFromFocus(focus);
-  const gainTotal = Math.max(1, intensity + bonus);
-  const totalWeight = gains.reduce((acc, item) => acc + item.weight, 0);
-  const profile = { ...trainer.muscles };
-  let distributed = 0;
-
-  gains.forEach((entry) => {
-    const raw = Math.floor((gainTotal * entry.weight) / totalWeight);
-    const amount = Math.max(0, Math.min(3, raw));
-    profile[entry.muscle] += amount;
-    distributed += amount;
-  });
-
-  const remainder = gainTotal - distributed;
-  if (remainder > 0) {
-    const leader = gains[0];
-    if (leader) {
-      profile[leader.muscle] += Math.max(1, remainder);
-    }
-  }
-
-  return {
-    ...trainer,
-    muscles: clampMuscles(profile),
-  };
-}
-
-function trainerPhysiqueLevel(muscles: TrainerProfile['muscles']) {
-  const total = Object.values(muscles).reduce((sum, value) => sum + value, 0);
-  const max = Object.keys(muscles).length * MAX_MUSCLE_LEVEL;
-  return clamp(Math.floor((total / max) * 40), 1, 40);
-}
-
-
-function PixelCreature({ creature }: { creature: Creature }) {
-  return (
-    <div
-      className="pixel-sprite"
-      style={{
-        '--skin': creature.palette.skin,
-        '--core': creature.palette.core,
-        '--detail': creature.palette.detail,
-        '--accent': creature.palette.accent,
-      } as Record<string, string>}
-    >
-      {creature.sprite.map((row, r) => (
-        <div className="pixel-row" key={`r-${r}`}>
-          {[...row].map((cell, c) => (
-            <span key={`${r}-${c}`} className={`pixel ${classForPixel(cell)}`} />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TrainerSprite({ trainer, emote = 'neutral' }: { trainer: TrainerProfile; emote?: TrainerEmote }) {
-  const sprite = trainerTemplate();
-  const emotePalette: Record<TrainerEmote, string> = {
-    neutral: '😐',
-    focus: '👀',
-    grind: '😤',
-    pump: '🔥',
-    level: '✨',
-    victory: '🏆',
-    drained: '😵',
-    ready: '⚡',
-  };
-  const physique = trainerPhysiqueLevel(trainer.muscles);
-
-  function muscleTone(group: keyof TrainerProfile['muscles']) {
-    const base = trainer.muscles[group];
-    const intensity = clamp(base / MAX_MUSCLE_LEVEL, 0, 1);
-    const colorBias =
-      group === 'shoulders' || group === 'chest' || group === 'triceps'
-        ? trainer.top
-        : group === 'arms'
-          ? trainer.glove
-          : group === 'core' || group === 'back'
-            ? trainer.skin
-            : trainer.shoes;
-    const accent = blendHex(trainer.skin, colorBias, intensity * 0.55);
-    return base > 0 ? accent : trainer.skin;
-  }
-
-  function pixelFor(cell: string) {
-    switch (cell) {
-      case 'H':
-        return trainer.hair;
-      case 'S':
-        return trainer.skin;
-      case 'T':
-        return trainer.top;
-      case 'G':
-        return trainer.glove;
-      case 'P':
-        return trainer.shoes;
-      case 'A':
-        return muscleTone('arms');
-      case 'C':
-        return muscleTone('chest');
-      case 'B':
-        return muscleTone('shoulders');
-      case 'Q':
-        return muscleTone('quads');
-      case 'U':
-        return muscleTone('core');
-      default:
-        return 'transparent';
-    }
-  }
-
-  return (
-    <div className="trainer-sprite-wrap">
-      <div className="trainer-emote" title={`Physique: ${physique}`}>
-        {emotePalette[emote]}
-      </div>
-      <div className="trainer-sprite" style={{ '--trainer-name': trainer.name } as Record<string, string>}>
-        {sprite.map((row, r) => (
-          <div className="pixel-row" key={`trainer-row-${r}`}>
-            {[...row].map((cell, c) => (
-              <span
-                key={`${r}-${c}`}
-                className="pixel"
-                style={{ backgroundColor: pixelFor(cell) }}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="trainer-muscle-summary">
-        Physique Lvl {String(physique).padStart(2, '0')}
-      </div>
-    </div>
-  );
+  return consumeRandomResult((randomState) =>
+    calculateBossInterval(randomState, BOSS_MIN_MS, BOSS_MAX_MS),
+  ).intervalMs;
 }
 
 function createOpponent(zone: GymArea): Encounter {
-  const mythicChance = zone.type === 'higher' ? 0.22 : zone.type === 'starter' ? 0.1 : 0;
-  const pool = CREATURES.filter((c) => c.isExotic === (Math.random() < mythicChance));
-  const source = pool.length > 0 ? pool : CREATURES.filter((c) => !c.isExotic);
-  const creature = randomChoice(source);
-  const level = randInt(zone.levelMin, zone.levelMax);
-  return { creature, level, zoneId: zone.id, catchChance: getCatchChance(level, creature.isExotic), isBoss: false };
+  return consumeRandomResult((randomState) =>
+    createWildEncounter({ gym: zone, species: CREATURES, randomState }),
+  ).encounter;
 }
 
-function bossChallengeDifficultyForBoss(zone: GymArea, boss: GymBoss) {
-  const tierByPower = boss.powerBoost >= 24 || zone.type === 'higher' ? 'high' : boss.powerBoost >= 16 || zone.type === 'starter' ? 'normal' : 'low';
-  return tierByPower as BossChallengeTier;
-}
-
-function bossMachineByDifficulty(zone: GymArea, tier: BossChallengeTier) {
-  const candidates = zone.machines;
-  if (!candidates.length) return null;
-  if (tier === 'high' && candidates.length > 1) {
-    const index = randInt(0, candidates.length - 1);
-    const priority = candidates[index % candidates.length];
-    return priority;
-  }
-  if (tier === 'normal' && candidates.length > 1) {
-    return randInt(0, candidates.length - 1) % 2 === 0 ? candidates[0] : candidates[candidates.length - 1];
-  }
-  return candidates[Math.floor(candidates.length / 2)] ?? candidates[0]!;
-}
-
-function createBoss(zone: GymArea): Encounter {
-  const pool = bossForZone(zone.id);
-  const boss = randomChoice(pool);
-  const creature = getBuddySpeciesById(boss.speciesId);
-  const level = randInt(zone.levelMin + boss.levelShift, zone.levelMax + boss.levelShift);
-  const baseChance = getCatchChance(level, creature.isExotic);
-  const zoneMultiplier = BOSS_ZONE_CATCH_SCALE[zone.type];
-  const tier = bossChallengeDifficultyForBoss(zone, boss);
-  const machine = bossMachineByDifficulty(zone, tier);
-  return {
-    creature,
-    level,
-    zoneId: zone.id,
-    catchChance: clamp(baseChance * boss.catchMultiplier * zoneMultiplier, 0.05, 0.6),
-    isBoss: true,
-    bossName: `${boss.name} — ${creature.name}`,
-    bossPowerBonus: boss.powerBoost,
-    bossChallengeTier: tier,
-    bossChallengeMachineId: machine?.id,
-    bossChallengeMachineName: machine?.name,
-  };
-}
-
-function applyXpGain(buddy: Buddy, bonus: number) {
-  let xp = buddy.xp + bonus;
-  let level = buddy.level;
-  let maxHp = buddy.maxHp;
-  let leveled = false;
-
-  while (xp >= xpNeeded(level)) {
-    xp -= xpNeeded(level);
-    level += 1;
-    maxHp += 3;
-    leveled = true;
-  }
-
-  return {
-    leveled,
-    buddy: {
-      ...buddy,
-      xp,
-      level,
-      maxHp,
-      form: clampBuddyStats(buddy.form, MAX_BUDDY_FORM),
-      mobility: clampBuddyStats(buddy.mobility, MAX_BUDDY_MOBILITY),
-      volume: clampBuddyStats(buddy.volume, MAX_BUDDY_VOLUME),
-      hp: clamp(buddy.hp + (leveled ? 12 : 5), 1, maxHp),
-    },
-  };
-}
-
-function initialSaveData(): SaveData {
-  const preset = {
-    ...getTrainerPresetById(DEFAULT_TRAINER_PRESET_ID).profile,
-    name: 'Trainer',
-  };
-  const starterTeam = STARTER_BUDDIES.map((starter) =>
-    seedBuddy(starter.seed, getBuddySpeciesById(starter.speciesId), starter.level),
-  );
-  const fallback: SaveData = {
-    version: SAVE_VERSION,
-    trainingFatigue: 0,
-    workoutMomentum: 0,
-    deloadTokens: 0,
-    hasStarterSet: false,
-    unlockedZoneIds: FALLBACK_UNLOCKED_ZONES,
-    trainer: {
-      ...preset,
-    },
-    steroids: 3,
-    activeIndex: 0,
-    activeZoneId: STARTING_ZONE_ID,
-    team: starterTeam,
-    seenDex: starterTeam.map((buddy) => buddy.creature.dex),
-    caughtDex: starterTeam.map((buddy) => buddy.creature.dex),
-    selectedMachineByZone: Object.fromEntries(AREAS.map((zone) => [zone.id, zone.defaultMachineId])),
-    bossSchedules: Object.fromEntries(
-      AREAS.map((zone) => [zone.id, { nextBossAt: nowMs() + bossInterval(), defeated: 0 }]),
-    ) as Record<string, BossSchedule>,
-    audio: {
-      enabled: true,
-      musicVolume: 0.5,
-      sfxVolume: 0.82,
-    },
-    tutorialStep: 0,
-  };
-
-  if (typeof window === 'undefined') {
-    return fallback;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(SAVE_KEY);
-    if (!raw) return fallback;
-
-    const parsed = JSON.parse(raw) as Partial<SaveData>;
-      if (!parsed || !parsed.version || parsed.version !== SAVE_VERSION) {
-        return fallback;
-      }
-
-    const team = (parsed.team ?? fallback.team).slice(0, TEAM_SIZE).map((buddy) => ({
-      ...buddy,
-      creature: resolveBuddySpeciesIdentity(buddy.creature),
-      level: Math.max(1, buddy.level),
-      hp: Math.max(1, Math.min(buddy.maxHp, buddy.hp)),
-      maxHp: Math.max(18, buddy.maxHp),
-      xp: Math.max(0, buddy.xp),
-      form: clampBuddyStats(Math.round(buddy.form), MAX_BUDDY_FORM, 1),
-      mobility: clampBuddyStats(Math.round(buddy.mobility), MAX_BUDDY_MOBILITY, 1),
-      volume: clampBuddyStats(Math.round(buddy.volume), MAX_BUDDY_VOLUME, 1),
-    }));
-
-    return {
-      ...fallback,
-      ...parsed,
-      hasStarterSet: parsed.hasStarterSet ?? false,
-      trainer: {
-        ...fallback.trainer,
-        ...parsed.trainer,
-        name: parsed.trainer?.name?.trim() ? parsed.trainer.name : fallback.trainer.name,
-        muscles: clampMuscles({
-          ...fallback.trainer.muscles,
-          ...parsed.trainer?.muscles,
-        } as TrainerProfile['muscles']),
-      },
-      team,
-      selectedMachineByZone: {
-        ...fallback.selectedMachineByZone,
-        ...(parsed.selectedMachineByZone ?? {}),
-      },
-      bossSchedules: {
-        ...fallback.bossSchedules,
-        ...(parsed.bossSchedules ?? {}),
-      },
-      activeIndex: clamp(parsed.activeIndex ?? 0, 0, Math.max(0, team.length - 1)),
-      steroids: Math.max(0, parsed.steroids ?? 3),
-      trainingFatigue: clamp(Math.max(0, parsed.trainingFatigue ?? 0), 0, MAX_TRAINING_FATIGUE),
-      workoutMomentum: clamp(Math.max(0, parsed.workoutMomentum ?? 0), 0, WORKOUT_MOMENTUM_MAX),
-      deloadTokens: clamp(Math.max(0, parsed.deloadTokens ?? 0), 0, WORKOUT_DELOAD_MAX),
-      seenDex: parsed.seenDex ?? fallback.seenDex,
-      caughtDex: parsed.caughtDex ?? fallback.caughtDex,
-      activeZoneId: parsed.activeZoneId ?? 'home',
-      unlockedZoneIds: normalizeUnlockedZones(
-        parsed.unlockedZoneIds,
-        parsed.activeZoneId && WORLD_ROUTES[parsed.activeZoneId] ? [parsed.activeZoneId, ...WORLD_ROUTES[parsed.activeZoneId]] : FALLBACK_UNLOCKED_ZONES,
-      ),
-      audio: {
-        ...fallback.audio,
-        ...parsed.audio,
-        musicVolume: clamp01(parsed.audio?.musicVolume ?? fallback.audio.musicVolume),
-        sfxVolume: clamp01(parsed.audio?.sfxVolume ?? fallback.audio.sfxVolume),
-      },
-      tutorialStep: parsed.tutorialStep ?? 0,
-    };
-  } catch {
-    return fallback;
-  }
+function createBoss(zone: GymArea, scheduleCycle: number): Encounter {
+  return consumeRandomResult((randomState) =>
+    createBossEncounter({
+      gym: zone,
+      bosses: getBossesForGym(zone.id),
+      species: CREATURES,
+      scheduleCycle,
+      randomState,
+    }),
+  ).encounter;
 }
 
 export default function App() {
-  const [save, setSave] = useState<SaveData>(initialSaveData);
+  const saveStorageRef = useRef(getBrowserSaveStorage());
+  const skipNextAutosaveRef = useRef(false);
+  const initialSaveLoadRef = useRef<SaveLoadResult | null>(null);
+  const [save, setSave] = useState<SaveData>(() => {
+    const result = loadGameSave(saveStorageRef.current);
+    initialSaveLoadRef.current = result;
+    skipNextAutosaveRef.current = result.source === 'primary';
+    return result.save;
+  });
+  const latestSaveRef = useRef(save);
+  const autosaveTimerRef = useRef<number | null>(null);
+  const autosaveDirtyRef = useRef(false);
+  const lastAutosaveAtRef = useRef(0);
+  const lastPersistedSaveRef = useRef(save);
+  const [savePersistenceEnabled, setSavePersistenceEnabled] = useState(
+    () => initialSaveLoadRef.current?.canAutosave ?? false,
+  );
+  const [saveLoadMessage, setSaveLoadMessage] = useState(
+    () => initialSaveLoadRef.current?.message ?? 'Save service ready.',
+  );
+  const [saveLoadIssues, setSaveLoadIssues] = useState<string[]>(
+    () => initialSaveLoadRef.current?.issues ?? [],
+  );
+  const [previousSaveAvailable, setPreviousSaveAvailable] = useState(
+    () => hasPreviousSave(saveStorageRef.current),
+  );
+  const savePersistenceEnabledRef = useRef(savePersistenceEnabled);
+  const persistLatestSaveRef = useRef<() => void>(() => undefined);
+  latestSaveRef.current = save;
+  savePersistenceEnabledRef.current = savePersistenceEnabled;
   const [encounter, setEncounter] = useState<Encounter | null>(null);
   const [match, setMatch] = useState<Match | null>(null);
+  const [captureAnimation, setCaptureAnimation] = useState<{
+    moveId: Move['id'];
+    tone: 'counter' | 'advance' | 'resisted';
+  } | null>(null);
+  const captureAnimationTimerRef = useRef<number | null>(null);
+  const presentationEffectSequenceRef = useRef(0);
+  const presentationEffectTimerRef = useRef<number | null>(null);
+  const [presentationEffect, setPresentationEffect] =
+    useState<PresentationEffectCue | null>(null);
+  const [bossEntrance, setBossEntrance] = useState<BossEntranceCue | null>(null);
+  const bossEntranceTimerRef = useRef<number | null>(null);
   const [workoutSession, setWorkoutSession] = useState<WorkoutSession | null>(null);
+  const [gameplayPaused, setGameplayPaused] = useState(false);
+  const gameplayPausedRef = useRef(false);
+  const gameplayPauseStartedAtRef = useRef<number | null>(null);
+  const [selectedWorkoutLoad, setSelectedWorkoutLoad] =
+    useState<WorkoutLoadTier>('steady');
   const [workoutFrame, setWorkoutFrame] = useState(nowMs);
   const [message, setMessage] = useState('Welcome to Gym Buddies. Start from Home Gym and build your team.');
   const [tick, setTick] = useState(nowMs);
@@ -1438,17 +477,79 @@ export default function App() {
   const [zoneTransit, setZoneTransit] = useState<ZoneTransit | null>(null);
   const [trainerFacing, setTrainerFacing] = useState<CardinalDirection>('down');
   const [worldPlayerPos, setWorldPlayerPos] = useState<WorldPosition>(() => WORLD_ZONE_POSITIONS[save.activeZoneId] ?? WORLD_ZONE_POSITIONS.home);
+  const [overworldState, setOverworldState] = useState<OverworldState>(() =>
+    createOverworldState(locationIdForZone(save.activeZoneId) ?? 'home-gym'),
+  );
   const [worldMoveLockUntil, setWorldMoveLockUntil] = useState(0);
   const [lastRouteEncounterMs, setLastRouteEncounterMs] = useState(0);
   const [previewZoneId, setPreviewZoneId] = useState<string | null>(null);
-  const [showTrainerPanel, setShowTrainerPanel] = useState(false);
-  const [draftTrainer, setDraftTrainer] = useState<TrainerProfile>(() => ({ ...save.trainer }));
+  const [trainerSetupMode, setTrainerSetupMode] = useState<'new' | 'edit'>('new');
+  const [draftTrainer, setDraftTrainer] = useState<TrainerCreationDraft>(() =>
+    applyTrainerBodyPreset(
+      createTrainerCreationDraft(save.trainer),
+      getTrainerBodyPresetById(DEFAULT_TRAINER_BODY_PRESET_ID),
+    ),
+  );
+  const [trainerStartMode, setTrainerStartMode] =
+    useState<TrainerStartMode>('guided');
+  const [buddyCustomizationOpen, setBuddyCustomizationOpen] = useState(false);
+  const [restartConfirmationOpen, setRestartConfirmationOpen] = useState(false);
   const [trainerEmote, setTrainerEmote] = useState<TrainerEmote>('neutral');
   const [trainerEmoteUntil, setTrainerEmoteUntil] = useState(0);
   const [nextRestAvailableMs, setNextRestAvailableMs] = useState(0);
-  const [pendingTutorialRoute, setPendingTutorialRoute] = useState<string | null>(null);
-  const [showStarterSetup, setShowStarterSetup] = useState(true);
+  const [showStarterSetup, setShowStarterSetup] = useState(
+    () => !save.hasStarterSet,
+  );
   const audioRef = useRef<AudioEngine | null>(null);
+  persistLatestSaveRef.current = () => {
+    if (
+      !savePersistenceEnabledRef.current ||
+      !autosaveDirtyRef.current
+    ) {
+      return;
+    }
+    if (autosaveTimerRef.current !== null) {
+      window.clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    const result = writeGameSave(
+      saveStorageRef.current,
+      latestSaveRef.current,
+    );
+    autosaveDirtyRef.current = false;
+    lastAutosaveAtRef.current = nowMs();
+    if (!result.ok) {
+      setSavePersistenceEnabled(false);
+      setSaveLoadMessage(
+        `${result.message} Automatic saving is paused until a valid import or confirmed reset.`,
+      );
+      setSaveLoadIssues(result.issues);
+      return;
+    }
+    lastPersistedSaveRef.current = latestSaveRef.current;
+    if (result.backupCreated) setPreviousSaveAvailable(true);
+  };
+
+  function handleGameplayPauseChange(nextPaused: boolean) {
+    if (gameplayPausedRef.current === nextPaused) return;
+    if (nextPaused) {
+      gameplayPauseStartedAtRef.current = nowMs();
+    } else {
+      const pauseStartedAt = gameplayPauseStartedAtRef.current;
+      const pausedDuration =
+        pauseStartedAt === null ? 0 : Math.max(0, nowMs() - pauseStartedAt);
+      if (pausedDuration > 0) {
+        setWorkoutSession((session) =>
+          session
+            ? shiftWorkoutSessionTiming(session, pausedDuration)
+            : session,
+        );
+      }
+      gameplayPauseStartedAtRef.current = null;
+    }
+    gameplayPausedRef.current = nextPaused;
+    setGameplayPaused(nextPaused);
+  }
 
   const activeZone = useMemo(
     () => AREAS.find((area) => area.id === save.activeZoneId) ?? getGymById(STARTING_ZONE_ID),
@@ -1456,17 +557,131 @@ export default function App() {
   );
 
   const activeBuddy = save.team[save.activeIndex] ?? null;
-  const seenDex = useMemo(() => [...save.seenDex].sort((a, b) => a - b), [save.seenDex]);
-  const caughtDex = useMemo(() => [...save.caughtDex].sort((a, b) => a - b), [save.caughtDex]);
   const activeMachine = useMemo(() => {
     const id = save.selectedMachineByZone[activeZone.id];
     return activeZone.machines.find((machine) => machine.id === id) ?? getDefaultGymMachine(activeZone);
   }, [activeZone, save.selectedMachineByZone]);
   const bossSchedule = save.bossSchedules[activeZone.id];
-  const bossTicker = formatRemainingTime((bossSchedule?.nextBossAt ?? tick) - tick);
+  const activeGymBosses = getBossesForGym(activeZone.id);
+  const activeBossAvailability = getBossAvailability(
+    bossSchedule,
+    save.bossGameplayTimeMs,
+  );
+  const bossTicker =
+    activeBossAvailability.status === 'ready'
+      ? 'READY'
+      : formatRemainingTime(activeBossAvailability.remainingMs);
   const trainer = save.trainer;
+  const workoutPreview = useMemo(
+    () =>
+      activeBuddy && activeMachine
+        ? calculateWorkoutPreview({
+            buddy: activeBuddy,
+            machine: activeMachine,
+            trainer,
+            gymKind: activeZone.type,
+            selectedLoad: selectedWorkoutLoad,
+            trainingFatigue: save.trainingFatigue,
+            workoutMomentum: save.workoutMomentum,
+            deloadTokens: save.deloadTokens,
+            consecutiveMachineUses:
+              save.machineTrainingHistory.lastMachineId === activeMachine.id
+                ? save.machineTrainingHistory.repeatedUses
+                : 0,
+            machineMasteryXp:
+              save.machineTrainingHistory.masteryByMachineId[activeMachine.id]
+                ?.xp ?? 0,
+          })
+        : null,
+    [
+      activeBuddy,
+      activeMachine,
+      activeZone.type,
+      save.deloadTokens,
+      save.machineTrainingHistory,
+      save.trainingFatigue,
+      save.workoutMomentum,
+      selectedWorkoutLoad,
+      trainer,
+    ],
+  );
   const unlockedZoneSet = useMemo(() => new Set(save.unlockedZoneIds), [save.unlockedZoneIds]);
+  const overworldProgression = useMemo(
+    () => ({
+      visitedZoneIds: normalizeVisitedZones(
+        save.visitedZoneIds,
+        save.unlockedZoneIds,
+        save.activeZoneId,
+      ),
+      defeatedGymIds: JOURNEY_GYM_ZONE_IDS.filter(
+        (zoneId) => (save.bossSchedules[zoneId]?.defeated ?? 0) > 0,
+      ),
+    }),
+    [
+      save.activeZoneId,
+      save.bossSchedules,
+      save.unlockedZoneIds,
+      save.visitedZoneIds,
+    ],
+  );
   const encounterZone = encounter ? AREAS.find((area) => area.id === encounter.zoneId) ?? activeZone : activeZone;
+  const encounterBoss = getBossById(encounter?.bossId);
+  const encounterBossCharacterDesign = getBossCharacterDesign(
+    encounter?.bossId,
+  );
+  const encounterBossCosmetics = encounterBossCharacterDesign
+    ? bossBuddyCosmetics(encounterBossCharacterDesign)
+    : null;
+  const dialoguePortrait: DialoguePortrait = encounter?.creature
+    ? {
+        accent: encounter.creature.palette.accent,
+        base: encounter.creature.palette.core,
+        initial: (encounterBoss?.name ?? encounter.creature.name).slice(0, 1).toUpperCase(),
+        kind: encounterBoss ? 'boss' : 'buddy',
+        name: encounterBoss?.name ?? encounter.creature.name,
+      }
+    : workoutSession && activeBuddy
+      ? {
+          accent: activeBuddy.creature.palette.accent,
+          base: activeBuddy.creature.palette.core,
+          initial: activeBuddy.nickname.slice(0, 1).toUpperCase(),
+          kind: 'buddy',
+          name: activeBuddy.nickname,
+        }
+      : {
+          accent: trainer.top,
+          base: trainer.skin,
+          initial: trainer.name?.slice(0, 1).toUpperCase() || 'T',
+          kind: 'trainer',
+          name: trainer.name || 'Trainer',
+        };
+  const captureSpeed =
+    CAPTURE_BATTLE_SPEEDS.find(
+      (speed) => speed.id === save.captureBattleSpeed,
+    ) ?? CAPTURE_BATTLE_SPEEDS[1]!;
+  const bossEntranceDuration = getPresentationSequenceDuration(
+    PRESENTATION_EFFECT_TIMING.bossEntranceMs,
+    save.captureBattleSpeed,
+    save.accessibility.reducedMotion,
+  );
+  const capturePlayerReactionClass = captureAnimation
+    ? captureAnimation.tone === 'resisted'
+      ? 'buddy-reaction-brace'
+      : 'buddy-reaction-drive'
+    : match?.status === 'captured'
+      ? 'buddy-reaction-victory'
+      : match?.status === 'escape' || match?.status === 'failed-pin'
+        ? 'buddy-reaction-stagger'
+        : '';
+  const captureOpponentReactionClass = captureAnimation
+    ? captureAnimation.tone === 'resisted'
+      ? 'buddy-reaction-drive'
+      : 'buddy-reaction-brace'
+    : match?.status === 'captured' || match?.status === 'full-party'
+      ? 'buddy-reaction-bond'
+      : match?.status === 'escape'
+        ? 'buddy-reaction-escape'
+        : '';
   const encounterChallengeMachine = encounter?.isBoss ? getBossChallengeMachine(encounter, encounterZone) : null;
   const encounterTrainerPressure = encounter ? trainerArenaPressure(trainer, activeMachine, encounterZone) : 0;
   const encounterBuddyPressure = encounter && activeBuddy ? buddyArenaPressure(activeBuddy) : 0;
@@ -1478,20 +693,47 @@ export default function App() {
   const activeMatchChallengeSummary = match ? bossChallengeSummary(match.encounter, encounterZone, activeMachine ?? null) : null;
   const activeMatchChallengeProfile = match
     ? bossChallengeProfileForZone(encounterZone.type, match.encounter)
-    : BOSS_CHALLENGE_PRESSURE[encounterZone.type];
+    : bossChallengeProfileForZone(encounterZone.type);
   const matchChallengeMissCount = match?.bossChallengeMisses ?? 0;
   const matchChallengeNearMissCount = match?.bossChallengeNearMisses ?? 0;
   const activeMatchCaptureTarget = match?.encounter?.isBoss
-    ? bossCaptureTarget(
-        encounterZone,
-        match.encounter,
-        isMatchChallengeAligned,
-        match.bossChallengeMisses,
-        match.bossChallengeNearMisses,
-        match.bossChallengeMatchStreak,
-        activeBuddy ?? undefined,
-      )
-    : BOSS_CAPTURE_TARGET.home;
+    ? bossCaptureTarget({
+        gym: encounterZone,
+        encounter: match.encounter,
+        isChallengeAligned: isMatchChallengeAligned,
+        missCount: match.bossChallengeMisses,
+        nearMissCount: match.bossChallengeNearMisses,
+        matchStreak: match.bossChallengeMatchStreak,
+        buddy: activeBuddy ?? undefined,
+      })
+    : WILD_CAPTURE_CONTROL_TARGET;
+  const captureMovePredictions = useMemo(
+    () =>
+      match?.status === 'playing' && activeBuddy
+        ? new Map(
+            MOVES.map((move) => [
+              move.id,
+              calculateCaptureMovePrediction({
+                match,
+                gym: encounterZone,
+                trainer,
+                buddy: activeBuddy,
+                trainingFatigue: save.trainingFatigue,
+                move,
+                selectedMachine: activeMachine,
+              }),
+            ]),
+          )
+        : new Map(),
+    [
+      activeBuddy,
+      encounterZone,
+      match,
+      activeMachine,
+      save.trainingFatigue,
+      trainer,
+    ],
+  );
   const isMatchChallengeStreakReady =
     match?.isBossChallengeActive &&
     isMatchChallengeAligned === true &&
@@ -1500,52 +742,37 @@ export default function App() {
     match?.isBossChallengeActive &&
     !isMatchChallengeAligned &&
     matchChallengeMissCount >= Math.max(1, Math.ceil(activeMatchChallengeProfile.streakLimit / 1.6));
-  const isMatchChallengeNearWarn =
-    match?.isBossChallengeActive &&
-    matchChallengeNearMissCount > activeMatchChallengeProfile.missResetGrace;
   const isMatchChallengeOverload = match?.isBossChallengeActive
-    ? match.bossChallengeMisses >= Math.max(2, activeMatchChallengeProfile.streakLimit + 1)
+    ? match.bossChallengeMisses >= activeMatchChallengeProfile.overloadMissLimit
     : false;
   const isMatchChallengeForcedRecovery =
     isMatchChallengeOverload && match?.encounter?.isBoss && isMatchChallengeAligned === false;
-  const activeMatchChallengeStress: BossChallengeStress = match?.encounter?.isBoss && match?.isBossChallengeActive
-    ? (() => {
-        const rawAlignmentPenalty =
-          match.bossChallengeMachineId && activeMachine?.id
-            ? match.bossChallengeMachineId === activeMachine.id
-              ? 10
-              : 38
-            : 24;
-        const missPressure = Math.min(4, matchChallengeMissCount) * 12;
-        const nearPressure =
-          Math.max(0, matchChallengeNearMissCount - activeMatchChallengeProfile.missResetGrace) * 8;
-        const overloadBoost = isMatchChallengeOverload ? 28 : 0;
-        const nearWarnBoost = isMatchChallengeNearWarn ? 6 : 0;
-        const streakRecovery = (match.bossChallengeMatchStreak / Math.max(1, activeMatchChallengeProfile.streakLimit)) * 12;
-        const percent = clamp(
-          Math.round(12 + rawAlignmentPenalty + missPressure + nearPressure + nearWarnBoost + overloadBoost - streakRecovery),
-          0,
-          100,
-        );
-        const tone = percent > 84 ? 'overload' : percent > 70 ? 'danger' : percent > 35 ? 'caution' : 'safe';
-        return {
-          percent,
-          tone,
-          label:
-            percent > 84
-              ? 'Overload'
-              : percent > 70
-                ? 'Danger'
-                : percent > 35
-                  ? 'Caution'
-                  : 'Stable',
-          detail:
-            match.bossChallengeMisses + matchChallengeNearMissCount > 0
-              ? `${matchChallengeMissCount} misses · ${matchChallengeNearMissCount} near misses`
-              : 'No pressure events yet',
-        };
-      })()
-    : { percent: 0, tone: 'safe', label: 'No stress', detail: 'No active boss challenge pressure' };
+  const activeMatchChallengeStressMath = calculateBossChallengeStress(
+    match,
+    activeMachine,
+    encounterZone.type,
+  );
+  const activeMatchChallengeStress: BossChallengeStress = match?.encounter?.isBoss && match.isBossChallengeActive
+    ? {
+        ...activeMatchChallengeStressMath,
+        label:
+          activeMatchChallengeStressMath.percent > 84
+            ? 'Overload'
+            : activeMatchChallengeStressMath.percent > 70
+              ? 'Danger'
+              : activeMatchChallengeStressMath.percent > 35
+                ? 'Caution'
+                : 'Stable',
+        detail:
+          match.bossChallengeMisses + matchChallengeNearMissCount > 0
+            ? `${matchChallengeMissCount} misses · ${matchChallengeNearMissCount} near misses`
+            : 'No pressure events yet',
+      }
+    : {
+        ...activeMatchChallengeStressMath,
+        label: 'No stress',
+        detail: 'No active boss challenge pressure',
+      };
   const challengeAlignmentText =
     match?.isBossChallengeActive && match.bossChallengeMachineId && isMatchChallengeAligned !== null
       ? isMatchChallengeAligned
@@ -1559,7 +786,7 @@ export default function App() {
   const activeEmote: TrainerEmote = trainerEmoteUntil > tick ? trainerEmote : 'neutral';
   const trainerPhysique = trainerPhysiqueLevel(trainer.muscles);
   const draftTrainerPhysique = trainerPhysiqueLevel(draftTrainer.muscles);
-  const fatigueRatio = clamp01(save.trainingFatigue / MAX_TRAINING_FATIGUE);
+  const fatigueRatio = getFatigueRatio(save.trainingFatigue);
   const canRest = activeBuddy && !workoutSession && !encounter && !match && nowMs() >= nextRestAvailableMs;
   const restCooldownSeconds = Math.max(0, Math.ceil((nextRestAvailableMs - tick) / 1000));
   const connectedZones = WORLD_ROUTES[save.activeZoneId] ?? [];
@@ -1603,6 +830,15 @@ export default function App() {
   const worldMovePercent = clamp01(1 - worldMoveCooldownRemaining / WORLD_MOVE_COOLDOWN_MS);
   const worldMoveBlocked = nowMs() < worldMoveLockUntil;
   const canMoveInWorld = !isTraveling && !worldMoveBlocked;
+  const activeOverworldMap = getOverworldMap(overworldState.locationId);
+  const overworldDirectionAvailability = useMemo(
+    () => getOverworldDirectionAvailability(overworldState),
+    [overworldState],
+  );
+  const facingOverworldInteractable = useMemo(
+    () => findFacingInteractable(activeOverworldMap, overworldState),
+    [activeOverworldMap, overworldState],
+  );
   const connectedWalkByDirection = Object.fromEntries(connectedWalks.map((entry) => [entry.direction, entry])) as Record<
     CardinalDirection,
     {
@@ -1616,42 +852,71 @@ export default function App() {
   >;
   const routeScoutCooldownRemaining = Math.max(0, WORLD_ROUTE_ENCOUNTER_COOLDOWN_MS - (tick - lastRouteEncounterMs));
   const isZoneUnlocked = (zoneId: string) => unlockedZoneSet.has(zoneId);
-  const workoutProgress =
-    !workoutSession || workoutSession.phase === 'resolved'
-      ? 0
-      : workoutSession.phase === 'running'
-        ? clamp(
-            Math.round(((workoutFrame - workoutSession.startedAt) / (workoutSession.durationMs || 1)) * 100),
-            0,
-            100,
-          )
-        : clamp(Math.round(((workoutSession.spotWindowEnd - workoutFrame) / (workoutSession.spotWindowMs || 1)) * 100), 0, 100);
-  const workoutSpotRemainingMs = workoutSession?.phase === 'spot' ? Math.max(0, workoutSession.spotWindowEnd - workoutFrame) : 0;
-  const canSpot = workoutSession?.phase === 'spot' && !workoutSession.resolved && workoutSession.buddyId === activeBuddy?.id;
 
   function getAudioEngine() {
     if (audioRef.current) {
       return audioRef.current;
     }
-    const engine = createAudioEngine();
+    const engine = createRetroAudioEngine();
+    if (typeof document !== 'undefined') {
+      engine.setPageHidden(document.visibilityState !== 'visible');
+    }
     audioRef.current = engine;
     return engine;
   }
 
-  function activateAudioEngine() {
-    const engine = getAudioEngine();
+  function syncAudioEngineSettings(engine: AudioEngine) {
     engine.setEnabled(save.audio.enabled);
-    engine.setVolumes(save.audio.musicVolume, save.audio.sfxVolume);
-    void engine.context.resume();
-    return engine;
+    engine.setVolumes(
+      save.audio.musicVolume,
+      save.audio.sfxVolume,
+    );
   }
 
-  function updateMusic() {
-    const engine = activateAudioEngine();
-    const zone: MusicZoneState =
-      activeZone.type === 'home' ? 'home' : encounter?.isBoss ? 'boss' : match?.status === 'playing' ? 'fight' : 'ambient';
-    const intensity = activeZone.type === 'home' ? 'home' : activeZone.type === 'starter' ? 'starter' : 'higher';
-    engine.startMusic(zone, intensity);
+  function desiredMusicTrack(): MusicTrackId {
+    if (workoutSession && !workoutSession.resolved) return 'training';
+    if (
+      encounter?.isBoss ||
+      (match?.status === 'playing' && match.encounter?.isBoss)
+    ) {
+      return 'boss-challenge';
+    }
+    if (encounter || match?.status === 'playing') {
+      return 'wild-encounter';
+    }
+    if (
+      activeZone.type === 'home' &&
+      activeOverworldMap.kind !== 'route'
+    ) {
+      return 'home-gym';
+    }
+    return 'route-exploration';
+  }
+
+  function updateMusic(engine = getAudioEngine()) {
+    syncAudioEngineSettings(engine);
+    engine.setMusic(desiredMusicTrack());
+  }
+
+  function activateAudioEngine() {
+    const engine = getAudioEngine();
+    updateMusic(engine);
+    return engine.unlock();
+  }
+
+  function playAudioCue(cueId: AudioCueId, intensity = 1) {
+    const engine = getAudioEngine();
+    updateMusic(engine);
+    void engine.unlock().then((ready) => {
+      if (ready) engine.emitSfx(cueId, intensity);
+    });
+  }
+
+  function auditionAudioTrack(trackId: MusicTrackId) {
+    const engine = getAudioEngine();
+    syncAudioEngineSettings(engine);
+    engine.setMusic(trackId);
+    void engine.unlock();
   }
 
   function setAudioEnabled(enabled: boolean) {
@@ -1664,8 +929,10 @@ export default function App() {
     }));
     const engine = getAudioEngine();
     engine.setEnabled(enabled);
+    engine.setVolumes(save.audio.musicVolume, save.audio.sfxVolume);
     if (enabled) {
-      updateMusic();
+      engine.setMusic(desiredMusicTrack());
+      void engine.unlock();
     }
   }
 
@@ -1679,7 +946,7 @@ export default function App() {
       },
     }));
     if (!audioRef.current) return;
-    audioRef.current.musicGain.gain.value = volume;
+    audioRef.current.setVolumes(volume, save.audio.sfxVolume);
   }
 
   function setSfxVolume(value: number) {
@@ -1692,13 +959,46 @@ export default function App() {
       },
     }));
     if (!audioRef.current) return;
-    audioRef.current.sfxGain.gain.value = volume;
+    audioRef.current.setVolumes(save.audio.musicVolume, volume);
+  }
+
+  function setCaptureBattleSpeed(value: CaptureBattleSpeed) {
+    if (!CAPTURE_BATTLE_SPEEDS.some((speed) => speed.id === value)) return;
+    setSave((state) => ({
+      ...state,
+      captureBattleSpeed: value,
+    }));
+  }
+
+  function setAccessibilitySettings(
+    accessibility: SaveData['accessibility'],
+  ) {
+    setSave((state) => ({
+      ...state,
+      accessibility: { ...accessibility },
+    }));
+  }
+
+  function setKeyboardBindings(
+    keyboardBindings: SaveData['input']['keyboardBindings'],
+  ) {
+    setSave((state) => ({
+      ...state,
+      input: {
+        ...state.input,
+        keyboardBindings,
+      },
+    }));
   }
 
   function getGymBossTicker(zone: GymArea) {
-    const nextAt = save.bossSchedules[zone.id]?.nextBossAt ?? tick;
-    const remaining = nextAt - tick;
-    return remaining <= 0 ? 'READY' : formatRemainingTime(remaining);
+    const availability = getBossAvailability(
+      save.bossSchedules[zone.id],
+      save.bossGameplayTimeMs,
+    );
+    return availability.status === 'ready'
+      ? 'READY'
+      : formatRemainingTime(availability.remainingMs);
   }
 
   function trySpawnRouteEncounter(zone: GymArea, encounterBoost = 0, routeName = 'Route') {
@@ -1707,15 +1007,18 @@ export default function App() {
     if (now - lastRouteEncounterMs < WORLD_ROUTE_ENCOUNTER_COOLDOWN_MS) {
       return;
     }
-    const wasBossDue = (save.bossSchedules[zone.id]?.nextBossAt ?? 0) <= now;
-    const encounterChance = WORLD_ROUTE_ENCOUNTER_RATE[zone.type] * (1 + encounterBoost) * (1 + clamp01(save.trainingFatigue / MAX_TRAINING_FATIGUE) * 0.2);
-    if (
-      !wasBossDue &&
-      !encounter &&
-      !match &&
-      !workoutSession &&
-      Math.random() < Math.min(0.55, encounterChance)
-    ) {
+    const encounterChance = calculateRouteEncounterChance({
+      gymKind: zone.type,
+      encounterBoost,
+      trainingFatigue: save.trainingFatigue,
+    });
+    if (encounter || match || workoutSession) {
+      return;
+    }
+    const spawnRoll = consumeRandomResult((randomState) =>
+      rollRouteEncounter(randomState, encounterChance),
+    );
+    if (spawnRoll.shouldSpawn) {
       const next = createOpponent(zone);
       setEncounter(next);
       setMatch(null);
@@ -1725,41 +1028,132 @@ export default function App() {
       }));
       setMessage(`A wild ${next.creature.name} stepped out via ${routeName} near ${zone.name}.`);
       pushLog(`Scouted ${next.creature.name} Lv.${next.level} via ${routeName} at ${zone.name}.`);
+      playAudioCue(
+        next.creature.isExotic ? 'rare-encounter' : 'wild-alert',
+        next.creature.isExotic ? 1.1 : 0.8,
+      );
       setLastRouteEncounterMs(now);
     }
   }
 
-  function triggerBossSpawn(gym: GymArea) {
-    if (!encounter && !match) {
-        const now = nowMs();
-        const schedule = save.bossSchedules[gym.id];
-        if (schedule && now >= schedule.nextBossAt) {
-          const boss = createBoss(gym);
-          setEncounter(boss);
-          setMatch(null);
-        activateAudioEngine().emitSfx('bossAlert', 1.2);
-        setSave((state) => ({
-          ...state,
-          bossSchedules: {
-            ...state.bossSchedules,
-            [gym.id]: {
-              nextBossAt: now + bossInterval(),
-              defeated: (state.bossSchedules[gym.id]?.defeated ?? 0) + 1,
-            },
-          },
-        })); 
-        const challenge = boss.bossChallengeMachineName ?? 'a random machine';
-        setMessage(`A gym boss appeared at ${gym.name}: ${boss.bossName}! Hold at ${challenge}.`);
-        pushLog(`Boss spawn in ${gym.name}: ${boss.bossName} Lv.${boss.level} at ${challenge}.`);
-      }
+  function startBossChallenge(gym: GymArea) {
+    if (encounter || match || workoutSession) {
+      setMessage('Finish the current activity before answering a boss challenge.');
+      return;
     }
+    const schedule = save.bossSchedules[gym.id];
+    if (!schedule) {
+      setMessage('This gym is still preparing its boss challenge.');
+      return;
+    }
+    const availability = getBossAvailability(
+      schedule,
+      save.bossGameplayTimeMs,
+    );
+    if (availability.status !== 'ready') {
+      setMessage(
+        `Boss challenge available after ${formatRemainingTime(availability.remainingMs)} of active play.`,
+      );
+      return;
+    }
+    const scheduleCycle = schedule.cycle + 1;
+    const boss = createBoss(gym, scheduleCycle);
+    if (!boss.bossId) return;
+    const claimed = claimBossSchedule({
+      schedule,
+      gameplayTimeMs: save.bossGameplayTimeMs,
+      nextIntervalMs: bossInterval(),
+      bossId: boss.bossId,
+    });
+    if (!claimed.claimed) return;
+    setEncounter(boss);
+    setMatch(null);
+    const entranceSequence = presentationEffectSequenceRef.current + 1;
+    presentationEffectSequenceRef.current = entranceSequence;
+    setBossEntrance({
+      bossName: boss.bossName ?? 'Gym challenger',
+      gymName: gym.name,
+      sequence: entranceSequence,
+      signature: boss.bossRequiredMoveName ?? 'adaptive pressure',
+    });
+    cuePresentationEffect(
+      'boss-entrance',
+      'neutral',
+      boss.bossName ?? 'Boss challenge',
+    );
+    playAudioCue('boss-alert', 1.2);
+    setSave((state) => ({
+      ...state,
+      bossSchedules: {
+        ...state.bossSchedules,
+        [gym.id]: claimed.schedule,
+      },
+    }));
+    const challenge = boss.bossChallengeMachineName ?? 'the announced machine';
+    const requiredMove = boss.bossRequiredMoveName ?? 'the announced move';
+    setMessage(
+      `${boss.bossName} answered at ${gym.name}. Link ${challenge} with ${requiredMove}.`,
+    );
+    pushLog(
+      `Boss challenge in ${gym.name}: ${boss.bossName} Lv.${boss.level} · ${challenge} + ${requiredMove}.`,
+    );
   }
 
   useEffect(() => {
     if (!zoneTransit) return;
-    const id = window.setTimeout(() => setZoneTransit(null), 1200);
+    const duration = getPresentationSequenceDuration(
+      PRESENTATION_EFFECT_TIMING.routeTransitionMs,
+      save.captureBattleSpeed,
+      save.accessibility.reducedMotion,
+    );
+    const id = window.setTimeout(() => setZoneTransit(null), duration);
     return () => clearTimeout(id);
-  }, [zoneTransit]);
+  }, [
+    save.accessibility.reducedMotion,
+    save.captureBattleSpeed,
+    zoneTransit,
+  ]);
+
+  useEffect(() => {
+    if (!bossEntrance) return;
+    if (bossEntranceTimerRef.current) {
+      clearTimeout(bossEntranceTimerRef.current);
+    }
+    const duration = getPresentationSequenceDuration(
+      PRESENTATION_EFFECT_TIMING.bossEntranceMs,
+      save.captureBattleSpeed,
+      save.accessibility.reducedMotion,
+    );
+    bossEntranceTimerRef.current = window.setTimeout(() => {
+      setBossEntrance(null);
+      bossEntranceTimerRef.current = null;
+    }, duration);
+    return () => {
+      if (bossEntranceTimerRef.current) {
+        clearTimeout(bossEntranceTimerRef.current);
+        bossEntranceTimerRef.current = null;
+      }
+    };
+  }, [
+    bossEntrance,
+    save.accessibility.reducedMotion,
+    save.captureBattleSpeed,
+  ]);
+
+  useEffect(
+    () => () => {
+      if (captureAnimationTimerRef.current) {
+        clearTimeout(captureAnimationTimerRef.current);
+      }
+      if (bossEntranceTimerRef.current) {
+        clearTimeout(bossEntranceTimerRef.current);
+      }
+      if (presentationEffectTimerRef.current) {
+        clearTimeout(presentationEffectTimerRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const activeTile = WORLD_ZONE_POSITIONS[save.activeZoneId];
@@ -1774,132 +1168,207 @@ export default function App() {
   }, [save.activeZoneId, isTraveling, worldPlayerPos.x, worldPlayerPos.y]);
 
   useEffect(() => {
+    const locationId = locationIdForZone(save.activeZoneId);
+    if (!locationId) return;
+    setOverworldState((current) => {
+      const currentMap = getOverworldMap(current.locationId);
+      if (currentMap.zoneId === save.activeZoneId || current.locationId === locationId) {
+        return current;
+      }
+      return createOverworldState(locationId);
+    });
+  }, [save.activeZoneId]);
+
+  useEffect(() => {
+    if (gameplayPaused || !workoutSession || workoutSession.resolved) return;
+    setWorkoutFrame(nowMs());
     const timer = window.setInterval(() => {
       setWorkoutFrame(nowMs());
     }, 90);
     return () => clearInterval(timer);
-  }, []);
+  }, [gameplayPaused, workoutSession?.id, workoutSession?.resolved]);
 
   useEffect(() => {
-    if (!workoutSession || workoutSession.resolved) return;
+    if (gameplayPaused || !workoutSession || workoutSession.resolved) return;
     const timer = window.setInterval(() => {
       setWorkoutSession((current) => {
         if (!current || current.resolved) return current;
         const now = nowMs();
-
-        if (current.phase === 'running') {
-          if (current.willFail && now >= current.failCheckAt) {
-            return {
-              ...current,
-              phase: 'spot',
-              spotWindowStart: now,
-              spotWindowEnd: now + current.spotWindowMs,
-            };
-          }
-          if (now >= current.startedAt + current.durationMs) {
-            const complete: WorkoutSession = {
-              ...current,
-              phase: 'resolved',
-              resolved: true,
-            };
-            queueMicrotask(() => resolveWorkoutSession(complete, true));
-            return complete;
-          }
-          return current;
+        const next = advanceWorkoutSession(current, now);
+        if (next.resolved && !current.resolved) {
+          queueMicrotask(() => resolveWorkoutSession(next));
         }
-
-        if (current.phase === 'spot' && now > current.spotWindowEnd) {
-          const failed: WorkoutSession = {
-            ...current,
-            phase: 'resolved',
-            resolved: true,
-          };
-          queueMicrotask(() => resolveWorkoutSession(failed, false));
-          return failed;
-        }
-        return current;
+        return next;
       });
     }, 90);
     return () => clearInterval(timer);
-  }, [workoutSession]);
+  }, [gameplayPaused, workoutSession?.id, workoutSession?.resolved]);
 
   useEffect(() => {
-    if (!workoutSession || !workoutSession.resolved) return;
-    const timeout = window.setTimeout(() => setWorkoutSession((current) => (current?.resolved ? null : current)), 1000);
+    if (gameplayPaused || !workoutSession || !workoutSession.resolved) return;
+    const timeout = window.setTimeout(
+      () => setWorkoutSession((current) => (current?.resolved ? null : current)),
+      WORKOUT_BALANCE.resolvedDisplayMs,
+    );
     return () => clearTimeout(timeout);
-  }, [workoutSession]);
+  }, [gameplayPaused, workoutSession?.id, workoutSession?.resolved]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
+      if (
+        gameplayPausedRef.current ||
+        document.visibilityState !== 'visible' ||
+        !save.hasStarterSet
+      ) {
+        return;
+      }
       setTick(nowMs());
-      triggerBossSpawn(activeZone);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [save.activeZoneId, save.bossSchedules, encounter, match]);
-
-  useEffect(() => {
-    if (save.trainingFatigue <= 0 || encounter || match || workoutSession) return;
-    const recovery = FATIGUE_COOLDOWN_PER_TICK + (activeZone.id === 'home' ? FATIGUE_COOLDOWN_HOME_BONUS : 0);
-    const timer = window.setInterval(() => {
       setSave((state) => ({
         ...state,
-        trainingFatigue: clamp(state.trainingFatigue - recovery, 0, MAX_TRAINING_FATIGUE),
-        workoutMomentum: clamp(state.workoutMomentum - WORKOUT_MOMENTUM_RECOVERY, 0, WORKOUT_MOMENTUM_MAX),
+        bossGameplayTimeMs: advanceBossGameplayTime(
+          state.bossGameplayTimeMs,
+          1_000,
+          true,
+        ),
       }));
-    }, 5000);
+    }, 1000);
     return () => clearInterval(timer);
-  }, [activeZone.id, encounter, match, workoutSession, save.trainingFatigue]);
+  }, [save.hasStarterSet]);
 
   useEffect(() => {
-    if (!save.audio.enabled) {
-      const engine = getAudioEngine();
-      engine.setEnabled(false);
+    if (
+      gameplayPaused ||
+      save.trainingFatigue <= 0 ||
+      encounter ||
+      match ||
+      workoutSession
+    ) {
       return;
     }
+    const timer = window.setInterval(() => {
+      setSave((state) => {
+        const recovery = applyPassiveRecovery(
+          {
+            trainingFatigue: state.trainingFatigue,
+            workoutMomentum: state.workoutMomentum,
+          },
+          activeZone.id === 'home',
+        );
+        return { ...state, ...recovery };
+      });
+    }, FATIGUE_BALANCE.passiveRecoveryTickMs);
+    return () => clearInterval(timer);
+  }, [
+    activeZone.id,
+    encounter,
+    gameplayPaused,
+    match,
+    workoutSession,
+    save.trainingFatigue,
+  ]);
 
-    const engine = activateAudioEngine();
-    engine.setVolumes(save.audio.musicVolume, save.audio.sfxVolume);
-    updateMusic();
-    return () => {};
+  useEffect(() => {
+    const engine = getAudioEngine();
+    updateMusic(engine);
   }, [
     activeZone.id,
     activeZone.type,
+    activeOverworldMap.kind,
     save.audio.enabled,
     save.audio.musicVolume,
     save.audio.sfxVolume,
+    Boolean(encounter),
     encounter?.isBoss,
     match?.status,
+    match?.encounter?.isBoss,
+    Boolean(workoutSession && !workoutSession.resolved),
   ]);
 
   useEffect(() => {
     if (!save.hasStarterSet || showStarterSetup) return;
     function onKeyDown(event: KeyboardEvent) {
+      if (gameplayPausedRef.current) return;
+      if (restartConfirmationOpen) {
+        if (event.key === 'Escape') setRestartConfirmationOpen(false);
+        return;
+      }
       if (showRoadmap) return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return;
+      if (
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'button' ||
+        tag === 'select' ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+      if (target?.closest('[data-game-presentation="true"]')) return;
 
-      const key = event.key.toLowerCase();
-      const directionByKey: Record<string, CardinalDirection | undefined> = {
-        arrowup: 'up',
-        w: 'up',
-        arrowdown: 'down',
-        s: 'down',
-        arrowleft: 'left',
-        a: 'left',
-        arrowright: 'right',
-        d: 'right',
-      };
-      const direction = directionByKey[key];
-      if (!direction) return;
+      const action = keyboardEventToAction(
+        event,
+        save.input.keyboardBindings,
+      );
+      if (!action || action === 'menu' || action === 'debug-toggle') return;
 
       event.preventDefault();
-      moveTrainerByDirection(direction);
+      handlePresentationAction(action);
     }
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [save.hasStarterSet, showStarterSetup, showRoadmap, isTraveling, moveTrainerByDirection]);
+  }, [
+    save.hasStarterSet,
+    showStarterSetup,
+    restartConfirmationOpen,
+    showRoadmap,
+    overworldState,
+    encounter,
+    match,
+    workoutSession,
+    isTraveling,
+    lastRouteEncounterMs,
+    save.activeZoneId,
+    save.input.keyboardBindings,
+    save.trainingFatigue,
+  ]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      audioRef.current?.setPageHidden(
+        gameplayPausedRef.current ||
+          document.visibilityState !== 'visible',
+      );
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    onVisibilityChange();
+    return () =>
+      document.removeEventListener(
+        'visibilitychange',
+        onVisibilityChange,
+      );
+  }, []);
+
+  useEffect(() => {
+    audioRef.current?.setPageHidden(
+      gameplayPaused || document.visibilityState !== 'visible',
+    );
+  }, [gameplayPaused]);
+
+  useEffect(() => {
+    document.documentElement.dataset.gbHighContrast =
+      save.accessibility.highContrast ? 'true' : 'false';
+    document.documentElement.dataset.gbReducedMotion =
+      save.accessibility.reducedMotion ? 'true' : 'false';
+    return () => {
+      delete document.documentElement.dataset.gbHighContrast;
+      delete document.documentElement.dataset.gbReducedMotion;
+    };
+  }, [
+    save.accessibility.highContrast,
+    save.accessibility.reducedMotion,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -1913,20 +1382,81 @@ export default function App() {
     if (typeof window === 'undefined') return;
     const openSetup = new URLSearchParams(window.location.search).get('setup') === '1';
     if (openSetup) {
+      setTrainerSetupMode(save.hasStarterSet ? 'edit' : 'new');
+      setDraftTrainer(createTrainerCreationDraft(save.trainer));
       setShowStarterSetup(true);
       return;
     }
-    const forceSetup = window.localStorage.getItem('gymbuddies-force-setup');
-    if (forceSetup === '1') {
-      setShowStarterSetup(true);
-      window.localStorage.removeItem('gymbuddies-force-setup');
+    const storage = saveStorageRef.current;
+    if (!storage) return;
+    try {
+      const forceSetup = storage.getItem('gymbuddies-force-setup');
+      if (forceSetup === '1') {
+        setTrainerSetupMode('new');
+        setShowStarterSetup(true);
+        storage.removeItem('gymbuddies-force-setup');
+      }
+    } catch {
+      // The save service has already selected its in-memory fallback.
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify(save));
-  }, [save]);
+    if (!savePersistenceEnabled) {
+      if (autosaveTimerRef.current !== null) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+      autosaveDirtyRef.current = false;
+      return;
+    }
+    if (skipNextAutosaveRef.current) {
+      skipNextAutosaveRef.current = false;
+      autosaveDirtyRef.current = false;
+      lastPersistedSaveRef.current = save;
+      return;
+    }
+
+    autosaveDirtyRef.current = true;
+    const clockOnlyChange = hasOnlyAllowedTopLevelChanges(
+      lastPersistedSaveRef.current,
+      save,
+      ['bossGameplayTimeMs'],
+    );
+    const delay = clockOnlyChange
+      ? getAutosaveDelayMs(
+          lastAutosaveAtRef.current,
+          nowMs(),
+          AUTOSAVE_MIN_INTERVAL_MS,
+        )
+      : 0;
+    if (delay === 0) {
+      persistLatestSaveRef.current();
+      return;
+    }
+    if (autosaveTimerRef.current !== null) return;
+    autosaveTimerRef.current = window.setTimeout(() => {
+      autosaveTimerRef.current = null;
+      persistLatestSaveRef.current();
+    }, delay);
+  }, [save, savePersistenceEnabled]);
+
+  useEffect(() => {
+    const flushPendingSave = () => persistLatestSaveRef.current();
+    const flushWhenHidden = () => {
+      if (document.visibilityState !== 'visible') flushPendingSave();
+    };
+    window.addEventListener('pagehide', flushPendingSave);
+    document.addEventListener('visibilitychange', flushWhenHidden);
+    return () => {
+      window.removeEventListener('pagehide', flushPendingSave);
+      document.removeEventListener('visibilitychange', flushWhenHidden);
+      if (autosaveTimerRef.current !== null) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+    };
+  }, []);
 
   function resetTutorial() {
     setSave((state) => ({ ...state, tutorialStep: 0 }));
@@ -1950,139 +1480,268 @@ export default function App() {
     setMessage('Tutorial skipped. Good luck, trainer.');
   }
 
-  function setTrainerName(event: { target: { value: string } }) {
-    setSave((state) => ({
-      ...state,
-      trainer: {
-        ...state.trainer,
-        name: event.target.value.slice(0, 14) || 'Trainer',
-      },
-    }));
-  }
-
-  function setTrainerPreset(profile: TrainerProfile) {
-    setSave((state) => ({ ...state, trainer: { ...profile } }));
-  }
-
-  function setTrainerColor(part: keyof Omit<TrainerProfile, 'name' | 'muscles'>, value: string) {
-    setSave((state) => ({
-      ...state,
-      trainer: {
-        ...state.trainer,
-        [part]: value,
-      },
-    }));
-  }
-
-  function setTrainerMuscle(group: keyof TrainerProfile['muscles'], value: number) {
-    setSave((state) => ({
-      ...state,
-      trainer: {
-        ...state.trainer,
-        muscles: {
-          ...state.trainer.muscles,
-          [group]: clamp(Number.isFinite(value) ? value : 0, 0, MAX_MUSCLE_LEVEL),
-        },
-      },
-    }));
-    setTrainerEmote('pump');
-    setTrainerEmoteUntil(nowMs() + 900);
-  }
-
-  function setDraftTrainerName(event: { target: { value: string } }) {
+  function setDraftTrainerName(value: string) {
     setDraftTrainer((state) => ({
       ...state,
-      name: event.target.value.slice(0, 14) || 'Trainer',
+      name: value.slice(0, 14),
     }));
   }
 
-  function setDraftTrainerColor(part: keyof Omit<TrainerProfile, 'name' | 'muscles'>, value: string) {
-    setDraftTrainer((state) => ({
-      ...state,
-      [part]: value,
-    }));
+  function setDraftTrainerAppearance(appearance: TrainerAppearance) {
+    setDraftTrainer((state) =>
+      replaceTrainerDraftAppearance(state, appearance),
+    );
   }
 
-  function setDraftTrainerMuscle(group: keyof TrainerProfile['muscles'], value: number) {
-    setDraftTrainer((state) => ({
-      ...state,
-      muscles: {
-        ...state.muscles,
-        [group]: clamp(Number.isFinite(value) ? value : 0, 0, MAX_MUSCLE_LEVEL),
-      },
-    }));
+  function setDraftTrainerMuscle(
+    group: TrainerMuscleId,
+    value: number,
+  ) {
+    setDraftTrainer((state) => updateTrainerDraftMuscle(state, group, value));
   }
 
-  function setDraftTrainerPreset(profile: TrainerProfile) {
-    setDraftTrainer({
-      ...profile,
-    });
+  function setDraftTrainerPreset(presetId: string) {
+    setDraftTrainer((state) =>
+      applyTrainerBodyPreset(state, getTrainerBodyPresetById(presetId)),
+    );
   }
 
-  function launchTrainer(startWithTutorial = false) {
+  function launchTrainer() {
+    const trainerProfile = trainerProfileFromCreationDraft(draftTrainer);
+    if (trainerSetupMode === 'edit') {
+      setSave((state) => saveTrainerProfileToJourney(state, draftTrainer));
+      setDraftTrainer(createTrainerCreationDraft(trainerProfile));
+      setShowStarterSetup(false);
+      setMessage(
+        `Trainer profile saved for ${trainerProfile.name}. Journey progress was preserved.`,
+      );
+      return;
+    }
+
+    const startWithTutorial = trainerStartMode === 'guided';
     setShowStarterSetup(false);
     setSave((state) => ({
       ...state,
       hasStarterSet: true,
       activeZoneId: STARTING_ZONE_ID,
       unlockedZoneIds: normalizeUnlockedZones(FALLBACK_UNLOCKED_ZONES),
-      tutorialStep: 0,
-      trainer: {
-        ...draftTrainer,
-        name: draftTrainer.name.trim() || 'Trainer',
-      },
+      visitedZoneIds: ['home'],
+      tutorialStep: startWithTutorial ? 0 : TUTORIAL_STEPS.length,
+      trainer: trainerProfile,
     }));
+    setOverworldState(createOverworldState('home-gym'));
     setWorldPlayerPos(WORLD_ZONE_POSITIONS[STARTING_ZONE_ID] ?? WORLD_ZONE_POSITIONS.home);
     setWorldMoveLockUntil(0);
     setTrainerFacing('down');
-    setPendingTutorialRoute(startWithTutorial ? STARTING_TUTORIAL_GYM_ID : null);
     setMessage(
       startWithTutorial
-        ? `Welcome to your journey, ${draftTrainer.name || 'Trainer'}. Starting at Home Gym and guiding you to Starter Gym A...`
-        : `Welcome to your journey, ${draftTrainer.name || 'Trainer'}. You are at Home Gym.`,
+        ? `Welcome, ${trainerProfile.name}. Your guided journey begins at Home Gym.`
+        : `Welcome, ${trainerProfile.name}. Your normal journey begins at Home Gym.`,
     );
-    activateAudioEngine().emitSfx('matchStart', 0.9);
+    playAudioCue('menu-navigate', 0.9);
+    window.requestAnimationFrame(() => {
+      document.getElementById('root')?.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'auto',
+      });
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
+  }
+
+  function setDraftTrainerPhysiquePreset(presetId: string) {
+    setDraftTrainer((state) =>
+      applyTrainerPhysiquePreset(
+        state,
+        getTrainerPhysiquePresetById(presetId),
+      ),
+    );
+  }
+
+  function setDraftTrainerAppearancePresets(
+    presets: readonly TrainerAppearancePreset[],
+  ) {
+    setDraftTrainer((state) => ({
+      ...state,
+      appearancePresets: presets.map((preset) => ({
+        ...preset,
+        appearance: {
+          ...preset.appearance,
+          build: { ...preset.appearance.build },
+          face: { ...preset.appearance.face },
+          hair: { ...preset.appearance.hair },
+          outfit: { ...preset.appearance.outfit },
+          colors: { ...preset.appearance.colors },
+          accessories: { ...preset.appearance.accessories },
+        },
+      })),
+    }));
   }
 
   function reopenTrainerSetup() {
-    setDraftTrainer(save.trainer);
-    setSave((state) => ({
-      ...state,
-      hasStarterSet: false,
-    }));
+    setTrainerSetupMode('edit');
+    setDraftTrainer(createTrainerCreationDraft(save.trainer));
     setShowStarterSetup(true);
-    setMessage('Trainer setup reopened. Finish your custom gear and build your body stats again.');
+    setMessage('Trainer studio opened. Saving changes will preserve journey progress.');
+  }
+
+  function cancelTrainerEdit() {
+    setDraftTrainer(createTrainerCreationDraft(save.trainer));
+    setShowStarterSetup(false);
+    setRestartConfirmationOpen(false);
+    setMessage('Trainer changes canceled. Journey progress is unchanged.');
+  }
+
+  function requestJourneyRestart() {
+    setRestartConfirmationOpen(true);
+  }
+
+  function applyLoadedSave(
+    next: SaveData,
+    statusMessage: string,
+    issues: readonly string[] = [],
+  ) {
+    const locationId =
+      locationIdForZone(next.activeZoneId) ?? 'home-gym';
+    skipNextAutosaveRef.current = true;
+    setSave(next);
+    setSavePersistenceEnabled(true);
+    setSaveLoadMessage(statusMessage);
+    setSaveLoadIssues([...issues]);
+    setEncounter(null);
+    setMatch(null);
+    setWorkoutSession(null);
+    setCaptureAnimation(null);
+    setZoneTransit(null);
+    setOverworldState(createOverworldState(locationId));
+    setWorldPlayerPos(
+      WORLD_ZONE_POSITIONS[next.activeZoneId] ??
+        WORLD_ZONE_POSITIONS.home,
+    );
+    setWorldMoveLockUntil(0);
+    setTrainerFacing('down');
+    setDraftTrainer(createTrainerCreationDraft(next.trainer));
+    setTrainerSetupMode('new');
+    setShowStarterSetup(!next.hasStarterSet);
+    setMessage(statusMessage);
+  }
+
+  function importJourneyJson(text: string): SaveUiActionResult {
+    const fallback = createDefaultSaveData({
+      accessibility: save.accessibility,
+    });
+    const imported = importSaveJson(text, {
+      fallback,
+      accessibility: save.accessibility,
+    });
+    if (!imported.ok) {
+      setSaveLoadIssues(imported.issues);
+      return {
+        ok: false,
+        message: `${imported.message} The current journey was not changed.`,
+      };
+    }
+    const written = writeGameSave(
+      saveStorageRef.current,
+      imported.save,
+      { allowOverwriteUnsupported: true },
+    );
+    if (!written.ok) {
+      setSaveLoadIssues(written.issues);
+      return {
+        ok: false,
+        message: `${written.message} The current journey was not changed.`,
+      };
+    }
+    setPreviousSaveAvailable(
+      written.backupCreated ||
+        hasPreviousSave(saveStorageRef.current),
+    );
+    const migrationText = imported.appliedMigrations.length
+      ? ` Migrated with ${imported.appliedMigrations.join(', ')}.`
+      : '';
+    const statusMessage = `Imported a validated schema-14 Gym Buddies save.${migrationText}`;
+    applyLoadedSave(imported.save, statusMessage, imported.issues);
+    return { ok: true, message: statusMessage };
+  }
+
+  function restorePreviousJourney(): SaveUiActionResult {
+    const previous = loadPreviousSave(
+      saveStorageRef.current,
+      createDefaultSaveData({
+        accessibility: save.accessibility,
+      }),
+    );
+    if (!previous.ok) {
+      setSaveLoadIssues(previous.issues);
+      return {
+        ok: false,
+        message: `${previous.message} The current journey was not changed.`,
+      };
+    }
+    const written = writeGameSave(
+      saveStorageRef.current,
+      previous.save,
+      { allowOverwriteUnsupported: true },
+    );
+    if (!written.ok) {
+      setSaveLoadIssues(written.issues);
+      return {
+        ok: false,
+        message: `${written.message} The current journey was not changed.`,
+      };
+    }
+    setPreviousSaveAvailable(true);
+    const statusMessage =
+      'Restored the previous validated save. The replaced journey is now the previous-save backup.';
+    applyLoadedSave(previous.save, statusMessage, previous.issues);
+    return { ok: true, message: statusMessage };
   }
 
   function restartOpeningProcess() {
-    const fresh = initialSaveData();
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(SAVE_KEY, JSON.stringify(fresh));
-      window.localStorage.setItem('gymbuddies-force-setup', '1');
+    const fresh = createDefaultSaveData({
+      accessibility: save.accessibility,
+      audio: save.audio,
+    });
+    const written = writeGameSave(saveStorageRef.current, fresh, {
+      allowOverwriteUnsupported: true,
+    });
+    if (!written.ok) {
+      setRestartConfirmationOpen(false);
+      setSaveLoadMessage(
+        `${written.message} The current journey was not reset.`,
+      );
+      setSaveLoadIssues(written.issues);
+      setMessage('Reset canceled because the new save could not be stored safely.');
+      return;
     }
+    setPreviousSaveAvailable(
+      written.backupCreated ||
+        hasPreviousSave(saveStorageRef.current),
+    );
+    setSavePersistenceEnabled(true);
+    setSaveLoadMessage(
+      'Journey reset completed. The prior valid journey is available under Restore Previous.',
+    );
+    setSaveLoadIssues([]);
+    skipNextAutosaveRef.current = true;
     setSave(fresh);
-    setDraftTrainer(fresh.trainer);
-    setPendingTutorialRoute(null);
+    setTrainerSetupMode('new');
+    setDraftTrainer(
+      applyTrainerBodyPreset(
+        createTrainerCreationDraft(fresh.trainer),
+        getTrainerBodyPresetById(DEFAULT_TRAINER_BODY_PRESET_ID),
+      ),
+    );
+    setTrainerStartMode('guided');
+    setRestartConfirmationOpen(false);
+    setOverworldState(createOverworldState('home-gym'));
+    setWorldPlayerPos(WORLD_ZONE_POSITIONS.home);
     setWorldMoveLockUntil(0);
     setTrainerFacing('down');
     setShowStarterSetup(true);
-    setMessage('Opening process restarted. Build your trainer and begin from Home Gym.');
+    setMessage('Journey restarted. Create a trainer to begin again from Home Gym.');
   }
-
-  function continueSavedJourney() {
-    if (!save.hasStarterSet) return;
-    setShowStarterSetup(false);
-    setMessage('Resuming your saved journey from home or latest unlocked gym.');
-  }
-
-  useEffect(() => {
-    if (!save.hasStarterSet || showStarterSetup || !pendingTutorialRoute) return;
-
-    if (save.activeZoneId === STARTING_ZONE_ID && !isTraveling && !worldMoveBlocked) {
-      setPendingTutorialRoute(null);
-      travelToZone(pendingTutorialRoute);
-    }
-  }, [save.hasStarterSet, showStarterSetup, save.activeZoneId, isTraveling, worldMoveBlocked, pendingTutorialRoute]);
 
   function moveTrainerByDirection(direction: CardinalDirection) {
     if (isTraveling) {
@@ -2120,7 +1779,7 @@ export default function App() {
 
     setSave((state) => ({
       ...state,
-      trainingFatigue: clamp(state.trainingFatigue + fatigueGain, 0, MAX_TRAINING_FATIGUE),
+      trainingFatigue: applyFatigueChange(state.trainingFatigue, fatigueGain),
     }));
     setTrainerFacing(direction);
     setWorldPlayerPos(next);
@@ -2215,12 +1874,11 @@ export default function App() {
     }
 
     const normalizedEncounterChance = routeDistance
-      ? Math.min(
-          0.55,
-          WORLD_ROUTE_ENCOUNTER_RATE[zone.type] *
-            (1 + pathEncounterBoost / Math.max(1, routeDistance)) *
-            (1 + clamp01(save.trainingFatigue / MAX_TRAINING_FATIGUE) * 0.2),
-        )
+      ? calculateRouteEncounterChance({
+          gymKind: zone.type,
+          encounterBoost: pathEncounterBoost / Math.max(1, routeDistance),
+          trainingFatigue: save.trainingFatigue,
+        })
       : 0;
     const fatigueCost = routeDistance > 0 ? pathFatigueCost / routeDistance : pathFatigueCost;
     return {
@@ -2260,7 +1918,6 @@ export default function App() {
       setMessage('That destination is not mapped yet.');
       return;
     }
-    const routeProfile = routeProfileFromZones(save.activeZoneId, zoneId);
     const currentPos = WORLD_ZONE_POSITIONS[save.activeZoneId];
     if (currentPos) {
       const directionX = Math.sign(zonePos.x - currentPos.x);
@@ -2282,6 +1939,53 @@ export default function App() {
   function pulseTrainerEmote(state: TrainerEmote, ttl = 1800) {
     setTrainerEmote(state);
     setTrainerEmoteUntil(nowMs() + ttl);
+  }
+
+  function cuePresentationEffect(
+    kind: PresentationEffectKind,
+    tone: PresentationEffectTone,
+    label: string,
+  ) {
+    const sequence = presentationEffectSequenceRef.current + 1;
+    presentationEffectSequenceRef.current = sequence;
+    setPresentationEffect({ kind, label, sequence, tone });
+    if (presentationEffectTimerRef.current) {
+      clearTimeout(presentationEffectTimerRef.current);
+    }
+    const visibleMs = save.accessibility.reducedMotion
+      ? PRESENTATION_EFFECT_TIMING.reducedMotionSequenceMs
+      : kind === 'boss-entrance' || kind === 'level-up'
+        ? 700
+        : 520;
+    presentationEffectTimerRef.current = window.setTimeout(() => {
+      setPresentationEffect((current) =>
+        current?.sequence === sequence ? null : current,
+      );
+      presentationEffectTimerRef.current = null;
+    }, visibleMs);
+  }
+
+  function skipPresentationSequence() {
+    if (captureAnimationTimerRef.current) {
+      clearTimeout(captureAnimationTimerRef.current);
+      captureAnimationTimerRef.current = null;
+    }
+    if (bossEntranceTimerRef.current) {
+      clearTimeout(bossEntranceTimerRef.current);
+      bossEntranceTimerRef.current = null;
+    }
+    if (presentationEffectTimerRef.current) {
+      clearTimeout(presentationEffectTimerRef.current);
+      presentationEffectTimerRef.current = null;
+    }
+    setCaptureAnimation(null);
+    setBossEntrance(null);
+    setPresentationEffect(null);
+    setZoneTransit(null);
+  }
+
+  function skipZoneTransit() {
+    setZoneTransit(null);
   }
 
   function pushLog(entry: string) {
@@ -2316,15 +2020,16 @@ export default function App() {
       ...state,
       activeZoneId: id,
       unlockedZoneIds: unlockAdjacentZones(state.unlockedZoneIds, id),
+      visitedZoneIds: [...new Set([...state.visitedZoneIds, id])],
     }));
     const routeProfile = routeProfileFromZones(save.activeZoneId, id);
     const routeEncounterBonus = routeProfile?.encounterBoost ?? 0;
     const routeFatigue = routeFatigueCost(activeZone.id, id, activeZone.type);
-    const baseEncounterChance = WORLD_ROUTE_ENCOUNTER_RATE[zone.type] * (1 + routeEncounterBonus);
-    const encounterChance = Math.min(
-      0.55,
-      baseEncounterChance * (1 + clamp01(save.trainingFatigue / MAX_TRAINING_FATIGUE) * 0.2),
-    );
+    const encounterChance = calculateRouteEncounterChance({
+      gymKind: zone.type,
+      encounterBoost: routeEncounterBonus,
+      trainingFatigue: save.trainingFatigue,
+    });
     setZoneTransit({
       from: activeZone.name,
       to: zone.name,
@@ -2336,11 +2041,10 @@ export default function App() {
     });
     setEncounter(null);
     setMatch(null);
-    activateAudioEngine().emitSfx('zoneShift', 0.6);
+    playAudioCue('route-transition', 0.6);
     const machineName = getDefaultGymMachine(zone).name;
     setMessage(`Moved to ${zone.name}. Current machine: ${machineName}.`);
     pulseTrainerEmote('focus', 1600);
-    triggerBossSpawn(zone);
     const routeBoost = routeEncounterBoost(save.activeZoneId, id);
     trySpawnRouteEncounter(zone, routeBoost, routeProfile?.routeName ?? 'Route');
   }
@@ -2352,7 +2056,9 @@ export default function App() {
       return;
     }
     setSave((state) => ({ ...state, activeIndex: index }));
+    setBuddyCustomizationOpen(false);
     setMessage(`Selected ${save.team[index].nickname}.`);
+    playAudioCue('menu-navigate', 0.55);
   }
   function selectMachine(id: string) {
     setSave((state) => ({
@@ -2365,216 +2071,37 @@ export default function App() {
     const machine = activeZone.machines.find((entry) => entry.id === id);
     if (machine) {
       setMessage(`Selected ${machine.name} in ${activeZone.name}.`);
+      playAudioCue('menu-navigate', 0.55);
     }
   }
 
   function renderStarterSetup() {
     return (
-      <div className="app-shell starter-shell">
-        <header className="top-banner">
-          <h1>GYM BUDDIES</h1>
-          <p>GBA-style open-world trainer setup. Pick your character and step into the gym map.</p>
-          <div className="panel-head-row">
-            <span className="chip">Step 1: Build your trainer</span>
-          </div>
-        </header>
-
-      <main className="game-grid setup-grid">
-        <section className="panel">
-          <h2>Character Creation</h2>
-            <p className="small-note">
-              Create your trainer body build, colors, and name before entering the route map.
-            </p>
-            <div className="starter-layout">
-              <div className="trainer-panel">
-                <div className="trainer-panel-left">
-                  <TrainerSprite trainer={draftTrainer} emote={activeEmote} />
-                  <div className="trainer-fields">
-                    <label>
-                      Name:
-                      <input value={draftTrainer.name} onChange={setDraftTrainerName} maxLength={14} />
-                    </label>
-                    <div className="trainer-muscle-summary">Physique Lvl {String(draftTrainerPhysique).padStart(2, '0')}</div>
-                    <small className="small-note">
-                      You will use this body build in every gym. You can tweak in-game after the trip starts.
-                    </small>
-                  </div>
-                </div>
-
-                <div className="trainer-presets">
-                  {TRAINER_PRESETS.map((preset) => (
-                    <button
-                      key={preset.id}
-                      className={`trainer-preset ${draftTrainer.name === preset.profile.name ? 'active' : ''}`}
-                      onClick={() => setDraftTrainerPreset(preset.profile)}
-                    >
-                      {preset.profile.name}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="trainer-sliders">
-                  <div className="muscle-sliders">
-                    {TRAINER_MUSCLES.map((entry) => (
-                      <label className="muscle-slider" key={entry.key}>
-                        <span>{entry.label}</span>
-                        <div className="muscle-slider-row">
-                          <input
-                            type="range"
-                            min="0"
-                            max={MAX_MUSCLE_LEVEL}
-                            value={draftTrainer.muscles[entry.key]}
-                            onChange={(event) => setDraftTrainerMuscle(entry.key, Number(event.target.value))}
-                          />
-                          <span>{draftTrainer.muscles[entry.key]}</span>
-                        </div>
-                        <small>{entry.detail}</small>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="trainer-row">
-                    <span>Hair</span>
-                    <input type="color" value={draftTrainer.hair} onChange={(event) => setDraftTrainerColor('hair', event.target.value)} />
-                    <span>Skin</span>
-                    <input type="color" value={draftTrainer.skin} onChange={(event) => setDraftTrainerColor('skin', event.target.value)} />
-                  </div>
-                  <div className="trainer-row">
-                    <span>Top</span>
-                    <input type="color" value={draftTrainer.top} onChange={(event) => setDraftTrainerColor('top', event.target.value)} />
-                    <span>Gloves</span>
-                    <input type="color" value={draftTrainer.glove} onChange={(event) => setDraftTrainerColor('glove', event.target.value)} />
-                  </div>
-                  <div className="trainer-row">
-                    <span>Shoes</span>
-                    <input
-                      type="color"
-                      value={draftTrainer.shoes}
-                      onChange={(event) => setDraftTrainerColor('shoes', event.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="action-row">
-                  <button className="primary-btn" onClick={() => launchTrainer(false)} disabled={!draftTrainer.name.trim()}>
-                    Start Journey (Home Gym)
-                  </button>
-                  <button
-                    className="secondary-btn"
-                    onClick={() => launchTrainer(true)}
-                    disabled={!draftTrainer.name.trim()}
-                  >
-                    Start Tutorial to Starter Gym A
-                  </button>
-                  <button className="secondary-btn micro-btn" onClick={continueSavedJourney} disabled={!save.hasStarterSet}>
-                    Continue Saved Journey
-                  </button>
-                  <button className="secondary-btn micro-btn" onClick={restartOpeningProcess}>
-                    Restart Opening Process
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-          <section className="panel">
-            <h2>Open World Preview</h2>
-            <p className="small-note">Connected routes unlock as you move zone-to-zone.</p>
-            <div className="world-map">
-              {Object.keys(WORLD_ROUTES).map((zoneId) => {
-                const zone = AREAS.find((entry) => entry.id === zoneId);
-                if (!zone) return null;
-                return (
-                  <div key={zoneId} className="world-node">
-                    <div className={`world-node-title ${zone.type}`}>
-                      {ZONE_VIBES[zoneId]?.icon ?? '🗺'} {zone.name}
-                    </div>
-                    <small>Routes: {WORLD_ROUTES[zoneId]?.join(', ') ?? 'none'}</small>
-                  </div>
-                );
-              })}
-            </div>
-              <h3>Trainer Path Preview</h3>
-              <p className="small-note">
-                You can move with WASD / arrow keys, or use the on-screen D-pad below to test route tiles and unlock adjacent gyms.
-              </p>
-              <div className="world-dpad world-dpad-smol">
-                <div className="dpad-spacer" />
-                <button
-                  className={`dpad-btn ${connectedWalkByDirection.up ? 'dpad-available' : 'dpad-blocked'}`}
-                  onClick={() => moveTrainerByDirection('up')}
-                  disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.up}
-                >
-                  ▲
-                </button>
-                <div className="dpad-spacer" />
-                <button
-                  className={`dpad-btn ${connectedWalkByDirection.left ? 'dpad-available' : 'dpad-blocked'}`}
-                  onClick={() => moveTrainerByDirection('left')}
-                  disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.left}
-                >
-                  ◀
-                </button>
-                <button
-                  className={`dpad-btn ${connectedWalkByDirection.down ? 'dpad-available' : 'dpad-blocked'}`}
-                  onClick={() => moveTrainerByDirection('down')}
-                  disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.down}
-                >
-                  ▼
-                </button>
-                <button
-                  className={`dpad-btn ${connectedWalkByDirection.right ? 'dpad-available' : 'dpad-blocked'}`}
-                  onClick={() => moveTrainerByDirection('right')}
-                  disabled={isTraveling || worldMoveBlocked || !connectedWalkByDirection.right}
-                >
-                  ▶
-                </button>
-              </div>
-              <div
-                className="world-mini-grid world-overworld-map"
-                style={{
-                  width: WORLD_GRID_WIDTH * WORLD_TILE_PITCH + WORLD_GRID_PADDING * 2,
-                  height: WORLD_GRID_HEIGHT * WORLD_TILE_PITCH + WORLD_GRID_PADDING * 2,
-                }}
-              >
-              {AREAS.map((zone) => {
-                const linked = connectedZones.includes(zone.id);
-                const isActive = save.activeZoneId === zone.id;
-                const isUnlocked = isZoneUnlocked(zone.id);
-                const isRouteReady = (linked && isUnlocked) || isActive;
-                const mapPos = mapPointForZone(zone.id);
-                if (!mapPos) return null;
-                return (
-                  <button
-                    key={`setup-${zone.id}`}
-                    className={`world-mini-node ${isActive ? 'active' : ''} ${isRouteReady ? 'route-ready' : 'route-locked'}`}
-                    style={{
-                      left: mapPos.left - WORLD_TILE_PX / 2,
-                      top: mapPos.top - WORLD_TILE_PX / 2,
-                    }}
-                    onClick={() => travelToZone(zone.id)}
-                    disabled={!isRouteReady || isTraveling || worldMoveBlocked}
-                  >
-                    {zone.name}
-                    {!isUnlocked && !isActive ? ' 🔒' : ''}
-                  </button>
-                );
-              })}
-              {worldPlayerPixelPos ? (
-                <div
-                  className={`world-mini-trainer trainer-facing-${trainerFacing}`}
-                  style={{
-                    left: worldPlayerPixelPos.left - WORLD_TILE_PX / 3,
-                    top: worldPlayerPixelPos.top - WORLD_TILE_PX / 3,
-                  }}
-                >
-                  {ZONE_VIBES[activeZone.id]?.icon ?? '🧍'}
-                </div>
-              ) : null}
-              </div>
-          </section>
-        </main>
-      </div>
+      <TrainerCreationScreen
+        draft={draftTrainer}
+        keyboardBindings={save.input.keyboardBindings}
+        mode={trainerSetupMode}
+        physiqueLevel={draftTrainerPhysique}
+        reducedMotion={save.accessibility.reducedMotion}
+        restartConfirmationOpen={restartConfirmationOpen}
+        startMode={trainerStartMode}
+        validationIssues={validateTrainerCreationDraft(draftTrainer)}
+        onAppearanceChange={setDraftTrainerAppearance}
+        onAppearancePresetsChange={setDraftTrainerAppearancePresets}
+        onCancelEdit={cancelTrainerEdit}
+        onCancelRestart={() => setRestartConfirmationOpen(false)}
+        onConfirm={launchTrainer}
+        onConfirmRestart={restartOpeningProcess}
+        onMuscleChange={setDraftTrainerMuscle}
+        onNameChange={setDraftTrainerName}
+        onPhysiquePresetSelect={setDraftTrainerPhysiquePreset}
+        onPresetSelect={setDraftTrainerPreset}
+        onRequestRestart={requestJourneyRestart}
+        onStartModeChange={setTrainerStartMode}
+      />
     );
   }
-  function resolveWorkoutSession(session: WorkoutSession, succeeded: boolean) {
+  function resolveWorkoutSession(session: WorkoutSession) {
     const machine = ALL_GYM_MACHINES.find((entry) => entry.id === session.machineId);
     if (!machine) {
       setWorkoutSession(null);
@@ -2582,212 +2109,123 @@ export default function App() {
     }
 
     if (!session.resolved) return;
-
-    if (succeeded) {
-      const sourceBuddy = save.team.find((buddy) => buddy.id === session.buddyId);
-      if (!sourceBuddy) {
-        setWorkoutSession(null);
-        return;
-      }
-      const profile = workoutBuddyProfile(sourceBuddy);
-      const qualityLabel =
-        session.sessionQuality >= 0.82
-          ? 'Excellent prep'
-          : session.sessionQuality >= 0.64
-            ? 'Solid prep'
-            : session.sessionQuality >= 0.45
-              ? 'Good prep'
-              : 'Rushed prep';
-      const qualityGrowth = session.sessionQuality * 0.2;
-      const qualityStrainShield = clamp(Math.round(session.sessionQuality * 3), 0, 3);
-      const qualityMomentum = clamp(Math.round(session.sessionQuality * 2), 0, 2);
-
-      const growthMultiplier = clamp(
-        1 + session.loadPressure * 0.32 - session.setStress * 0.28 + qualityGrowth,
-        0.55,
-        1.35,
-      );
-      const growth = buddyGrowthFromWorkout(
-        machine,
-        session.readiness,
-        session.zoneType,
-        true,
-      );
-      const strainFatigue = clamp(
-        Math.round((session.setStress + session.loadPressure) * 6) - qualityStrainShield,
-        0,
-        5,
-      );
-      const formTax = clamp(Math.round(0.55 + session.setStress * 2 + session.loadPressure * 2) - qualityStrainShield, 0, 3);
-      const mobilityTax = clamp(Math.round(0.35 + session.setStress * 2.4 + session.loadPressure * 2.1) - qualityStrainShield, 0, 4);
-      const volumeTax = clamp(Math.round(0.3 + session.setStress * 3 + session.loadPressure * 2.8) - qualityStrainShield, 0, 5);
-      const result = applyXpGain(sourceBuddy, session.xpGain);
-      const resultBuddy: Buddy = {
-        ...result.buddy,
-        form: clampBuddyStats(
-          result.buddy.form + Math.max(-3, Math.round(growth.form * growthMultiplier) - Math.max(formTax, strainFatigue * 0.55)),
-          MAX_BUDDY_FORM,
-        ),
-        mobility: clampBuddyStats(
-          result.buddy.mobility +
-            Math.max(
-              -4,
-              Math.round(growth.mobility * growthMultiplier) - Math.max(mobilityTax, strainFatigue * 0.7),
-            ),
-          MAX_BUDDY_MOBILITY,
-        ),
-        volume: clampBuddyStats(
-          result.buddy.volume + Math.max(-4, Math.round(growth.volume * growthMultiplier) - Math.max(volumeTax, strainFatigue)),
-          MAX_BUDDY_VOLUME,
-        ),
-        hp: clamp(result.buddy.hp + session.staminaChange, 0, result.buddy.maxHp),
-      };
-      const momentumGain = clamp(
-        Math.round(
-          session.readiness * 10 -
-            session.loadPressure * 3 -
-            session.setStress * 3 +
-            (session.staminaChange > 0 ? 2 : 0) +
-            qualityMomentum,
-        ),
-        0,
-        7,
-      );
-      const trainerStaminaGain = Math.max(
-        1,
-        Math.floor(session.xpGain / (3.2 - session.loadPressure * 1.2)),
-      );
-      const leveled = result.leveled;
-      const fatigueRecoveryPenalty = Math.round(session.loadPressure * 9 + session.setStress * 8);
-      const fatigueRecovery = Math.max(
-        6,
-        Math.round(
-          (session.readiness * 16) +
-            machine.hpRestore +
-            profile.fatigueRecoveryBonus +
-            profile.hpLossResistance * 10 -
-            Math.round(session.sessionQuality * 4) +
-            Math.abs(session.hpLossOnFail - 1) * 0.5,
-        ) - fatigueRecoveryPenalty,
-      );
-
-      setSave((state) => ({
-        ...state,
-        trainer: applyTrainerGrowth(state.trainer, machine.focus, trainerStaminaGain, leveled ? 1 : 0),
-        steroids: state.steroids + (session.steroidsAwarded ? 1 : 0),
-        workoutMomentum: clamp(state.workoutMomentum + momentumGain, 0, WORKOUT_MOMENTUM_MAX),
-        trainingFatigue: clamp(state.trainingFatigue - fatigueRecovery, 0, MAX_TRAINING_FATIGUE),
-        team: state.team.map((buddy) =>
-          buddy.id === session.buddyId
-            ? {
-                ...buddy,
-                ...resultBuddy,
-                hp: clamp(resultBuddy.hp, 0, buddy.maxHp),
-              }
-            : buddy,
-        ),
-      }));
-      setMessage(
-      `${resultBuddy.nickname} finished training on ${machine.name}: +${session.xpGain}XP${leveled ? ' and leveled up.' : ''} · ${machine.focus} · `
-          + `Readiness ${session.readinessLabel} ${percent(session.readiness)} · Stamina ${session.staminaChange >= 0 ? '+' : ''}${session.staminaChange}`
-          + ` · Form ${resultBuddy.form} (${buddyStatBand(resultBuddy.form, MAX_BUDDY_FORM)})`
-          + ` · Mobility ${resultBuddy.mobility} (${buddyStatBand(resultBuddy.mobility, MAX_BUDDY_MOBILITY)})`
-          + ` · Volume ${resultBuddy.volume} (${buddyStatBand(resultBuddy.volume, MAX_BUDDY_VOLUME)})`
-          + ` · Session ${qualityLabel} (${percent(session.sessionQuality)})`
-          + ` · Set strain ${workoutSetStressLabel(session.setStress)} · ${percent(session.setStress)}`
-          + `${session.steroidsAwarded ? ' · Found one Steroid.' : ''}`,
-      );
-      pushLog(`${resultBuddy.nickname} completed training on ${machine.name} at ${activeZone.name}.`);
-      activateAudioEngine().emitSfx('train', Math.min(1.6, session.xpGain / machine.xpMax));
-      pulseTrainerEmote('level', leveled ? 1200 : 900);
+    const outcome = session.outcome ?? 'failure';
+    const target = save.team.find((entry) => entry.id === session.buddyId);
+    if (!target) {
+      setWorkoutSession(null);
       return;
     }
-
-    const target = save.team.find((entry) => entry.id === session.buddyId);
-    const sourceProfile = target ? workoutBuddyProfile(target) : null;
-    const fatiguePenalty = clamp(Math.round((1 - session.readiness) * 18), 4, 18);
-    const resistancePenalty = sourceProfile ? clamp(Math.round((1 - sourceProfile.movementConsistency) * 8), 0, 6) : 0;
-    const stressFailurePenalty = Math.round(session.setStress * 14);
-    const qualityPenaltyReduction = clamp(Math.round(session.sessionQuality * 6), 0, 6);
-    const failFatiguePenalty = clamp(
-      fatiguePenalty + resistancePenalty + Math.round(session.loadPressure * 16) + stressFailurePenalty - qualityPenaltyReduction,
-      4,
-      30,
-    );
-    const momentumLoss = clamp(
-      Math.round((1.4 - session.readiness) * 8 + session.loadPressure * 2 + session.setStress * 2 + 1) - Math.round(session.sessionQuality * 2),
-      2,
-      8,
-    );
-    const failQualityGrowth = clamp(session.sessionQuality * 0.28, 0, 0.2);
-    const failGrowthScale = clamp(1 + session.setStress * 0.18 + failQualityGrowth, 0.45, 1.3);
-    const failHpMitigation = clamp(Math.round(session.sessionQuality * 4), 0, 6);
-    const growth = buddyGrowthFromWorkout(
+    const resolution = calculateWorkoutResolution({
+      session,
+      outcome,
+      buddy: target,
       machine,
-      session.readiness,
-      session.zoneType,
-      false,
-    );
-      const failureStrainFatigue = clamp(
-        Math.round((session.setStress + session.loadPressure) * 5 + session.staminaChange * 0.2),
-        1,
-        8,
-      );
-      const sessionQualityFatigue = Math.max(0, session.hpLossOnFail + Math.round(session.loadPressure * 4) + Math.round(session.setStress * 4) - failHpMitigation);
-
+      trainer: save.trainer,
+      steroids: save.steroids,
+      workoutMomentum: save.workoutMomentum,
+      trainingFatigue: save.trainingFatigue,
+    });
     setSave((state) => ({
-        ...state,
-        workoutMomentum: clamp(state.workoutMomentum - momentumLoss, 0, WORKOUT_MOMENTUM_MAX),
-        trainingFatigue: clamp(
-          state.trainingFatigue +
-            Math.round(sessionQualityFatigue * 1.2) +
-            failFatiguePenalty +
-            Math.round(session.hpLossOnFail * (1 - (sourceProfile?.movementConsistency ?? 0.5))),
-          0,
-          MAX_TRAINING_FATIGUE,
-        ),
+      ...state,
+      trainer: resolution.trainer,
+      steroids: state.steroids + resolution.steroidsAwarded,
+      deloadTokens: clamp(
+        state.deloadTokens + resolution.deloadTokensAwarded,
+        0,
+        WORKOUT_DELOAD_MAX,
+      ),
+      workoutMomentum: resolution.workoutMomentum,
+      trainingFatigue: resolution.trainingFatigue,
+      machineTrainingHistory: {
+        lastMachineId: machine.id,
+        repeatedUses:
+          state.machineTrainingHistory.lastMachineId === machine.id
+            ? state.machineTrainingHistory.repeatedUses + 1
+            : 1,
+        masteryByMachineId: {
+          ...state.machineTrainingHistory.masteryByMachineId,
+          [machine.id]: recordMachineMastery({
+            current:
+              state.machineTrainingHistory.masteryByMachineId[machine.id],
+            outcome,
+            quality: session.sessionQuality,
+          }),
+        },
+      },
       team: state.team.map((buddy) =>
         buddy.id === session.buddyId
-          ? {
-              ...buddy,
-                form: clampBuddyStats(
-                  buddy.form + Math.round(growth.form * failGrowthScale * (1 + session.loadPressure * 0.45)),
-                  MAX_BUDDY_FORM,
-                -8,
-              ),
-              mobility: clampBuddyStats(
-                buddy.mobility + Math.round(growth.mobility * failGrowthScale * (1 + session.loadPressure * 0.45)),
-                MAX_BUDDY_MOBILITY,
-                -8,
-              ),
-              volume: clampBuddyStats(
-                buddy.volume +
-                  Math.max(-4, Math.round(growth.volume * failGrowthScale * (1 + session.loadPressure * 0.45) - failureStrainFatigue * 0.35)),
-                MAX_BUDDY_VOLUME,
-                -5,
-                ),
-                hp: clamp(
-                  buddy.hp - sessionQualityFatigue,
-                  0,
-                  buddy.maxHp,
-                ),
-            }
+          ? { ...buddy, ...resolution.buddy }
           : buddy,
       ),
     }));
+
+    const qualityLabel =
+      session.sessionQuality >= 0.82
+        ? 'Excellent technique'
+        : session.sessionQuality >= 0.64
+          ? 'Solid technique'
+          : session.sessionQuality >= 0.45
+            ? 'Recoverable technique'
+            : 'Inconsistent technique';
+    if (outcome === 'success') {
+      const resultBuddy = resolution.buddy;
+      setMessage(
+        `${resultBuddy.nickname} completed ${session.loadTier.toUpperCase()} on ${machine.name}: +${resolution.xpAwarded}XP${resolution.leveled ? ' and leveled up.' : ''} · ${machine.focus} · `
+          + `${qualityLabel} ${percent(session.sessionQuality)} · HP ${resolution.hpChange >= 0 ? '+' : ''}${resolution.hpChange}`
+          + ` · Fatigue ${resolution.fatigueDelta >= 0 ? '+' : ''}${resolution.fatigueDelta}`
+          + ` · Momentum ${resolution.momentumDelta >= 0 ? '+' : ''}${resolution.momentumDelta}`
+          + ` · Form ${resultBuddy.form} (${buddyStatBand(resultBuddy.form, MAX_BUDDY_FORM)})`
+          + ` · Mobility ${resultBuddy.mobility} (${buddyStatBand(resultBuddy.mobility, MAX_BUDDY_MOBILITY)})`
+          + ` · Volume ${resultBuddy.volume} (${buddyStatBand(resultBuddy.volume, MAX_BUDDY_VOLUME)})`
+          + `${resolution.steroidsAwarded ? ' · Boost Token dropped.' : ''}`
+          + `${resolution.deloadTokensAwarded ? ' · Deload Token dropped.' : ''}`
+          + `${session.rewardEfficiency < 1 ? ` · Repeat yield ${percent(session.rewardEfficiency)}.` : ''}`,
+      );
+      pushLog(`${resultBuddy.nickname} completed a technique set on ${machine.name} at ${activeZone.name}.`);
+      playAudioCue(
+        resolution.leveled ? 'level-up' : 'rep-success',
+        Math.min(
+          1.6,
+          resolution.xpAwarded / machine.rewardTable.buddyXp.max,
+        ),
+      );
+      cuePresentationEffect(
+        resolution.leveled ? 'level-up' : 'rep-success',
+        'success',
+        resolution.leveled ? `LEVEL ${resultBuddy.level}` : 'SET CLEAR',
+      );
+      pulseTrainerEmote('level', resolution.leveled ? 1200 : 900);
+      return;
+    }
+
+    if (outcome === 'rescued') {
+      setMessage(
+        `Spot saved part of ${target.nickname}'s ${session.loadTier.toUpperCase()} set: +${resolution.xpAwarded}XP`
+          + ` · HP ${resolution.hpChange} · Fatigue +${resolution.fatigueDelta}`
+          + ` · Form ${resolution.growth.form >= 0 ? '+' : ''}${resolution.growth.form}`
+          + ` · ${qualityLabel} ${percent(session.sessionQuality)}.`
+          + ' The rescue limited the consequences, but a clean set earns more.',
+      );
+      pushLog(`${target.nickname}'s set on ${machine.name} was partially saved by a spot.`);
+      cuePresentationEffect('rep-success', 'neutral', 'SPOT SAVE');
+      pulseTrainerEmote('focus', 900);
+      playAudioCue('rep-success', 0.75);
+      return;
+    }
+
     setMessage(
-      `${target?.nickname ?? 'Buddy'} failed ${machine.name} and was spot-needed.`
-        + ` Tough set: ${growth.form < 0 ? `Form -${Math.abs(growth.form)}` : `Form +${growth.form}`}`
-        + `, Mobility ${growth.mobility < 0 ? `-${Math.abs(growth.mobility)}` : `+${growth.mobility}`}`
-        + `, Volume ${growth.volume < 0 ? `-${Math.abs(growth.volume)}` : `+${growth.volume}`}`
-        + ` · Session ${session.sessionQuality >= 0.82 ? 'Excellent prep' : session.sessionQuality >= 0.64 ? 'Solid prep' : session.sessionQuality >= 0.45 ? 'Good prep' : 'Rushed prep'} (${percent(
-          session.sessionQuality,
-        )})`
-        + `. Set stress: ${workoutSetStressLabel(session.setStress)} (${percent(session.setStress)}).`,
+      `${target.nickname}'s ${session.loadTier.toUpperCase()} set ended after the rescue window.`
+        + ` HP ${resolution.hpChange} · Fatigue +${resolution.fatigueDelta}`
+        + ` · ${resolution.growth.form < 0 ? `Form -${Math.abs(resolution.growth.form)}` : `Form +${resolution.growth.form}`}`
+        + `, Mobility ${resolution.growth.mobility < 0 ? `-${Math.abs(resolution.growth.mobility)}` : `+${resolution.growth.mobility}`}`
+        + `, Volume ${resolution.growth.volume < 0 ? `-${Math.abs(resolution.growth.volume)}` : `+${resolution.growth.volume}`}`
+        + ` · ${qualityLabel} ${percent(session.sessionQuality)}`
+        + `. ${workoutSetStressLabel(session.setStress)} stress and missed timing caused the outcome.`,
     );
-    pushLog(`${target?.nickname ?? 'Buddy'} failed training on ${machine.name} at ${activeZone.name}.`);
+    pushLog(`${target.nickname}'s set on ${machine.name} ended after a missed spot.`);
+    cuePresentationEffect('rep-failure', 'failure', 'SET ENDED');
     pulseTrainerEmote('drained', 900);
-    activateAudioEngine().emitSfx('moveBad', 1);
+    playAudioCue('rep-failure', 1);
     setTrainerEmote('drained');
     setTrainerEmoteUntil(nowMs() + 900);
   }
@@ -2802,7 +2240,8 @@ export default function App() {
       setMessage('No machine selected in this gym.');
       return;
     }
-    if (activeBuddy.hp <= activeMachine.fatigueCost) {
+    if (!workoutPreview) return;
+    if (activeBuddy.hp <= Math.max(1, -workoutPreview.expectedHpChange)) {
       setMessage(
         `${activeBuddy.nickname} is too worn down to push ${activeMachine.name} right now. Rest or pick a low-fatigue machine.`,
       );
@@ -2813,107 +2252,29 @@ export default function App() {
       return;
     }
 
-    const gain = randInt(activeMachine.xpMin, activeMachine.xpMax);
-    const adjusted = Math.max(1, Math.ceil(gain * activeMachine.xpMultiplier));
-    const staminaChange = activeMachine.hpRestore - activeMachine.fatigueCost;
-    const buddyProfile = workoutBuddyProfile(activeBuddy);
-    const readiness = workoutReadiness(
-      activeMachine,
-      activeBuddy,
-      trainer,
-      activeZone.type,
-      save.trainingFatigue,
-      save.workoutMomentum,
-    );
-    const readinessLabel = workoutReadinessLabel(readiness);
-    const movementConsistency = buddyProfile.movementConsistency;
-    const volumePreparedness = clamp01(activeBuddy.volume / MAX_BUDDY_VOLUME);
-    const loadPressure = workoutLoadPressure(
-      activeMachine,
-      activeBuddy,
-      activeZone.type,
-      readiness,
-      save.trainingFatigue,
-      save.workoutMomentum,
-    );
-    const loadTier = workoutLoadTier(loadPressure);
-    const deloadUsed = clamp(
-      Math.min(save.deloadTokens, WORKOUT_DELOAD_BY_TIER[loadTier]),
-      0,
-      WORKOUT_DELOAD_MAX,
-    );
-    const deloadLoadPressure = clamp(loadPressure - deloadUsed * WORKOUT_DELOAD_LOAD_REDUCTION, 0.05, 1);
-    const deloadReadiness = clamp(
-      readiness + deloadUsed * WORKOUT_DELOAD_READINESS_BONUS,
-      0,
-      1,
-    );
-    const sessionQuality = clamp(
-      movementConsistency * 0.6 + deloadReadiness * 0.22 + volumePreparedness * 0.18,
-      0,
-      1,
-    );
-    const setStress = workoutSetStress(
-      deloadLoadPressure,
-      deloadReadiness,
-      save.trainingFatigue,
-      activeZone.type,
-      loadTier,
-    );
-    const sessionStaminaChange = Math.max(
-      -8,
-      Math.min(
-        8,
-        staminaChange +
-          Math.round(
-            (deloadReadiness - 0.5) * 2 + buddyProfile.fatigueRecoveryBonus * 0.15 + buddyProfile.readinessSupport * 20,
-          ) -
-          Math.round(deloadLoadPressure * 3),
-      ),
-    );
-    const trainerAdvantage = trainerWorkoutAdvantage(activeMachine, trainer, activeZone.type);
-    const failChance = clamp(
-      workoutFailureChance(activeMachine, activeBuddy, activeZone.type, trainerAdvantage.failReduction, deloadReadiness) +
-        clamp(setStress * 0.22, 0, 0.22) -
-        workoutMomentumFactor(save.workoutMomentum) * 0.12 -
-        sessionQuality * 0.16,
-      0.12,
-      0.9,
-    );
-    const spotBase = clamp(
-      (BASE_SPOT_SUCCESS_CHANCE + trainerAdvantage.spotBaseBonus + (activeZone.type === 'higher' ? -0.05 : 0)) *
-        (0.68 + deloadReadiness * 0.33 + sessionQuality * 0.1),
-      0.5,
-      0.9,
-    );
-    const adjustedXpGain = Math.max(
-      1,
-      Math.floor(
-        adjusted *
-          (0.75 + deloadReadiness * 0.5) *
-          (0.9 + deloadLoadPressure * 0.25) *
-          (0.9 + sessionQuality * 0.18) *
-          (1 + workoutMomentumFactor(save.workoutMomentum) * 0.18),
-      ),
-    );
-    const willFail = Math.random() < failChance;
     const now = nowMs();
-    const loadLoss = clamp(
-      Math.ceil(
-        activeMachine.fatigueCost * (1.1 + (1 - deloadReadiness) * 0.6) +
-          (1 - buddyProfile.movementConsistency) * 2 -
-          buddyProfile.fatigueRecoveryBonus * 0.2 +
-          Math.round(deloadLoadPressure * 5) -
-          Math.round(sessionQuality * 1.6),
-      ),
-      1,
-      activeBuddy.maxHp,
+    const workout = consumeRandomResult((randomState) =>
+      createWorkoutSession({
+        buddy: activeBuddy,
+        machine: activeMachine,
+        trainer,
+        gymKind: activeZone.type,
+        trainingFatigue: save.trainingFatigue,
+        workoutMomentum: save.workoutMomentum,
+        deloadTokens: save.deloadTokens,
+        consecutiveMachineUses:
+          save.machineTrainingHistory.lastMachineId === activeMachine.id
+            ? save.machineTrainingHistory.repeatedUses
+            : 0,
+        machineMasteryXp:
+          save.machineTrainingHistory.masteryByMachineId[activeMachine.id]
+            ?.xp ?? 0,
+        selectedLoad: selectedWorkoutLoad,
+        startedAt: now,
+        randomState,
+      }),
     );
-    const hpLossOnFail = clamp(
-      loadLoss + Math.round(deloadLoadPressure * 6) + Math.round(setStress * 6),
-      1,
-      activeBuddy.maxHp,
-    );
+    const { deloadUsed, session } = workout;
 
     if (deloadUsed > 0) {
       setSave((state) => ({
@@ -2922,72 +2283,59 @@ export default function App() {
       }));
     }
 
-    setWorkoutSession({
-      id: now,
-      phase: 'running',
-      zoneType: activeZone.type,
-      buddyId: activeBuddy.id,
-      machineId: activeMachine.id,
-      willFail,
-      startedAt: now,
-      durationMs: WORKOUT_DURATION_MS,
-      failCheckAt: now + WORKOUT_AUTO_FAILURE_MS,
-      spotWindowMs: WORKOUT_SPOT_WINDOW_MS,
-      spotWindowStart: 0,
-      spotWindowEnd: 0,
-      failChance,
-      buddyLevelBefore: activeBuddy.level,
-      hpLossOnFail,
-      xpGain: adjustedXpGain,
-      spotChanceBase: spotBase,
-      steroidsAwarded: Math.random() < activeMachine.steroidChance,
-      staminaChange: sessionStaminaChange,
-      resolved: false,
-      readiness: deloadReadiness,
-      readinessLabel,
-      loadPressure: deloadLoadPressure,
-      loadTier,
-      setStress,
-      movementConsistency,
-      volumePreparedness,
-      sessionQuality,
-    });
+    setWorkoutSession(session);
     const deloadLabel = deloadUsed > 0 ? `Deload used: ${deloadUsed} · ` : '';
 
     setMessage(
-      `${activeBuddy.nickname} starts a full-set on ${activeMachine.name}: ${loadTier.toUpperCase()} load (${percent(
-        deloadLoadPressure,
-      )}). ${deloadLabel}Readiness ${readinessLabel} ${percent(deloadReadiness)} · ${workoutSetStressLabel(setStress)} strain (${percent(
-        setStress,
-      )}). Spot if rep form breaks!`,
+      `${activeBuddy.nickname} starts a skill set on ${activeMachine.name}: ${session.loadTier.toUpperCase()} load (${percent(
+        session.loadPressure,
+      )}). ${deloadLabel}Readiness ${session.readinessLabel} ${percent(session.readiness)} · ${workoutSetStressLabel(session.setStress)} strain (${percent(
+        session.setStress,
+      )}). Press Lock Rep inside the timing zone.`,
     );
     pulseTrainerEmote('focus', 900);
-    activateAudioEngine().emitSfx('train', 0.6);
-    pushLog(`${activeBuddy.nickname} began training on ${activeMachine.name} with ${percent(failChance)} fail chance.`);
+    playAudioCue(activeMachine.soundCueId, 0.6);
+    pushLog(`${activeBuddy.nickname} began training on ${activeMachine.name} with ${percent(session.failChance)} fail chance.`);
   }
 
-  function spotWorkout() {
-    if (!canSpot || !workoutSession || !workoutSession.willFail) return;
-    const successChance = workoutSpotSuccessChance(
-      workoutSpotRemainingMs,
-      workoutSession.spotChanceBase,
-      workoutSession.zoneType,
+  function performWorkoutAction() {
+    if (!workoutSession || workoutSession.resolved) return;
+    const at = nowMs();
+    const next =
+      workoutSession.phase === 'rep'
+        ? resolveWorkoutRep(workoutSession, at)
+        : resolveWorkoutSpot({
+            session: workoutSession,
+            inputAt: at,
+          }).session;
+    setWorkoutSession(next);
+    if (next.phase === 'spot') {
+      setMessage('Rep timing slipped. Spot Now before the rescue line closes.');
+      pulseTrainerEmote('focus', 700);
+      playAudioCue('spot-now', 0.9);
+      return;
+    }
+    if (next.resolved) {
+      resolveWorkoutSession(next);
+      return;
+    }
+    const latestRep = next.repResults.at(-1);
+    cuePresentationEffect(
+      'rep-success',
+      latestRep?.grade === 'rough' ? 'neutral' : 'success',
+      latestRep?.grade === 'perfect'
+        ? 'PERFECT REP'
+        : latestRep?.grade === 'good'
+          ? 'GOOD REP'
+          : 'ROUGH REP',
     );
-    const success = Math.random() < successChance;
-    setWorkoutSession((current) =>
-      current && current.id === workoutSession.id && !current.resolved
-        ? {
-            ...current,
-            phase: 'resolved',
-            resolved: true,
-          }
-        : current,
-    );
-    resolveWorkoutSession({ ...workoutSession, phase: 'resolved', resolved: true }, success);
     setMessage(
-      success ? `You rushed in and held the set (${percent(successChance)}).` : 'You were a beat too late for the spot.',
+      `${latestRep?.grade === 'perfect' ? 'Perfect' : latestRep?.grade === 'good' ? 'Good' : 'Rough'} timing. Rep ${next.currentRep}/${next.repCount} is moving.`,
     );
-    activateAudioEngine().emitSfx(success ? 'train' : 'moveBad', 1);
+    playAudioCue(
+      'rep-success',
+      latestRep?.grade === 'perfect' ? 1 : 0.72,
+    );
   }
 
   function useSteroid() {
@@ -2997,34 +2345,33 @@ export default function App() {
       return;
     }
 
-    const result = applyXpGain(activeBuddy, 4);
-    const steroidGrowth = {
-      form: clampBuddyStats(2, MAX_BUDDY_FORM, 1),
-      mobility: clampBuddyStats(1, MAX_BUDDY_MOBILITY, 1),
-      volume: clampBuddyStats(1, MAX_BUDDY_VOLUME, 1),
-    };
+    const result = applySteroidReward({
+      buddy: activeBuddy,
+      trainer: save.trainer,
+      steroids: save.steroids,
+    });
     setSave((state) => ({
       ...state,
-      trainer: applyTrainerGrowth(state.trainer, 'Power', 2, result.leveled ? 1 : 0),
-      steroids: Math.max(0, state.steroids - 1),
+      trainer: result.trainer,
+      steroids: result.steroids,
       team: state.team.map((buddy, index) =>
         index === state.activeIndex
-          ? {
-              ...result.buddy,
-              form: clampBuddyStats(result.buddy.form + steroidGrowth.form, MAX_BUDDY_FORM),
-              mobility: clampBuddyStats(result.buddy.mobility + steroidGrowth.mobility, MAX_BUDDY_MOBILITY),
-              volume: clampBuddyStats(result.buddy.volume + steroidGrowth.volume, MAX_BUDDY_VOLUME),
-            }
+          ? result.buddy
           : buddy,
       ),
     }));
 
     setMessage(
       `${activeBuddy.nickname} used 1 Steroid.${result.leveled ? ' Leveled up to Lv ' + result.buddy.level + '.' : ''} ` +
-        `Form +${steroidGrowth.form} · Mobility +${steroidGrowth.mobility} · Volume +${steroidGrowth.volume}.`,
+        `Form +${result.growth.form} · Mobility +${result.growth.mobility} · Volume +${result.growth.volume}.`,
     );
     pulseTrainerEmote('ready', 1400);
-    activateAudioEngine().emitSfx('steroid', 1);
+    cuePresentationEffect(
+      result.leveled ? 'level-up' : 'rep-success',
+      'success',
+      result.leveled ? `LEVEL ${result.buddy.level}` : 'BOOST READY',
+    );
+    playAudioCue(result.leveled ? 'level-up' : 'rep-success', 1);
     pushLog(`Used Steroid on ${activeBuddy.nickname}.`);
   }
 
@@ -3052,52 +2399,35 @@ export default function App() {
       return;
     }
 
-    const buddyProfile = workoutBuddyProfile(activeBuddy);
-    const recoverEfficiency = clamp(1 + buddyProfile.fatigueRecoveryBonus / 40, 0.72, 1.44);
-    const bonusRecover = Math.round(REST_ACTION_RECOVERY * (1 - fatigueRatio) * recoverEfficiency);
-    const actualRecover = Math.max(2, bonusRecover);
-    const fatigueRecovered = Math.max(
-      0,
-      Math.min(MAX_TRAINING_FATIGUE, save.trainingFatigue) - Math.max(0, save.trainingFatigue - (REST_ACTION_RECOVERY + actualRecover)),
-    );
-    const deloadGainRaw = Math.floor(fatigueRecovered / WORKOUT_DELOAD_RECOVERY_DIVISOR);
-    const baseStatRecovery = clamp(Math.round((REST_ACTION_RECOVERY + actualRecover) / WORKOUT_REST_STAT_RECOVERY_DIVISOR), 1, 3);
-    const deloadStatRecovery = clamp(Math.round(deloadGainRaw * WORKOUT_REST_DELOAD_STAT_BONUS), 0, 2);
-    const statRecovery = clamp(baseStatRecovery + deloadStatRecovery, 1, 4);
-    const targetHeal = REST_ACTION_BUDDY_HEAL * (1 + buddyProfile.bossSteady);
-    const actualHeal = Math.min(
-      Math.round(targetHeal),
-      activeBuddy.maxHp - activeBuddy.hp + activeBuddy.hp * 0.04,
-    );
+    const recovery = calculateRestRecovery({
+      buddy: activeBuddy,
+      trainingFatigue: save.trainingFatigue,
+      deloadTokens: save.deloadTokens,
+    });
 
     setSave((state) => ({
       ...state,
-      trainingFatigue: clamp(state.trainingFatigue - (REST_ACTION_RECOVERY + actualRecover), 0, MAX_TRAINING_FATIGUE),
-      deloadTokens: clamp(
-        state.deloadTokens + Math.min(deloadGainRaw, WORKOUT_DELOAD_MAX - state.deloadTokens),
-        0,
-        WORKOUT_DELOAD_MAX,
-      ),
+      trainingFatigue: recovery.trainingFatigue,
+      deloadTokens: recovery.deloadTokens,
+      machineTrainingHistory: {
+        lastMachineId: null,
+        repeatedUses: 0,
+        masteryByMachineId:
+          state.machineTrainingHistory.masteryByMachineId,
+      },
       team: state.team.map((buddy, index) =>
         index === state.activeIndex
-          ? {
-              ...buddy,
-              hp: clamp(buddy.hp + actualHeal, 1, buddy.maxHp),
-              form: clampBuddyStats(buddy.form + statRecovery, MAX_BUDDY_FORM),
-              mobility: clampBuddyStats(buddy.mobility + statRecovery, MAX_BUDDY_MOBILITY),
-              volume: clampBuddyStats(buddy.volume + Math.max(1, statRecovery - 1), MAX_BUDDY_VOLUME),
-            }
+          ? recovery.buddy
           : buddy,
       ),
     }));
-    setNextRestAvailableMs(nowMs() + REST_ACTION_COOLDOWN_MS);
-    const deloadGain = clamp(Math.min(deloadGainRaw, WORKOUT_DELOAD_MAX - save.deloadTokens), 0, WORKOUT_DELOAD_MAX);
-    const deloadText = deloadGain > 0 ? ` and +${deloadGain} Deload` : '';
+    setNextRestAvailableMs(nowMs() + FATIGUE_BALANCE.restCooldownMs);
+    const deloadText = recovery.deloadGain > 0 ? ` and +${recovery.deloadGain} Deload` : '';
     setMessage(
-      `${activeBuddy.nickname} takes a controlled reset. Recovery +${actualRecover} fatigue, +${actualHeal} HP and +${statRecovery} load-readiness stat` +
-      `${statRecovery === 1 ? '' : 's'}${deloadText}.`,
+      `${activeBuddy.nickname} takes a controlled reset. Recovery +${recovery.actualRecovery} fatigue, +${recovery.actualHeal} HP and +${recovery.statRecovery} load-readiness stat` +
+      `${recovery.statRecovery === 1 ? '' : 's'}${deloadText}.`,
     );
-    activateAudioEngine().emitSfx('teamFull', 0.72);
+    playAudioCue('recovery', 0.72);
     pulseTrainerEmote('ready', 900);
   }
 
@@ -3121,7 +2451,10 @@ export default function App() {
     const next = createOpponent(activeZone);
     setEncounter(next);
     setMatch(null);
-    activateAudioEngine().emitSfx('catchAlmost', 0.7);
+    playAudioCue(
+      next.creature.isExotic ? 'rare-encounter' : 'wild-alert',
+      next.creature.isExotic ? 1.1 : 0.8,
+    );
     setSave((state) => ({
       ...state,
       seenDex: state.seenDex.includes(next.creature.dex)
@@ -3138,7 +2471,7 @@ export default function App() {
     if (match) return;
     const trainerPressure = trainerArenaPressure(trainer, activeMachine, activeZone);
     const buddyPressure = buddyArenaPressure(activeBuddy);
-    const readiness = matchReadinessModifier(trainer, activeBuddy, activeZone.type);
+    const readiness = matchReadinessModifier(trainer, activeBuddy, activeZone);
     const challengeMachine = getBossChallengeMachine(encounter, activeZone);
     const machinePressure = bossChallengePressure(encounter, activeZone, activeMachine);
     const challengeSummary = bossChallengeSummary(encounter, activeZone, activeMachine);
@@ -3146,21 +2479,39 @@ export default function App() {
     const challengeTier = bossChallengeTierFromEncounter(encounter, activeZone.type);
     const maxRounds = Math.max(4, challengeProfile.maxRounds - (encounterMachineBonus >= 4 ? 1 : 0));
     const openingBonus = encounter.isBoss ? challengeProfile.matchMachineBonus : 0;
+    const bossDefinition = getBossById(encounter.bossId);
+    const openingMeter = clamp(
+      50 + (bossDefinition?.signatureRule.openingMeterShift ?? 0),
+      CAPTURE_METER_MIN,
+      CAPTURE_METER_MAX,
+    );
     const activeCaptureTarget = encounter.isBoss
-      ? bossCaptureTarget(
-          activeZone,
+      ? bossCaptureTarget({
+          gym: activeZone,
           encounter,
-          challengeSummary.isAligned,
-          0,
-          0,
-          0,
-          activeBuddy,
-        )
-      : BOSS_CAPTURE_TARGET.home;
+          isChallengeAligned: challengeSummary.isAligned,
+          buddy: activeBuddy,
+        })
+      : WILD_CAPTURE_CONTROL_TARGET;
+    const playerStamina = calculateCaptureStartingStamina({
+      buddy: activeBuddy,
+      trainingFatigue: save.trainingFatigue,
+    });
+    const opponentStamina = calculateOpponentStartingStamina(encounter);
+    const opponentIntent = consumeRandomResult((randomState) =>
+      selectCaptureOpponentIntent({
+        encounter,
+        meter: openingMeter,
+        opponentStamina,
+        playerMoveHistory: [],
+        opponentMoveHistory: [],
+        randomState,
+      }),
+    ).intent;
     const opening =
       encounter.isBoss && challengeMachine
         ? `${encounter.bossName} (${bossChallengeThresholdText(challengeSummary.tier, activeZone.type)}) is anchored on ${challengeMachine.name}. `
-          + `Hold ${challengeMachine.name} ${challengeSummary.isFocusAligned ? 'with focus alignment' : 'at least consistently'} and build ${challengeProfile.streakLimit} move streak for +${openingBonus}% control recovery.`
+          + `Link ${challengeMachine.name} with ${encounter.bossRequiredMoveName ?? 'the required move'} for a ${challengeProfile.streakLimit}-action streak and +${openingBonus}% control recovery.`
         : 'Keep the pressure steady and rotate your grip each round.';
     const fatigueState = workoutReadinessLabel(clamp01(1 - save.trainingFatigue / MAX_TRAINING_FATIGUE));
     const pressureSummary = `Trainer pressure ${trainerPressure} · Buddy pressure ${buddyPressure} · Challenge bonus ${
@@ -3174,7 +2525,14 @@ export default function App() {
       status: 'playing',
       round: 1,
       maxRounds,
-      meter: 50,
+      meter: openingMeter,
+      playerStamina,
+      opponentStamina,
+      playerMoveHistory: [],
+      opponentMoveHistory: [],
+      opponentIntent,
+      lastRound: null,
+      pendingCapturedBuddy: null,
       isBossChallengeActive: encounter.isBoss && !!challengeMachine,
       bossChallengeMachineId: challengeMachine?.id ?? null,
       bossChallengeMachineName: challengeMachine?.name ?? null,
@@ -3182,55 +2540,56 @@ export default function App() {
       bossChallengeMatchStreak: 0,
       bossChallengeNearMisses: 0,
       lines: [
-        'You and the wild buddy hit the mat, shoulders tight, and go flat on your stomachs.',
+        'You and the wild Buddy lock grips at the Rally Table.',
         `${opening}`,
-        `Challenge difficulty: ${challengeTier.toUpperCase()} tier · ${challengeSummary.bonusLabel} machine bias.`,
+        ...(bossDefinition
+          ? [
+              `${bossDefinition.signatureRule.name}: ${bossDefinition.signatureRule.description}`,
+              `Counterplay: ${bossDefinition.counterplay}`,
+            ]
+          : []),
+        `Challenge difficulty: ${challengeTier.toUpperCase()} tier · ${challengeSummary.bonus >= 0 ? '+' : ''}${challengeSummary.bonus} machine bias.`,
         `${encounter.isBoss ? 'BOSS' : 'WILD'} pressure check: ${pressureSummary}.`,
         `${fatigueSummary}.`,
         `Readiness edge: ${readinessSummary}.`,
         `Boss lock target: ${activeCaptureTarget}% (higher is tighter ${activeCaptureTarget > 74 ? 'on this gym tier' : 'for boss only'}).`,
-        'The hold starts at a neutral meter. Push to your side to pin.',
+        `Stamina opens at ${playerStamina}/${opponentStamina}. Read the tell, choose a response, and secure ${activeCaptureTarget}% control before the pin check.`,
       ],
     });
     pulseTrainerEmote('focus', 1200);
     setMessage(encounter.isBoss ? `${encounter.bossName} engages the challenge machine.` : 'Arm-wrestle match started.');
-    activateAudioEngine().emitSfx('matchStart', 1);
+    playAudioCue(encounter.isBoss ? 'boss-alert' : 'wild-alert', 1);
     updateMusic();
   }
 
-function resolveMatch(meter: number, playerWonLine: string[]) {
+function resolveMatch(
+    meter: number,
+    playerWonLine: string[],
+    roundState?: Partial<Match>,
+  ) {
     if (!match) return;
     if (!activeBuddy) return;
 
+    const resolvingMatch: Match = { ...match, ...roundState, meter };
     const zone = AREAS.find((entry) => entry.id === match.encounter.zoneId) ?? activeZone;
     const activeMachineForMatch = activeMachine ?? getDefaultGymMachine(zone);
     const challengeMachine = getBossChallengeMachine(match.encounter, zone);
     const zoneMachine = activeMachineForMatch;
-    const modifier = matchCatchModifier(match.encounter, zone, zoneMachine, trainer, activeBuddy, meter, save.trainingFatigue);
     const challengeProfile = bossChallengeProfileForZone(zone.type, match.encounter);
-    const challengePenaltyState = bossChallengeCapturePenalty(match, zone, zoneMachine, meter, activeBuddy);
-    const captureTarget = bossCaptureTarget(
-      zone,
-      match.encounter,
-      challengePenaltyState.isActive ? challengePenaltyState.isAligned : null,
-      match.bossChallengeMisses,
-      match.bossChallengeNearMisses,
-      match.bossChallengeMatchStreak,
-      activeBuddy,
+    const attempt = consumeRandomResult((randomState) =>
+      calculateCaptureAttempt({
+        match: resolvingMatch,
+        gym: zone,
+        machine: zoneMachine,
+        trainer,
+        buddy: activeBuddy,
+        meter,
+        trainingFatigue: save.trainingFatigue,
+        randomState,
+      }),
     );
-    const zoneCatchProfile = BOSS_CAPTURE_WEIGHTS[zone.type];
-    const base = clamp(match.encounter.catchChance + modifier.meterDelta, 0.08, 0.97);
-    const bonus = clamp(modifier.raw / BOSS_METER_CATCH_SCALE[zone.type], -0.24, 0.32);
-    const readinessBonus = clamp(modifier.readinessTotal / BOSS_CAPTURE_READINESS_SCALE[zone.type], -0.12, 0.12);
-    const isChallengeMachine = !!(challengeMachine && zoneMachine && zoneMachine.id === challengeMachine.id);
-    const challengeMissPenaltyFactor = match.encounter.isBoss && match.isBossChallengeActive ? challengePenaltyState.penalty : 0;
-    const finalChance = clamp(
-      base + bonus + readinessBonus - challengeMissPenaltyFactor,
-      zoneCatchProfile.minCatch,
-      zoneCatchProfile.maxCatch,
-    );
-
-    const passHold = match.encounter.isBoss ? meter >= captureTarget : meter >= 72;
+    const challengePenaltyState = attempt.penalty;
+    const captureTarget = attempt.captureTarget;
 
     const lines = [...playerWonLine];
     if (match.encounter.isBoss && challengeMachine && zoneMachine) {
@@ -3242,31 +2601,43 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     }
     if (challengePenaltyState.isActive) {
       lines.push(
-        `Challenge state: ${match.bossChallengeMatchStreak}/${challengeProfile.streakLimit} streak · ${match.bossChallengeMisses} misses · ${match.bossChallengeNearMisses} near misses.`,
+        `Challenge state: ${resolvingMatch.bossChallengeMatchStreak}/${challengeProfile.streakLimit} streak · ${resolvingMatch.bossChallengeMisses} misses · ${resolvingMatch.bossChallengeNearMisses} near misses.`,
       );
     }
     if (
       match.encounter.isBoss &&
-      match.bossChallengeMisses >= Math.max(2, challengeProfile.streakLimit + 1)
+      resolvingMatch.bossChallengeMisses >=
+        challengeProfile.overloadMissLimit
     ) {
       lines.push('Challenge overload: misses stacked; return to the required machine or pressure escalates.');
     }
-    if (match.encounter.isBoss && match.isBossChallengeActive && challengePenaltyState.penalty > 0.005) {
-      lines.push(`Capture penalty: -${challengePenaltyState.penaltyLabel} (streak bonus ${Math.round(challengePenaltyState.streakBonus * 100)}%).`);
+    if (
+      match.encounter.isBoss &&
+      resolvingMatch.isBossChallengeActive &&
+      challengePenaltyState.penalty > 0.005
+    ) {
+      lines.push(`Capture penalty: -${Math.round(challengePenaltyState.penalty * 100)}% (streak bonus ${Math.round(challengePenaltyState.streakBonus * 100)}%).`);
     }
     if (match.encounter.isBoss) {
-      const thresholdText = match.meter >= captureTarget ? 'met' : 'not met';
+      const thresholdText =
+        resolvingMatch.meter >= captureTarget ? 'met' : 'not met';
       lines.push(`Capture target ${captureTarget}% ${thresholdText}: current ${meter}%.`);
     }
 
-    if (!passHold) {
-      const escape = meter <= 24;
+    if (attempt.outcome === 'escape' || attempt.outcome === 'failed-pin') {
+      const escape = attempt.outcome === 'escape';
       setMatch((current) =>
         current
           ? {
               ...current,
-              status: escape ? 'escape' : 'failed',
-              lines: [...lines, escape ? 'It slips out at the end.' : 'You are close, but not enough.'],
+              ...roundState,
+              status: escape ? 'escape' : 'failed-pin',
+              lines: [
+                ...lines,
+                escape
+                  ? 'The wild Buddy breaks the grip and clears the arena.'
+                  : `The round ends below the ${captureTarget}% secure-control line. No pin is awarded.`,
+              ],
               meter,
             }
           : current,
@@ -3278,13 +2649,17 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
             : 'The wild buddy breaks loose.'
           : 'You missed the pin.',
       );
-      activateAudioEngine().emitSfx(escape ? 'escape' : 'moveBad', escape ? 1 : 0.9);
+      playAudioCue('capture-failure', escape ? 1 : 0.9);
+      cuePresentationEffect(
+        'capture-failure',
+        'failure',
+        escape ? 'GRIP BROKEN' : 'PIN MISSED',
+      );
       pulseTrainerEmote(escape ? 'drained' : 'grind', escape ? 1300 : 1100);
       setEncounter(escape ? null : encounter);
       return;
     }
-    const roll = Math.random();
-    if (roll > finalChance) {
+    if (attempt.outcome === 'near-capture') {
       if (match.encounter.isBoss && challengePenaltyState.isActive && challengePenaltyState.nearWarn) {
         lines.push('Challenge discipline dropped. Re-center the required machine or your grip loses edge.');
       }
@@ -3292,227 +2667,419 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
         current
           ? {
               ...current,
-              status: 'failed',
+              ...roundState,
+              status: 'near-capture',
               meter,
-              lines: [...lines, 'You almost had it, but its final twitch breaks the pin.'],
+              lines: [
+                ...lines,
+                'PIN WIN. The invitation nearly lands, but the wild Buddy chooses one more challenge.',
+              ],
             }
           : current,
       );
       setMessage('The hold was almost won, but catch failed.');
-      activateAudioEngine().emitSfx('catchAlmost', 1);
+      playAudioCue('capture-failure', 0.8);
+      cuePresentationEffect('capture-failure', 'resisted', 'NEAR CAPTURE');
       pulseTrainerEmote('drained', 1200);
       return;
     }
 
-    const newBuddy: Buddy = {
-      id: `${encounter!.creature.dex}-${Date.now()}`,
-      nickname: `${randomChoice(FANCY_NAMES)} #${encounter!.creature.dex}`,
-      creature: encounter!.creature,
-      level: encounter!.level,
-      hp: 32 + encounter!.level * 2,
-      maxHp: 42 + encounter!.level * 2,
-      xp: 0,
-      form: clampBuddyStats(11 + Math.round(encounter!.level * 0.45), MAX_BUDDY_FORM, 1),
-      mobility: clampBuddyStats(12 + Math.round(encounter!.level * 0.4), MAX_BUDDY_MOBILITY, 1),
-      volume: clampBuddyStats(4 + Math.round(encounter!.level * 0.08), MAX_BUDDY_VOLUME, 1),
-    };
+    const newBuddy = consumeRandomResult((randomState) =>
+      createCapturedBuddy({
+        species: match.encounter.creature,
+        level: match.encounter.level,
+        capturedAtMs: Date.now(),
+        names: FANCY_NAMES,
+        randomState,
+      }),
+    ).buddy;
 
-    const teamIsFull = save.team.length >= TEAM_SIZE;
-    if (teamIsFull) {
+    const placement = planCapturePartyPlacement(
+      save.team,
+      newBuddy,
+      TEAM_SIZE,
+    );
+    const bossDefinition = getBossById(match.encounter.bossId);
+    const bossVictoryReward =
+      match.encounter.isBoss && bossDefinition
+        ? consumeRandomResult((randomState) =>
+            resolveBossVictoryReward({
+              rewardTable: bossDefinition.rewardTable,
+              team: placement.team,
+              activeIndex: save.activeIndex,
+              trainingFatigue: save.trainingFatigue,
+              workoutMomentum: save.workoutMomentum,
+              deloadTokens: save.deloadTokens,
+              randomState,
+            }),
+          )
+        : null;
+    const bossRewardLine = bossVictoryReward
+      ? `Boss rewards: +${bossVictoryReward.reward.buddyXp} active Buddy XP · ${bossVictoryReward.reward.fatigueRecovered} fatigue recovered · +${bossVictoryReward.reward.momentumGained} momentum · +${bossVictoryReward.reward.deloadTokensGained} Deload.`
+      : null;
+    const markBossRewardForState = (state: SaveData) => {
+      const schedule = state.bossSchedules[zone.id];
+      if (
+        !match.encounter.isBoss ||
+        !schedule ||
+        !match.encounter.bossScheduleCycle
+      ) {
+        return null;
+      }
+      return markBossCycleRewarded(
+        schedule,
+        match.encounter.bossScheduleCycle,
+      );
+    };
+    if (placement.kind === 'full-party') {
+      if (match.encounter.isBoss) {
+        setSave((state) => {
+          const marked = markBossRewardForState(state);
+          const applyReward = Boolean(
+            marked?.awarded && bossVictoryReward,
+          );
+          return {
+            ...state,
+            team: applyReward ? bossVictoryReward!.team : state.team,
+            trainingFatigue: applyReward
+              ? bossVictoryReward!.trainingFatigue
+              : state.trainingFatigue,
+            workoutMomentum: applyReward
+              ? bossVictoryReward!.workoutMomentum
+              : state.workoutMomentum,
+            deloadTokens: applyReward
+              ? bossVictoryReward!.deloadTokens
+              : state.deloadTokens,
+            caughtDex: state.caughtDex.includes(match.encounter.creature.dex)
+              ? state.caughtDex
+              : [...state.caughtDex, match.encounter.creature.dex],
+            bossSchedules: marked
+              ? {
+                  ...state.bossSchedules,
+                  [zone.id]: marked.schedule,
+                }
+              : state.bossSchedules,
+          };
+        });
+      }
       setMatch((current) =>
         current
           ? {
               ...current,
-              status: 'full',
+              ...roundState,
+              status: 'full-party',
               meter,
-              lines: [...lines, 'You win the pin, but your team is already full.'],
+              pendingCapturedBuddy: placement.pendingBuddy,
+              lines: [
+                ...lines,
+                'PIN WIN. The capture succeeds, but all six party positions are occupied.',
+                ...(bossRewardLine ? [bossRewardLine] : []),
+                'Choose a Buddy to rotate out, or let the new Buddy return to the route.',
+              ],
             }
           : current,
       );
-      setMessage('Captured, but team is full.');
-      activateAudioEngine().emitSfx('teamFull', 0.9);
+      if (!match.encounter.isBoss) {
+        setSave((state) => ({
+          ...state,
+          caughtDex: state.caughtDex.includes(match.encounter.creature.dex)
+            ? state.caughtDex
+            : [...state.caughtDex, match.encounter.creature.dex],
+        }));
+      }
+      setMessage('Capture secured. Choose how to resolve the full party.');
+      playAudioCue('team-full', 0.9);
+      cuePresentationEffect('capture-success', 'success', 'CAPTURE HELD');
       return;
     }
 
-    setSave((state) => ({
-      ...state,
-      team: [...state.team, newBuddy],
-      caughtDex: state.caughtDex.includes(encounter!.creature.dex)
-        ? state.caughtDex
-        : [...state.caughtDex, encounter!.creature.dex],
-      activeIndex: state.activeIndex >= state.team.length ? state.team.length - 1 : state.activeIndex,
-    }));
+    setSave((state) => {
+      const marked = markBossRewardForState(state);
+      const applyReward = Boolean(marked?.awarded && bossVictoryReward);
+      const rewardedTeam = applyReward
+        ? bossVictoryReward!.team
+        : placement.team;
+      return {
+        ...state,
+        team: rewardedTeam,
+        trainingFatigue: applyReward
+          ? bossVictoryReward!.trainingFatigue
+          : state.trainingFatigue,
+        workoutMomentum: applyReward
+          ? bossVictoryReward!.workoutMomentum
+          : state.workoutMomentum,
+        deloadTokens: applyReward
+          ? bossVictoryReward!.deloadTokens
+          : state.deloadTokens,
+        caughtDex: state.caughtDex.includes(encounter!.creature.dex)
+          ? state.caughtDex
+          : [...state.caughtDex, encounter!.creature.dex],
+        activeIndex:
+          state.activeIndex >= rewardedTeam.length
+            ? rewardedTeam.length - 1
+            : state.activeIndex,
+        bossSchedules: marked
+          ? {
+              ...state.bossSchedules,
+              [zone.id]: marked.schedule,
+            }
+          : state.bossSchedules,
+      };
+    });
 
     setMatch((current) =>
       current
         ? {
             ...current,
-            status: 'won',
+            ...roundState,
+            status: 'captured',
             meter,
+            pendingCapturedBuddy: null,
             lines: [
               ...lines,
-              'You flatten your bodies, elbows locked, and drag the pressure down.',
-              `YOU WIN THE ARMWRESTLE. ${encounter!.creature.name} cries like a baby and joins your squad.`,
+              'PIN WIN. Your control holds through the count.',
+              `CAPTURE COMPLETE. ${encounter!.creature.name} accepts the challenge bond and joins your party.`,
+              ...(bossRewardLine ? [bossRewardLine] : []),
             ],
           }
         : current,
     );
     setEncounter(null);
-    activateAudioEngine().emitSfx('catchWin', 1.1);
+    playAudioCue('capture-success', 1.1);
+    cuePresentationEffect('capture-success', 'success', 'CAPTURE COMPLETE');
     pulseTrainerEmote('victory', 1600);
-    setMessage(`Captured ${encounter!.creature.name} as ${newBuddy.nickname}.`);
+    setMessage(
+      `Captured ${encounter!.creature.name} as ${newBuddy.nickname}.${bossRewardLine ? ` ${bossRewardLine}` : ''}`,
+    );
     pushLog(`Captured ${encounter!.creature.name} Lv.${encounter!.level}.`);
   }
 
+  function replacePartySlotAfterCapture(index: number) {
+    if (
+      !match ||
+      match.status !== 'full-party' ||
+      !match.pendingCapturedBuddy
+    ) {
+      return;
+    }
+    const capturedBuddy = match.pendingCapturedBuddy;
+    const rotatedBuddy = save.team[index];
+    if (!rotatedBuddy) return;
+    setSave((state) => ({
+      ...state,
+      team: replacePartyBuddy(state.team, index, capturedBuddy),
+      activeIndex: state.activeIndex,
+    }));
+    setMatch((current) =>
+      current
+        ? {
+            ...current,
+            status: 'captured',
+            pendingCapturedBuddy: null,
+            lines: [
+              ...current.lines,
+              `${rotatedBuddy.nickname} rotates to recovery while ${capturedBuddy.nickname} takes party slot ${index + 1}.`,
+            ],
+          }
+        : current,
+    );
+    setEncounter(null);
+    setMessage(`${capturedBuddy.nickname} joined the party.`);
+    playAudioCue('capture-success', 1);
+    pushLog(
+      `${capturedBuddy.nickname} replaced ${rotatedBuddy.nickname} after a full-party capture.`,
+    );
+  }
+
+  function releaseFullPartyCapture() {
+    if (
+      !match ||
+      match.status !== 'full-party' ||
+      !match.pendingCapturedBuddy
+    ) {
+      return;
+    }
+    const releasedBuddy = match.pendingCapturedBuddy;
+    setMatch((current) =>
+      current
+        ? {
+            ...current,
+            pendingCapturedBuddy: null,
+            lines: [
+              ...current.lines,
+              `${releasedBuddy.nickname} returns to the route with the encounter recorded in the Index.`,
+            ],
+          }
+        : current,
+    );
+    setEncounter(null);
+    setMessage(`${releasedBuddy.nickname} returned to the route.`);
+    pushLog(`Full-party capture recorded; ${releasedBuddy.nickname} returned safely.`);
+  }
+
   function performMove(move: Move) {
-    if (!match || !match.encounter || match.status !== 'playing' || !activeBuddy) {
+    if (
+      !match ||
+      !match.encounter ||
+      match.status !== 'playing' ||
+      !activeBuddy ||
+      captureAnimation
+    ) {
       return;
     }
 
     const zone = AREAS.find((entry) => entry.id === match.encounter.zoneId) ?? activeZone;
     const selectedMachine = activeMachine ?? getDefaultGymMachine(zone);
-    const modifier = matchCatchModifier(
-      match.encounter,
-      zone,
-      selectedMachine,
-      trainer,
-      activeBuddy,
-      match.meter,
-      save.trainingFatigue,
+    const isForcedChallengeRecovery = Boolean(isMatchChallengeForcedRecovery);
+    const moveResult = consumeRandomResult((randomState) =>
+      calculateCaptureMove({
+        match,
+        gym: zone,
+        selectedMachine,
+        trainer,
+        buddy: activeBuddy,
+        trainingFatigue: save.trainingFatigue,
+        move,
+        isForcedChallengeRecovery,
+        challengeStressPercent: activeMatchChallengeStress.percent,
+        randomState,
+      }),
     );
-    const fatiguePressure = Math.round(fatigueRatio * 8);
-    const trainerPressure = Math.round(modifier.trainerPressure * 1.12);
-    const buddyPressure = Math.round(modifier.buddyPressure * 0.93);
-    const challengePressure = modifier.bossPressure;
-    const activeMachineForMatch = selectedMachine ?? getDefaultGymMachine(zone);
-    const challengeMachine = match.encounter.isBoss ? getBossChallengeMachine(match.encounter, zone) : null;
-    const isChallengeMachine = !!(challengeMachine && activeMachineForMatch && activeMachineForMatch.id === challengeMachine.id);
-    const isForcedChallengeRecovery = match.encounter.isBoss && match.isBossChallengeActive && isMatchChallengeOverload && !isChallengeMachine;
-    const challengeProfile = bossChallengeProfileForZone(zone.type, match.encounter);
-    const challengeMove = BOSS_CHALLENGE_MOVE_MODIFIERS[move.id];
-    const battleProfile = workoutBuddyProfile(activeBuddy);
-    const overloadRecoveryPenalty = isForcedChallengeRecovery
-      ? clamp(Math.floor(activeMatchChallengeStress.percent / 10) + 8, 8, 18)
-      : 0;
-    const moveFatigueDrain = Math.max(
-      0,
-      Math.round(challengeMove.staminaDrain + (0.5 - battleProfile.movementConsistency) * 1.5 + overloadRecoveryPenalty),
+    const {
+      challengeMachine,
+      isChallengeMachine,
+      isChallengeAction,
+      isNearMiss,
+      signatureEffect,
+      profile: challengeProfile,
+      moveAlignmentBonus,
+      moveMismatchPenalty,
+      nextMisses,
+      nextNearMisses,
+      nextMatchStreak,
+      delta,
+      nextMeter,
+      round,
+      playerStamina,
+      opponentStamina,
+      playerMoveHistory,
+      opponentMoveHistory,
+      opponentIntent,
+      roundSummary,
+    } = moveResult;
+    const opponentMove =
+      MOVES.find((entry) => entry.id === roundSummary.opponentMoveId) ??
+      MOVES[1]!;
+
+    if (captureAnimationTimerRef.current) {
+      clearTimeout(captureAnimationTimerRef.current);
+    }
+    setCaptureAnimation({
+      moveId: move.id,
+      tone:
+        roundSummary.counterState === 'counter'
+          ? 'counter'
+          : roundSummary.meterDelta >= 0
+            ? 'advance'
+            : 'resisted',
+    });
+    cuePresentationEffect(
+      'arm-impact',
+      roundSummary.counterState === 'counter'
+        ? 'counter'
+        : roundSummary.meterDelta >= 0
+          ? 'advance'
+          : 'resisted',
+      move.title.toUpperCase(),
     );
-    const closeControl = Math.abs(match.meter - 50);
-    const moveAlignmentBonus = isChallengeMachine ? challengeMove.alignmentBonus : 0;
-    const moveMismatchPenalty = isChallengeMachine
-      ? 0
-      : clamp(
-          Math.abs(challengeMove.mismatchPenalty) +
-            Math.min(10, Math.floor((match.bossChallengeMisses + match.bossChallengeNearMisses) / 2)) +
-            (isForcedChallengeRecovery ? 12 : 0),
-          1,
-          30,
-        );
+    const impactDuration = save.accessibility.reducedMotion
+      ? PRESENTATION_EFFECT_TIMING.reducedMotionSequenceMs
+      : captureSpeed.animationMs;
+    captureAnimationTimerRef.current = window.setTimeout(() => {
+      setCaptureAnimation(null);
+      captureAnimationTimerRef.current = null;
+    }, impactDuration);
 
     setSave((state) => ({
       ...state,
-      trainingFatigue: clamp(state.trainingFatigue + moveFatigueDrain, 0, MAX_TRAINING_FATIGUE),
+      trainingFatigue: moveResult.trainingFatigue,
     }));
-    const nearMissNow = !isChallengeMachine && (isForcedChallengeRecovery || closeControl <= 10) ? 1 : 0;
     const challengeAlignmentNote =
       challengeMachine && match.encounter.isBoss && match.isBossChallengeActive
-        ? isChallengeMachine
-          ? 'You stay locked on the boss challenge machine.'
-          : `Challenge break: ${challengeMachine.name} was expected.`
+        ? isChallengeAction
+          ? `Complete action: ${challengeMachine.name} + ${match.encounter.bossRequiredMoveName ?? move.title}.`
+          : isNearMiss
+            ? `Partial action: ${
+                isChallengeMachine
+                  ? match.encounter.bossRequiredMoveName ?? 'the required move'
+                  : challengeMachine.name
+              } was still missing.`
+            : `Challenge break: ${challengeMachine.name} + ${match.encounter.bossRequiredMoveName ?? 'the required move'} was expected.`
         : null;
-    const nextMisses = match.encounter.isBoss && match.isBossChallengeActive
-      ? isChallengeMachine
-        ? Math.max(0, match.bossChallengeMisses - 1)
-        : match.bossChallengeMisses + (isForcedChallengeRecovery ? 2 : 1)
-      : match.bossChallengeMisses;
-    const nextNearMisses = match.encounter.isBoss && match.isBossChallengeActive
-      ? isChallengeMachine
-        ? Math.max(0, match.bossChallengeNearMisses - 1)
-        : match.bossChallengeNearMisses + nearMissNow
-      : match.bossChallengeNearMisses;
-    const nextMatchStreak = match.encounter.isBoss && match.isBossChallengeActive
-      ? isChallengeMachine
-        ? clamp(match.bossChallengeMatchStreak + 1, 0, challengeProfile.streakLimit)
-        : 0
-      : match.bossChallengeMatchStreak;
-    const bossPowerScale = BOSS_POWER_BONUS_SCALE[zone.type];
-    const bossBonus = (match.encounter.bossPowerBonus ?? 0) * bossPowerScale;
-    const streakPressure = nextMatchStreak ? nextMatchStreak : 0;
-    const moveMomentumPenalty = matchMovePenalty(moveMismatchPenalty, isChallengeMachine, nextNearMisses, nextMatchStreak);
-    const readinessShift = clamp(Math.round(modifier.readinessTotal * 0.6), -8, 8);
-    const nearMissPenalty = isChallengeMachine
-      ? 0
-      : clamp(4 + (match.bossChallengeNearMisses > challengeProfile.missResetGrace ? 2 : 0), 0, 16);
-    const formEdge = clamp(Math.round((activeBuddy.form / MAX_BUDDY_FORM - 0.45) * 8), -2, 5);
-    const mobilityEdge = clamp(Math.round((activeBuddy.mobility / MAX_BUDDY_MOBILITY - 0.45) * 7), -2, 4);
-    const volumeEdge = clamp(Math.round((activeBuddy.volume / MAX_BUDDY_VOLUME - 0.55) * 10), -3, 3);
-    const playerBase =
-      activeBuddy.level * 1.75 +
-      move.power +
-      move.control +
-      (0 - fatiguePressure) +
-      trainerPressure +
-      buddyPressure +
-      challengePressure +
-      (match.encounter.isBoss && isChallengeMachine ? 4 + moveAlignmentBonus + streakPressure : match.encounter.isBoss ? -moveMismatchPenalty : 0) -
-      (match.encounter.isBoss && !isChallengeMachine ? nearMissPenalty : 0) +
-      formEdge +
-      mobilityEdge +
-      volumeEdge +
-      readinessShift +
-      -challengeMove.staminaDrain +
-      -overloadRecoveryPenalty * (isForcedChallengeRecovery ? 2 : 1) +
-      randInt(-5, 9);
-    const wildBase =
-      match.encounter.level * 2.05 +
-      match.encounter.creature.power +
-      bossBonus -
-      challengePressure +
-      randInt(-4, 12) -
-      clamp(Math.round(modifier.buddyEdge * 0.4), -4, 4);
-    const delta = playerBase - wildBase;
-    const nextMeter = clamp(match.meter + Math.floor((delta - moveMomentumPenalty) / 2), 20, 92);
-    const round = match.round + 1;
-
     const line =
-      delta >= 8
-        ? `${move.title}: you crush the first edge and pull control.`
-        : delta >= 0
-          ? `${move.title}: pressure stays balanced; keep it up.`
-          : `${move.title}: wild buddy resisted and pushed back.`;
+      roundSummary.meterDelta >= 6
+        ? `${move.title} takes a clean control edge.`
+        : roundSummary.meterDelta >= 0
+          ? `${move.title} holds center without overcommitting.`
+          : `${opponentMove.title} reads the exchange and pushes control back.`;
+    const counterLine =
+      roundSummary.counterState === 'counter'
+        ? `${move.title} answers the tell and earns the counter edge.`
+        : roundSummary.counterState === 'countered'
+          ? `${opponentMove.title} counters your chosen line.`
+          : 'Neither move owns the matchup; preparation and execution decide it.';
 
     const nextLines = [
       ...match.lines,
-      `${line} (${move.tactic}).`,
+      `Round ${match.round}: ${move.title} meets ${opponentMove.title}. ${line}`,
+      counterLine,
+      `Control ${nextMeter}% · stamina ${playerStamina}/${opponentStamina} · next tell: ${opponentIntent.tell}`,
       ...(challengeAlignmentNote
         ? [
-            isChallengeMachine
+            isChallengeAction
               ? `${challengeAlignmentNote} +${moveAlignmentBonus} bonus. ${nextMatchStreak >= challengeProfile.streakLimit ? 'Streak lock active.' : ''}`
               : `${challengeAlignmentNote} -${moveMismatchPenalty} penalty.`,
+          ]
+        : []),
+      ...(signatureEffect.active && signatureEffect.name
+        ? [
+            `${signatureEffect.name}: ${signatureEffect.warning ?? 'The boss signature rule activates.'}`,
           ]
         : []),
       ...(isForcedChallengeRecovery
         ? ['You stay in overload: only the required machine can quickly recover pressure.']
         : []),
       ...(challengeMachine
-        ? [`Challenge pressure: ${nextMisses}/${Math.max(5, challengeProfile.maxRounds)} misses · ${nextNearMisses} near-miss points.`]
+        ? [`Challenge pressure: ${nextMisses}/${challengeProfile.overloadMissLimit} misses to overload · ${nextNearMisses} near-miss points.`]
         : []),
-      `Round ${match.round}: meter ${nextMeter}%${
-        isChallengeMachine ? '' : ` · challenge misses ${nextMisses}`
+      `Round state: meter ${nextMeter}%${
+        isChallengeAction ? '' : ` · challenge misses ${nextMisses}`
       }.`,
     ];
-    if (nextMeter >= 84) {
-      nextLines.push('It is almost yours. One clean burst and the pin lands.');
+    if (roundSummary.repetitionPenalty > 0) {
+      nextLines.push(
+        `Repeat read: familiar move history reduced pressure by ${roundSummary.repetitionPenalty}.`,
+      );
+    }
+    if (nextMeter >= activeMatchCaptureTarget - 6) {
+      nextLines.push(
+        `Secure-control line is close at ${activeMatchCaptureTarget}%.`,
+      );
     }
     if (nextMeter <= 28) {
       nextLines.push('Danger: hold is fading. Keep it moving.');
     }
-    activateAudioEngine().emitSfx(delta >= 0 ? 'moveGood' : 'moveBad', 0.5 + (Math.abs(delta) / 20));
+    playAudioCue(
+      delta >= 0 ? 'capture-advance' : 'capture-resisted',
+      0.5 + Math.abs(delta) / 20,
+    );
 
     if (nextMeter >= 76) {
       pulseTrainerEmote('level', 900);
-    } else if (match.encounter.isBoss && match.bossChallengeMisses >= challengeProfile.streakLimit + 1) {
+    } else if (
+      match.encounter.isBoss &&
+      match.bossChallengeMisses >= challengeProfile.overloadMissLimit
+    ) {
       pulseTrainerEmote('drained', 850);
     } else if (nextMeter <= 34) {
       pulseTrainerEmote('focus', 800);
@@ -3520,8 +3087,20 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       pulseTrainerEmote('grind', 700);
     }
 
-    if (match.round >= match.maxRounds || nextMeter >= 92 || nextMeter <= 20) {
-      resolveMatch(nextMeter, nextLines);
+    if (moveResult.shouldResolve) {
+      resolveMatch(nextMeter, nextLines, {
+        round,
+        meter: nextMeter,
+        playerStamina,
+        opponentStamina,
+        playerMoveHistory,
+        opponentMoveHistory,
+        opponentIntent,
+        lastRound: roundSummary,
+        bossChallengeMisses: nextMisses,
+        bossChallengeMatchStreak: nextMatchStreak,
+        bossChallengeNearMisses: nextNearMisses,
+      });
       return;
     }
 
@@ -3531,6 +3110,12 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
             ...current,
             round,
             meter: nextMeter,
+            playerStamina,
+            opponentStamina,
+            playerMoveHistory,
+            opponentMoveHistory,
+            opponentIntent,
+            lastRound: roundSummary,
             bossChallengeMisses: nextMisses,
             bossChallengeMatchStreak: nextMatchStreak,
             bossChallengeNearMisses: nextNearMisses,
@@ -3549,10 +3134,192 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
     return Math.round((value / max) * 100);
   }
 
+  function handlePresentationAction(action: InputAction) {
+    if (
+      action === 'menu' ||
+      action === 'pause' ||
+      action === 'cancel' ||
+      action === 'debug-toggle'
+    ) {
+      return;
+    }
+    const gameplayAction = action === 'confirm' ? 'interact' : action;
+    if (workoutSession) {
+      if (gameplayAction === 'interact' && !workoutSession.resolved) {
+        performWorkoutAction();
+      }
+      return;
+    }
+    const direction = inputActionToDirection(gameplayAction);
+    if (direction && (encounter || match || isTraveling)) return;
+
+    if (gameplayAction === 'interact' && encounter && !match) {
+      startMatch();
+      return;
+    }
+    if (match?.status === 'playing') {
+      const moveIndex =
+        gameplayAction === 'ability-2'
+          ? 1
+          : gameplayAction === 'ability-3'
+            ? 2
+            : gameplayAction === 'interact' || gameplayAction === 'ability-1'
+              ? 0
+              : -1;
+      const move = MOVES[moveIndex];
+      if (move) performMove(move);
+      return;
+    }
+
+    const now = nowMs();
+    const result = resolveOverworldAction({
+      state: overworldState,
+      action: gameplayAction,
+      now,
+      progression: overworldProgression,
+    });
+    if (result.state !== overworldState) {
+      setOverworldState(result.state);
+      setTrainerFacing(result.state.facing);
+    }
+
+    result.events.forEach((event) => {
+      if (event.type === 'blocked') {
+        setMessage(`The ${event.direction} path is blocked.`);
+      }
+      if (event.type === 'nothing-to-interact') {
+        setMessage('Nothing is within reach. Face a door, sign, machine, or trainer.');
+      }
+      if (event.type === 'interaction') {
+        if (event.interactable.machineId) {
+          selectMachine(event.interactable.machineId);
+        }
+        if (event.interactable.kind === 'recovery') {
+          recoverWithRest();
+        } else {
+          setMessage(event.interactable.message);
+        }
+      }
+      if (event.type === 'encounter-check') {
+        setMessage(
+          event.area.rarity === 'rare'
+            ? `A rare ${event.area.rewardQuality} signal flashes through the turf.`
+            : 'The marked pulse turf shifts. Stay ready for a competitive grip.',
+        );
+        trySpawnRouteEncounter(
+          getGymById(event.area.gymId),
+          event.area.encounterBoost,
+          event.area.routeName,
+        );
+        setLastRouteEncounterMs(now);
+      }
+      if (event.type === 'locked-transition') {
+        setMessage(`Route locked: ${event.requirement.description}`);
+      }
+      if (event.type === 'transition') {
+        setEncounter(null);
+        setMatch(null);
+        setSave((state) => {
+          const targetZoneId = event.transition.targetZoneId ?? state.activeZoneId;
+          return {
+            ...state,
+            activeZoneId: targetZoneId,
+            unlockedZoneIds: event.transition.targetZoneId
+              ? unlockAdjacentZones(state.unlockedZoneIds, targetZoneId)
+              : state.unlockedZoneIds,
+            visitedZoneIds: event.transition.targetZoneId
+              ? [...new Set([...state.visitedZoneIds, targetZoneId])]
+              : state.visitedZoneIds,
+            trainingFatigue: applyFatigueChange(
+              state.trainingFatigue,
+              event.transition.fatigueCost,
+            ),
+          };
+        });
+        const destination = getOverworldMap(event.toLocationId);
+        setMessage(
+          `${destination.name} reached via ${event.transition.routeName}. Fatigue +${event.transition.fatigueCost.toFixed(2)}.`,
+        );
+        playAudioCue('route-transition', 0.45);
+      }
+    });
+  }
+
+  const presentationActionLabel = match?.status === 'playing'
+    ? MOVES[0]?.title ?? 'Pull'
+    : encounter
+      ? 'Grip up'
+      : facingOverworldInteractable?.label ?? 'Interact';
+  const gamePresentationSnapshot = useMemo<
+    Omit<GamePresentationSnapshot, 'motion'>
+  >(
+    () => ({
+      activeZoneName: activeOverworldMap.name,
+      activeZoneType:
+        activeOverworldMap.kind === 'route' ? 'route' : activeZone.type,
+      buddyHp: activeBuddy?.hp ?? 0,
+      buddyMaxHp: activeBuddy?.maxHp ?? 0,
+      buddyName: activeBuddy?.nickname ?? '',
+      encounterActive: Boolean(encounter || match),
+      effect: presentationEffect,
+      defeatedGymIds: overworldProgression.defeatedGymIds,
+      facing: overworldState.facing,
+      fatigueRatio,
+      locationId: overworldState.locationId,
+      movementSequence: overworldState.movementSequence,
+      playerTileX: overworldState.position.x,
+      playerTileY: overworldState.position.y,
+      transitionSequence: overworldState.transitionSequence,
+      trainerEmote: activeEmote,
+      trainerInitial: trainer.name?.[0]?.toUpperCase() ?? 'T',
+      trainerColors: {
+        hair: trainer.hair,
+        shirt: trainer.top,
+        skin: trainer.skin,
+      },
+      trainerAppearance: trainer.appearance,
+      visitedZoneIds: overworldProgression.visitedZoneIds,
+    }),
+    [
+      activeBuddy?.hp,
+      activeBuddy?.maxHp,
+      activeBuddy?.nickname,
+      activeEmote,
+      activeOverworldMap.kind,
+      activeOverworldMap.name,
+      activeZone.type,
+      encounter,
+      fatigueRatio,
+      match,
+      overworldProgression.defeatedGymIds,
+      overworldProgression.visitedZoneIds,
+      overworldState.facing,
+      overworldState.locationId,
+      overworldState.movementSequence,
+      overworldState.position.x,
+      overworldState.position.y,
+      overworldState.transitionSequence,
+      presentationEffect,
+      trainer.hair,
+      trainer.appearance,
+      trainer.name,
+      trainer.skin,
+      trainer.top,
+    ],
+  );
+
   return showStarterSetup ? renderStarterSetup() : (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      data-gameplay-paused={gameplayPaused ? 'true' : 'false'}
+    >
       {zoneTransit && (
-        <div className="zone-transition">
+        <div
+          className={`zone-transition zone-transition-${save.captureBattleSpeed}`}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Traveling from ${zoneTransit.from} to ${zoneTransit.to}`}
+        >
           <div className="zone-transition-card">
             <div className="zone-transition-row">
               <span>{zoneTransit.icon}</span>
@@ -3575,6 +3342,13 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                 </p>
               ) : null}
             </div>
+            <button
+              type="button"
+              className="zone-transition-skip"
+              onClick={skipZoneTransit}
+            >
+              Continue now
+            </button>
           </div>
         </div>
       )}
@@ -3612,16 +3386,16 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       )}
       <header className="top-banner">
         <h1>GYM BUDDIES</h1>
-        <p>Pokémon-style world map, open-world gym travel, and capture battles.</p>
+        <p>Original handheld-era fitness adventure, open-world gym travel, and competitive captures.</p>
         <div className="panel-head-row">
           <span className="chip">Trainer: {trainer.name}</span>
           <span className="chip">Fatigue {trainingFatigueLevel} · {percent(1 - fatigueRatio)}</span>
           <div className="action-row">
             <button className="secondary-btn micro-btn" onClick={reopenTrainerSetup}>
-              Reopen Setup
+              Edit Trainer
             </button>
-            <button className="secondary-btn micro-btn" onClick={restartOpeningProcess}>
-              Reset to Opening
+            <button className="secondary-btn micro-btn" onClick={requestJourneyRestart}>
+              Restart Journey
             </button>
             <button className="secondary-btn" onClick={resetTutorial}>
               Restart Tutorial
@@ -3632,9 +3406,12 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           <button
             className="secondary-btn micro-btn"
             onClick={() => setAudioEnabled(!save.audio.enabled)}
-            aria-pressed={save.audio.enabled}
+            aria-label={
+              save.audio.enabled ? 'Mute all audio' : 'Unmute all audio'
+            }
+            aria-pressed={!save.audio.enabled}
           >
-            {save.audio.enabled ? '🎧 Music: On' : '🎧 Music: Off'}
+            {save.audio.enabled ? '🔊 Audio: On' : '🔇 Audio: Muted'}
           </button>
           <label className="audio-control">
             <span>Music {Math.round(save.audio.musicVolume * 100)}%</span>
@@ -3658,8 +3435,69 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
               onChange={(event) => setSfxVolume(Number(event.target.value))}
             />
           </label>
+          <label className="audio-control">
+            <span>Battle speed</span>
+            <select
+              value={save.captureBattleSpeed}
+              onChange={(event) =>
+                setCaptureBattleSpeed(event.target.value as CaptureBattleSpeed)
+              }
+              aria-label="Capture battle speed"
+            >
+              {CAPTURE_BATTLE_SPEEDS.map((speed) => (
+                <option key={speed.id} value={speed.id}>
+                  {speed.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+        <SaveManagementPanel
+          canRestorePrevious={previousSaveAvailable}
+          loadIssues={saveLoadIssues}
+          loadMessage={saveLoadMessage}
+          onImportJson={importJourneyJson}
+          onRestorePrevious={restorePreviousJourney}
+          save={save}
+        />
+        {import.meta.env.DEV ? (
+          <AudioTestPanel
+            onPlayCue={playAudioCue}
+            onPlayTrack={auditionAudioTrack}
+            onRestoreGameMix={() => {
+              void activateAudioEngine();
+            }}
+            onStopMusic={() => getAudioEngine().stopMusic()}
+          />
+        ) : null}
       </header>
+
+      <GamePresentation
+        accessibility={save.accessibility}
+        actionLabel={presentationActionLabel}
+        battleSpeed={save.captureBattleSpeed}
+        dialogue={message}
+        dialoguePortrait={dialoguePortrait}
+        directionAvailability={overworldDirectionAvailability}
+        effectSkippable={Boolean(captureAnimation || bossEntrance || zoneTransit)}
+        keyboardBindings={save.input.keyboardBindings}
+        movementDisabled={Boolean(
+          isTraveling || encounter || match || workoutSession || restartConfirmationOpen,
+        )}
+        onAction={handlePresentationAction}
+        onAccessibilityChange={setAccessibilitySettings}
+        onBattleSpeedChange={setCaptureBattleSpeed}
+        onKeyboardBindingsChange={setKeyboardBindings}
+        onPauseChange={handleGameplayPauseChange}
+        onSkipEffect={skipPresentationSequence}
+        partyCount={save.team.length}
+        primaryActionDisabled={Boolean(
+          restartConfirmationOpen ||
+            captureAnimation ||
+            (match && match.status !== 'playing'),
+        )}
+        snapshot={gamePresentationSnapshot}
+      />
 
       <main className="game-grid">
         <section className="panel">
@@ -3679,7 +3517,39 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
             <span className="chip">Zone Accent: {zoneVibe.accent}</span>
           </div>
           <p className="small-note">Current: {activeZone.name}</p>
-          <p className="small-note">Boss in this gym: {bossTicker} until spawn · active interval 5-10 min</p>
+          <section
+            className={`boss-availability boss-availability-${activeBossAvailability.status}`}
+            aria-label={`${activeZone.name} boss availability`}
+          >
+            <div>
+              <strong>
+                Boss challenge ·{' '}
+                {activeBossAvailability.status === 'ready'
+                  ? 'Ready now'
+                  : `${bossTicker} active play`}
+              </strong>
+              <small>
+                Possible challengers:{' '}
+                {activeGymBosses.map((boss) => boss.name).join(' or ')}
+              </small>
+              <small>
+                Repeat challenges recharge during visible gameplay; exploring,
+                training, and battles all count.
+              </small>
+            </div>
+            <button
+              className="secondary-btn boss-challenge-btn"
+              onClick={() => startBossChallenge(activeZone)}
+              disabled={
+                activeBossAvailability.status !== 'ready' ||
+                Boolean(encounter || match || workoutSession)
+              }
+            >
+              {activeBossAvailability.status === 'ready'
+                ? 'Answer Boss Challenge'
+                : `Available in ${bossTicker}`}
+            </button>
+          </section>
           <p className="small-note">{activeZone.blurb}</p>
           <p className="small-note">
             Move with WASD or arrow keys: {movementHint || 'No exits available'}
@@ -3906,101 +3776,18 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
           </div>
 
           <div className="panel-head-row">
-            <h3>Trainer Customization</h3>
+            <h3>Trainer Profile</h3>
             <button
               className="secondary-btn micro-btn"
-              onClick={() => setShowTrainerPanel((open) => !open)}
+              onClick={reopenTrainerSetup}
             >
-              {showTrainerPanel ? 'Hide' : 'Open'}
+              Edit Trainer
             </button>
           </div>
-          <p className="small-note">Name: {trainer.name} · click Open for color edits.</p>
-
-          {showTrainerPanel && (
-            <div className="trainer-panel">
-              <div className="trainer-panel-left">
-                <TrainerSprite trainer={trainer} emote={activeEmote} />
-                <div className="trainer-fields">
-                  <label>
-                    Name:
-                    <input value={trainer.name} onChange={setTrainerName} maxLength={14} />
-                  </label>
-                  <div className="trainer-muscle-summary">
-                    Physique Lvl {String(trainerPhysique).padStart(2, '0')}
-                  </div>
-                </div>
-              </div>
-              <div className="trainer-presets">
-                {TRAINER_PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    className={`trainer-preset ${trainer.name === preset.profile.name ? 'active' : ''}`}
-                    onClick={() => setTrainerPreset(preset.profile)}
-                  >
-                    {preset.profile.name}
-                  </button>
-                ))}
-              </div>
-              <div className="trainer-sliders">
-                <div className="muscle-sliders">
-                  {TRAINER_MUSCLES.map((entry) => (
-                    <label className="muscle-slider" key={entry.key}>
-                      <span>{entry.label}</span>
-                      <div className="muscle-slider-row">
-                        <input
-                          type="range"
-                          min="0"
-                          max={MAX_MUSCLE_LEVEL}
-                          value={trainer.muscles[entry.key]}
-                          onChange={(event) => setTrainerMuscle(entry.key, Number(event.target.value))}
-                        />
-                        <span>{trainer.muscles[entry.key]}</span>
-                      </div>
-                      <small>{entry.detail}</small>
-                    </label>
-                  ))}
-                </div>
-                <div className="trainer-row">
-                  <span>Hair</span>
-                  <input
-                    type="color"
-                    value={trainer.hair}
-                    onChange={(event) => setTrainerColor('hair', event.target.value)}
-                  />
-                  <span>Skin</span>
-                  <input
-                    type="color"
-                    value={trainer.skin}
-                    onChange={(event) => setTrainerColor('skin', event.target.value)}
-                  />
-                </div>
-                <div className="trainer-row">
-                  <span>Top</span>
-                  <input
-                    type="color"
-                    value={trainer.top}
-                    onChange={(event) => setTrainerColor('top', event.target.value)}
-                  />
-                  <span>Gloves</span>
-                  <input
-                    type="color"
-                    value={trainer.glove}
-                    onChange={(event) => setTrainerColor('glove', event.target.value)}
-                  />
-                </div>
-                <div className="trainer-row">
-                  <span>Shoes</span>
-                  <input
-                    type="color"
-                    value={trainer.shoes}
-                    onChange={(event) => setTrainerColor('shoes', event.target.value)}
-                  />
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-            </div>
-          )}
+          <p className="small-note">
+            {trainer.name} · Physique Level {String(trainerPhysique).padStart(2, '0')} ·
+            editing the trainer profile preserves all journey progress.
+          </p>
 
           <h3>Machines</h3>
           <p className="small-note">Selected machine boosts efficiency and fatigue tradeoff.</p>
@@ -4014,21 +3801,32 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   <strong>{machine.name}</strong>
                   <small>{machine.detail}</small>
                   <small>
-                    XP {machine.xpMin}-{machine.xpMax} | x{machine.xpMultiplier.toFixed(2)} · Steroid +
-                    {Math.round(machine.steroidChance * 100)}%
-                    {' | '}
-                    Focus: {machine.focus} · Stamina {machine.fatigueCost > 0 ? `-${machine.fatigueCost}` : '+0'}
-                    {machine.hpRestore ? ` · Recovery +${machine.hpRestore}` : ''}
+                    XP {machine.rewardTable.buddyXp.min}-{machine.rewardTable.buddyXp.max} | x
+                    {machine.rewardTable.buddyXp.multiplier.toFixed(2)}
+                    {' · '}
+                    HP {machine.hpEffect >= 0 ? '+' : ''}{machine.hpEffect}
+                    {' · '}
+                    Fatigue +{machine.fatigueCost}
+                    {' · '}
+                    Momentum {machine.momentumEffect >= 0 ? '+' : ''}{machine.momentumEffect}
+                  </small>
+                  <small>
+                    Focus: {machine.focus} · {machine.buddyDisciplines.join(' / ')}
+                    {' · '}
+                    Difficulty {machine.difficulty}/5 · Trainer Lv {machine.recommendedTrainerLevel.min}-
+                    {machine.recommendedTrainerLevel.max}
+                    {' · '}
+                    Drops: Boost {Math.round(machine.dropProbabilities.boostToken * 100)}% / Deload {Math.round(machine.dropProbabilities.deloadToken * 100)}%
                     {activeBuddy
                       ? ` · Readiness ${percent(
-                          workoutReadiness(
+                          calculateWorkoutReadiness({
                             machine,
-                            activeBuddy,
+                            buddy: activeBuddy,
                             trainer,
-                            activeZone.type,
-                            save.trainingFatigue,
-                            save.workoutMomentum,
-                          ),
+                            gymKind: activeZone.type,
+                            trainingFatigue: save.trainingFatigue,
+                            workoutMomentum: save.workoutMomentum,
+                          }),
                         )}`
                       : ''}
                   </small>
@@ -4073,18 +3871,31 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
               <div className="active-card">
                 <div
                   className={
-                    `workout-rig ${
-                      workoutSession?.phase === 'running'
+                     `workout-rig ${
+                      workoutSession?.phase === 'rep'
                         ? 'workout-rig-running'
                         : workoutSession?.phase === 'spot'
                           ? 'workout-rig-spot'
                           : workoutSession?.phase === 'resolved'
                             ? 'workout-rig-resolved'
                             : ''
+                    } ${
+                      presentationEffect?.kind === 'level-up'
+                        ? 'workout-rig-level-up'
+                        : presentationEffect?.kind === 'rep-failure'
+                          ? 'workout-rig-recoil'
+                          : presentationEffect?.kind === 'rep-success'
+                            ? 'workout-rig-cheer'
+                            : ''
                     }`
                   }
                 >
-                  <PixelCreature creature={activeBuddy.creature} />
+                  <PixelCreature
+                    cosmetics={activeBuddy.cosmetics}
+                    creature={activeBuddy.creature}
+                    pose={workoutSession ? 'training' : 'idle'}
+                    reducedMotion={save.accessibility.reducedMotion}
+                  />
                 </div>
                 <div className="active-copy">
                   <strong>{activeBuddy.nickname}</strong>
@@ -4105,136 +3916,63 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   <div>
                     Deload Tokens: {save.deloadTokens}/{WORKOUT_DELOAD_MAX}
                   </div>
-                  <div>Recovery: {activeBuddy.hp >= activeBuddy.maxHp ? 'ready' : `+${REST_ACTION_BUDDY_HEAL} at next rest`}</div>
+                  <div>Recovery: {activeBuddy.hp >= activeBuddy.maxHp ? 'ready' : `+${FATIGUE_BALANCE.restBuddyHeal} at next rest`}</div>
                   <div>Rest cooldown: {canRest ? 'Ready' : `${restCooldownSeconds}s`}</div>
                   <div>
                     Readiness state: {trainingFatigueLevel} ({percent(clamp01(1 - save.trainingFatigue / MAX_TRAINING_FATIGUE))})
                   </div>
-                  <div>XP {activeBuddy.xp}/{xpNeeded(activeBuddy.level)}</div>
+                  <div>XP {activeBuddy.xp}/{getExperienceNeeded(activeBuddy.level)}</div>
                 </div>
               </div>
-              {workoutSession && (
-                <div className="workout-console">
-                  <div className="workout-progress-row">
-                    <span className="small-note">
-                      {workoutSession.phase === 'running'
-                        ? 'Training rep in progress'
-                        : workoutSession.phase === 'spot'
-                          ? 'Rep slip detected: Spot the set'
-                          : workoutSession.willFail
-                            ? 'Spot attempt resolved'
-                            : workoutSession.phase === 'resolved'
-                              ? (activeBuddy
-                                ? `${activeBuddy.nickname} stabilized`
-                                : 'Set stabilized')
-                              : 'Set complete'}
-                    </span>
-                      <span className="small-note">
-                        Fail {percent(workoutSession.failChance)} · Spot bonus {percent(workoutSession.spotChanceBase)}
-                      </span>
-                      <span className="small-note">
-                        Readiness {percent(workoutSession.readiness)} · {workoutSession.readinessLabel}
-                      </span>
-                      <span className="small-note">
-                        Quality {percent(workoutSession.sessionQuality)} · Consistency {percent(workoutSession.movementConsistency)} · Volume {percent(
-                          workoutSession.volumePreparedness,
-                        )}
-                      </span>
-                      <span className="small-note">
-                        Load {workoutSession.loadTier.toUpperCase()} · {percent(workoutSession.loadPressure)}
-                      </span>
-                    <span className="small-note">
-                      Set strain {workoutSetStressLabel(workoutSession.setStress)} · {percent(workoutSession.setStress)}
-                    </span>
-                  </div>
-
-                  <div className="workout-meter">
-                    <div
-                      className={`workout-meter-fill ${workoutSession.phase === 'spot' ? 'workout-meter-fill-danger' : ''}`}
-                      style={{ width: `${workoutProgress}%` }}
-                    />
-                    <div className="workout-meter-cursor" />
-                  </div>
-                  <div className="workout-readiness-track">
-                    <div
-                      className="workout-readiness-fill"
-                      style={{ width: `${workoutSession.readiness * 100}%` }}
-                    />
-                  </div>
-                  <small className="small-note">
-                    Set recovery {workoutSession.staminaChange >= 0 ? '+' : ''}
-                    {workoutSession.staminaChange} HP expected ·
-                    {workoutSession.readiness >= 0.68 ? ' Balanced form' : ' Form drift risk'}
-                  </small>
-
-                  {workoutSession.phase === 'running' && (
-                    <>
-                      <small className="small-note">
-                         Hold steady: {Math.max(0, Math.ceil((workoutSession.startedAt + WORKOUT_DURATION_MS - workoutFrame) / 1000))}s
-                      </small>
-                      {workoutSession.willFail && (
-                        <small className="small-note warning">Risk window opens soon — form is weakening.</small>
-                      )}
-                    </>
-                  )}
-
-                  {workoutSession.phase === 'spot' && (
-                    <div className="workout-spot-wrap">
-                      <div className="workout-spot-meter">
-                        <div
-                          className="workout-spot-meter-window"
-                          style={{
-                            left: `${Math.max(0, Math.min(100, (workoutSpotRemainingMs / workoutSession.spotWindowMs) * 100))}%`,
-                          }}
-                        />
-                        <div
-                          className="workout-spot-meter-pin"
-                          style={{ left: `${Math.max(0, Math.min(100, ((workoutSession.spotWindowMs - workoutSpotRemainingMs) / workoutSession.spotWindowMs) * 100))}%` }}
-                        />
-                      </div>
-                      <div className="workout-spot-action">
-                        <button
-                          className="secondary-btn trainer-spot-btn"
-                          onClick={spotWorkout}
-                          disabled={!canSpot}
-                        >
-                          {canSpot ? 'Rush + Spot Now' : 'Too Late'}
-                        </button>
-                          <small className="small-note">
-                          Window left: {Math.max(0, Math.ceil(workoutSpotRemainingMs / 100) / 10)}s — Spot success {percent(
-                            workoutSpotSuccessChance(workoutSpotRemainingMs, workoutSession.spotChanceBase, workoutSession.zoneType),
-                          )}
-                        </small>
-                        <small className="small-note warning">
-                          Need to click while phase is active. Miss window → +fatigue + HP drop.
-                        </small>
-                      </div>
-                      <div className="trainer-spot-callout">
-                        <div className="trainer-spot-sprite" aria-hidden="true">
-                          <span>🏋️</span>
-                        </div>
-                        <p>Trainer is sprinting to spot.</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+              {buddyCustomizationOpen ? (
+                <BuddyCustomizer
+                  buddy={activeBuddy}
+                  onChange={(updatedBuddy) =>
+                    setSave((state) => ({
+                      ...state,
+                      team: state.team.map((entry) =>
+                        entry.id === updatedBuddy.id ? updatedBuddy : entry,
+                      ),
+                    }))
+                  }
+                  onClose={() => setBuddyCustomizationOpen(false)}
+                  reducedMotion={save.accessibility.reducedMotion}
+                />
+              ) : null}
+              {workoutPreview && (
+                <WorkoutMiniGame
+                  canStart={
+                    Boolean(activeBuddy && activeMachine) &&
+                    !encounter &&
+                    !match &&
+                    !workoutSession &&
+                    activeBuddy.hp > Math.max(1, -workoutPreview.expectedHpChange)
+                  }
+                  frame={workoutFrame}
+                  keyboardBindings={save.input.keyboardBindings}
+                  paused={gameplayPaused}
+                  preview={workoutPreview}
+                  selectedLoad={selectedWorkoutLoad}
+                  session={workoutSession}
+                  onAction={performWorkoutAction}
+                  onSelectLoad={setSelectedWorkoutLoad}
+                  onStart={sendToWorkout}
+                />
               )}
               <div className="action-row">
+                <button
+                  className="secondary-btn"
+                  onClick={() =>
+                    setBuddyCustomizationOpen((open) => !open)
+                  }
+                  type="button"
+                >
+                  {buddyCustomizationOpen
+                    ? 'Close Buddy Style'
+                    : 'Customize Buddy'}
+                </button>
                 <button className="secondary-btn" onClick={recoverWithRest} disabled={!canRest}>
                   Recover
-                </button>
-                <button
-                  className="primary-btn"
-                  onClick={sendToWorkout}
-                  disabled={
-                    !activeBuddy ||
-                    !!encounter ||
-                    !!match ||
-                    !!workoutSession ||
-                    !activeMachine
-                  }
-                >
-                  Train (+XP)
                 </button>
                 <button
                   className="primary-btn"
@@ -4261,11 +3999,18 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
         <section className="panel">
           <h2>Capture Arena</h2>
           {!encounter ? (
-            <p className="small-note">No encounter active. Move to a gym and press Scout or wait for a boss timer.</p>
+            <p className="small-note">
+              No encounter active. Scout a route or answer a ready boss
+              challenge from the current gym.
+            </p>
           ) : (
             <>
               <div
-                className={`combat-stage ${
+                className={`combat-stage combat-speed-${captureSpeed.id} ${
+                  captureAnimation
+                    ? `combat-beat-${captureAnimation.tone} combat-move-${captureAnimation.moveId}`
+                    : ''
+                } ${
                   encounter.isBoss
                     ? `combat-stage-boss ${
                         isMatchChallengeForcedRecovery
@@ -4279,29 +4024,152 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                               : isMatchChallengeAligned
                                 ? 'combat-stage-lock'
                                 : ''
-                      } ${isMatchChallengeInDanger ? 'combat-stage-danger' : ''} `
+                      } ${isMatchChallengeInDanger ? 'combat-stage-danger' : ''} ${
+                        encounterBoss
+                          ? `boss-arena-${encounterBoss.arenaEffect.className}`
+                          : ''
+                      }`
                     : ''
                 }`}
               >
+                {bossEntrance ? (
+                  <div
+                    className="boss-entrance"
+                    role="status"
+                    style={{
+                      '--boss-entrance-ms': `${bossEntranceDuration}ms`,
+                    } as Record<string, string>}
+                  >
+                    <span className="boss-entrance-kicker">Challenge line opens</span>
+                    <strong>{bossEntrance.bossName}</strong>
+                    <small>{bossEntrance.gymName} · {bossEntrance.signature}</small>
+                    <button type="button" onClick={skipPresentationSequence}>
+                      Skip entrance
+                    </button>
+                  </div>
+                ) : null}
                 <div className="combat-row">
-                  <div className={`combat-figure ${encounter.isBoss ? 'combat-figure-fighter' : ''}`}>
-                    {activeBuddy ? <PixelCreature creature={activeBuddy.creature} /> : <span>None</span>}
+                  <div
+                    className={`combat-figure ${encounter.isBoss ? 'combat-figure-fighter' : ''} ${capturePlayerReactionClass}`}
+                  >
+                    {activeBuddy ? (
+                      <PixelCreature
+                        animated
+                        cosmetics={activeBuddy.cosmetics}
+                        creature={activeBuddy.creature}
+                        pose={
+                          match?.status === 'captured'
+                            ? 'victory'
+                            : captureAnimation
+                              ? 'capture'
+                              : 'idle'
+                        }
+                        reducedMotion={save.accessibility.reducedMotion}
+                      />
+                    ) : <span>None</span>}
                     <span>You</span>
                   </div>
                   <div className="combat-vs">VS</div>
-                  <div className={`combat-figure ${encounter.isBoss ? 'combat-figure-opponent' : ''}`}>
-                    <PixelCreature creature={encounter.creature} />
+                  <div
+                    className={`combat-figure ${encounter.isBoss ? 'combat-figure-opponent' : ''} ${captureOpponentReactionClass}`}
+                  >
+                    <PixelCreature
+                      animationCueId={
+                        encounter.isBoss &&
+                        (match?.status === 'escape' ||
+                          match?.status === 'failed-pin' ||
+                          match?.status === 'near-capture')
+                          ? encounterBossCharacterDesign?.victoryAnimationId
+                          : encounterBossCharacterDesign?.entranceAnimationId
+                      }
+                      animated
+                      cosmetics={encounterBossCosmetics}
+                      creature={encounter.creature}
+                      pose={
+                        encounter.isBoss &&
+                        (match?.status === 'escape' ||
+                          match?.status === 'failed-pin' ||
+                          match?.status === 'near-capture')
+                          ? 'victory'
+                          : match?.status === 'captured' ||
+                              match?.status === 'full-party'
+                            ? 'capture'
+                            : encounter.isBoss
+                              ? 'entrance'
+                              : 'idle'
+                      }
+                      reducedMotion={save.accessibility.reducedMotion}
+                    />
                     <span>{encounter.creature.name}</span>
                   </div>
                 </div>
+                {captureAnimation ? (
+                  <button
+                    type="button"
+                    className="combat-skip-effect"
+                    onClick={skipPresentationSequence}
+                  >
+                    Skip impact
+                  </button>
+                ) : null}
 
                 <div className="encounter-data">
                   <div>Location: {zoneNames[encounter.zoneId]}</div>
                   <div>
                     Lv {encounter.level} · {encounter.isBoss ? 'Boss' : 'Wild'}{' '}
-                    {encounter.bossName ? `(${encounter.bossName})` : ''} · Catch Chance {percent(encounter.catchChance)}
+                    {encounter.bossName ? `(${encounter.bossName})` : ''} · Capture outlook{' '}
+                    {encounter.catchChance >= 0.84
+                      ? 'open'
+                      : encounter.catchChance >= 0.7
+                        ? 'contested'
+                        : 'guarded'}
                     {encounter.creature.isExotic ? ' (Exotic)' : ''}
                   </div>
+                  <small>
+                    Discipline: {encounter.creature.primaryDiscipline}
+                    {encounter.creature.secondaryDiscipline
+                      ? ` / ${encounter.creature.secondaryDiscipline}`
+                      : ''}
+                    {' · '}Zone pressure: {encounterZone.type}
+                  </small>
+                  {encounterBoss ? (
+                    <div className="boss-dossier">
+                      <strong>
+                        {encounterBoss.name} · {encounterBoss.arenaEffect.name}
+                      </strong>
+                      <span>{encounterBoss.visualIdentity}</span>
+                      <small>{encounterBoss.personality}</small>
+                      <small>
+                        Preferred tactic: {MOVES.find((move) => move.id === encounterBoss.preferredTactic)?.title}
+                        {' · '}Counterplay: {encounterBoss.counterplay}
+                      </small>
+                      <small>
+                        Signature: {encounterBoss.signatureRule.name} ·{' '}
+                        {encounterBoss.signatureRule.warning}
+                      </small>
+                      {encounterBossCharacterDesign ? (
+                        <>
+                          <small>
+                            Build: {encounterBossCharacterDesign.buildLabel} ·{' '}
+                            {encounterBossCharacterDesign.battleStance}
+                          </small>
+                          <small>
+                            Philosophy: {encounterBossCharacterDesign.trainingPhilosophy}
+                          </small>
+                          <small>
+                            Signature gear: {encounterBossCharacterDesign.signatureClothing} ·{' '}
+                            {encounterBossCharacterDesign.signatureEquipment}
+                          </small>
+                        </>
+                      ) : null}
+                      <small>
+                        Victory rewards: {encounterBoss.rewardTable.buddyXp} XP ·{' '}
+                        {encounterBoss.rewardTable.fatigueRecovery} recovery ·{' '}
+                        {encounterBoss.rewardTable.momentum} momentum ·{' '}
+                        {encounterBoss.rewardTable.deloadTokens} guaranteed Deload
+                      </small>
+                    </div>
+                  ) : null}
                   {encounter.isBoss && encounterChallengeMachine ? (
                     <small>
                       Machine challenge: {encounterChallengeMachine.name} · Challenge bonus {encounterMachineBonus >= 0 ? '+' : ''}
@@ -4326,13 +4194,29 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                       Trainer power {encounterTrainerPressure} · Buddy power {encounterBuddyPressure}
                     </small>
                   ) : null}
+                  {match?.status === 'playing' ? (
+                    <div className="opponent-tell" role="status" aria-live="polite">
+                      <strong>Opponent tell · {match.opponentIntent.tendencyLabel}</strong>
+                      <span>{match.opponentIntent.tell}</span>
+                      <small>
+                        Read: {match.opponentIntent.confidence === 'clear' ? 'clear' : 'mixed'}.
+                        Predictions show matchup direction, never the hidden roll.
+                      </small>
+                    </div>
+                  ) : null}
                   {match?.isBossChallengeActive && match.encounter?.isBoss ? (
                     <small>
                       Challenge misses: {match.bossChallengeMisses} · Near misses: {match.bossChallengeNearMisses} ·
-                      Required machine: {match.bossChallengeMachineName ?? 'locked'}
+                      Required action: {match.bossChallengeMachineName ?? 'locked'} +{' '}
+                      {match.encounter.bossRequiredMoveName ?? 'announced move'}
                     </small>
                   ) : null}
-                  {isMatchChallengeOverload ? <small>Boss challenge overload: return to required machine immediately.</small> : null}
+                  {isMatchChallengeOverload ? (
+                    <small>
+                      Boss challenge overload: complete the required
+                      machine-and-move action immediately.
+                    </small>
+                  ) : null}
                   {isMatchChallengeForcedRecovery ? (
                     <small className="overload-action-callout">
                       Forced recovery lock: every non-required move increases pressure and fatigue.
@@ -4345,7 +4229,14 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                     </small>
                   ) : null}
                   {match?.encounter?.isBoss && match.isBossChallengeActive ? (
-                    <div className="challenge-stress-track">
+                    <div
+                      className="challenge-stress-track"
+                      role="meter"
+                      aria-label={`Boss challenge stress: ${activeMatchChallengeStress.percent} percent, ${activeMatchChallengeStress.label}`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={activeMatchChallengeStress.percent}
+                    >
                       <div
                         className={`challenge-stress-fill challenge-stress-${activeMatchChallengeStress.tone}`}
                         style={{ width: `${activeMatchChallengeStress.percent}%` }}
@@ -4357,12 +4248,39 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
 
               {!match ? (
                 <button className="primary-btn" onClick={startMatch}>
-                  Go flat and arm wrestle
+                  Take the Rally Grip
                 </button>
               ) : (
                 <>
-                  <div className="meter-track">
+                  <div className="capture-stamina-grid" aria-label="Capture stamina">
+                    <div>
+                      <span>Team stamina {match.playerStamina}</span>
+                      <div className="capture-stamina-track">
+                        <div
+                          className="capture-stamina-fill capture-stamina-player"
+                          style={{ width: `${match.playerStamina}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <span>Wild stamina {match.opponentStamina}</span>
+                      <div className="capture-stamina-track">
+                        <div
+                          className="capture-stamina-fill capture-stamina-wild"
+                          style={{ width: `${match.opponentStamina}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                   <div
+                    className="meter-track"
+                    role="meter"
+                    aria-label={`Control meter. ${match.meter} percent. Secure control begins at ${activeMatchCaptureTarget} percent.`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={match.meter}
+                  >
+                    <div
                       className={`meter-fill ${
                         match.encounter.isBoss
                           ? isMatchChallengeOverload
@@ -4382,24 +4300,63 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                       }`}
                       style={{ width: `${match.meter}%` }}
                     />
+                    <div
+                      className="meter-capture-zone"
+                      style={{
+                        left: `${activeMatchCaptureTarget}%`,
+                        width: `${100 - activeMatchCaptureTarget}%`,
+                      }}
+                    />
+                    <div
+                      className="meter-capture-threshold"
+                      style={{ left: `${activeMatchCaptureTarget}%` }}
+                    />
                     <div className="meter-center" />
                     <div className="meter-pin" />
                   </div>
-                  <div className="small-note">Round {match.round}/{match.maxRounds}</div>
+                  <div className="capture-round-row">
+                    <span>Round {match.round}/{match.maxRounds}</span>
+                    <span>
+                      Control {match.meter}% · secure at {activeMatchCaptureTarget}%
+                    </span>
+                  </div>
 
                   {match.status === 'playing' && (
-                    <div className="action-grid">
-                      {MOVES.map((move) => (
-                        <button
-                          key={move.id}
-                          className={`primary-btn ${isMatchChallengeForcedRecovery ? 'combat-move-recovery' : ''}`}
-                          onClick={() => performMove(move)}
-                          disabled={isMatchChallengeOverload && !isMatchChallengeAligned}
-                        >
-                          <span>{move.title}</span>
-                          <small>{move.tactic}</small>
-                        </button>
-                      ))}
+                    <div className="capture-move-grid">
+                      {MOVES.map((move, index) => {
+                        const prediction = captureMovePredictions.get(move.id);
+                        return (
+                          <button
+                            key={move.id}
+                            className={`capture-move-btn capture-forecast-${prediction?.advantage ?? 'even'} ${
+                              isMatchChallengeForcedRecovery
+                                ? 'combat-move-recovery'
+                                : ''
+                            }`}
+                            onClick={() => performMove(move)}
+                            disabled={
+                              Boolean(captureAnimation) ||
+                              Boolean(
+                                isMatchChallengeOverload &&
+                                  !isMatchChallengeAligned,
+                              )
+                            }
+                            aria-keyshortcuts={`${index + 1}`}
+                          >
+                            <span className="capture-move-heading">
+                              <strong>{index + 1}. {move.title}</strong>
+                              <span>{prediction?.advantage ?? 'even'}</span>
+                            </span>
+                            <small>{move.summary}</small>
+                            <span className="capture-move-economy">
+                              Cost {move.staminaCost} · after {prediction?.staminaAfter ?? match.playerStamina}
+                            </span>
+                            <span className="capture-move-reason">
+                              {prediction?.reasons.join(' · ') ?? move.tactic}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -4410,27 +4367,93 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
                   </div>
 
                   {match.status !== 'playing' && (
-                    <div className="result-block">
-                      {match.status === 'won' && <p className="crying">Creature is crying like a baby.</p>}
+                    <div
+                      className={`result-block capture-result capture-result-${match.status}`}
+                      role="status"
+                    >
+                      {['near-capture', 'captured', 'full-party', 'pin-win'].includes(
+                        match.status,
+                      ) ? (
+                        <span className="capture-result-kicker">Pin win</span>
+                      ) : null}
+                      <h3>
+                        {match.status === 'captured'
+                          ? 'Successful capture'
+                          : match.status === 'full-party'
+                            ? 'Full-party capture'
+                            : match.status === 'near-capture'
+                              ? 'Near-capture'
+                              : match.status === 'failed-pin'
+                                ? 'Failed pin'
+                                : match.status === 'escape'
+                                  ? 'Opponent escaped'
+                                  : 'Pin won'}
+                      </h3>
                       <p>
-                        {match.status === 'won'
-                          ? 'Capture complete.'
-                          : match.status === 'full'
-                            ? 'Team full.'
-                            : match.status === 'escape'
-                              ? 'Escaped.'
-                              : 'Not caught.'}
+                        {match.status === 'captured'
+                          ? 'The challenge bond is complete.'
+                          : match.status === 'full-party'
+                            ? match.pendingCapturedBuddy
+                              ? 'Choose a party slot to rotate, or let the captured Buddy return safely.'
+                              : 'The capture was recorded and the party remains unchanged.'
+                            : match.status === 'near-capture'
+                              ? 'You secured the pin, but the final invitation did not hold.'
+                              : match.status === 'failed-pin'
+                                ? `Control did not reach the ${activeMatchCaptureTarget}% secure line.`
+                                : match.status === 'escape'
+                                  ? 'Control fell far enough for the wild Buddy to break away.'
+                                  : 'The control count is complete.'}
                       </p>
-                      <button
-                        className="secondary-btn"
-                        onClick={() => {
-                          setMatch(null);
-                          setEncounter(null);
-                          setMessage('Arena reset. Scout again when ready.');
-                        }}
-                      >
-                        Continue
-                      </button>
+                      {match.status === 'full-party' &&
+                      match.pendingCapturedBuddy ? (
+                        <div
+                          className="capture-party-choice"
+                          aria-label="Choose a Buddy to rotate out"
+                        >
+                          <strong>
+                            Place {match.pendingCapturedBuddy.nickname}
+                          </strong>
+                          <div className="capture-party-grid">
+                            {save.team.map((buddy, index) => (
+                              <button
+                                key={buddy.id}
+                                type="button"
+                                className="capture-party-slot"
+                                onClick={() =>
+                                  replacePartySlotAfterCapture(index)
+                                }
+                              >
+                                <span>Replace slot {index + 1}</span>
+                                <strong>{buddy.nickname}</strong>
+                                <small>
+                                  {buddy.creature.name} · Lv {buddy.level}
+                                  {save.activeIndex === index
+                                    ? ' · Active'
+                                    : ''}
+                                </small>
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            className="secondary-btn"
+                            onClick={releaseFullPartyCapture}
+                          >
+                            Let captured Buddy return to the route
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="secondary-btn"
+                          onClick={() => {
+                            setMatch(null);
+                            setEncounter(null);
+                            setMessage('Arena reset. Scout again when ready.');
+                          }}
+                        >
+                          Continue
+                        </button>
+                      )}
                     </div>
                   )}
                 </>
@@ -4440,23 +4463,11 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
         </section>
 
         <section className="panel">
-          <h2>Gym Buddy Index</h2>
-          <div className="dex-list">
-            {CREATURES.map((creature) => {
-              const seen = seenDex.includes(creature.dex);
-              const caught = caughtDex.includes(creature.dex);
-              return (
-                <div key={creature.dex} className={`dex-item ${seen ? 'seen' : ''}`}>
-                  <span className="dex-num">#{String(creature.dex).padStart(3, '0')}</span>
-                  <div>
-                    {seen ? creature.name : 'Unknown'}
-                    <small>{caught ? 'Caught' : seen ? 'Seen' : 'Hidden'}</small>
-                    <small>{creature.isExotic ? ' / Exotic' : ''}</small>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <BuddyIndex
+            species={CREATURES}
+            seenDex={save.seenDex}
+            caughtDex={save.caughtDex}
+          />
 
           <h3>Log</h3>
           <ul className="log-list">
@@ -4470,6 +4481,11 @@ function resolveMatch(meter: number, playerWonLine: string[]) {
       <footer className="status-bar">
         <strong>Broadcast:</strong> {message}
       </footer>
+      <JourneyRestartDialog
+        onCancel={() => setRestartConfirmationOpen(false)}
+        onConfirm={restartOpeningProcess}
+        open={restartConfirmationOpen}
+      />
     </div>
   );
 }

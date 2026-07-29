@@ -4,8 +4,8 @@ import { assertGameContentValid } from './src/game/content/validation';
 
 assertGameContentValid();
 
-export default defineConfig({
-  base: './',
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/GymBuddies/' : '/',
   plugins: [react()],
   css: {
     postcss: {
@@ -14,6 +14,6 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    emptyOutDir: true
-  }
-});
+    emptyOutDir: true,
+  },
+}));

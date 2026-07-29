@@ -1,19 +1,29 @@
-export type MusicZoneState = 'home' | 'ambient' | 'fight' | 'boss';
+export type RetroWaveform = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
-export type MusicIntensity = 'home' | 'starter' | 'higher';
+export type MusicTrackId =
+  | 'home-gym'
+  | 'route-exploration'
+  | 'wild-encounter'
+  | 'boss-challenge'
+  | 'training';
 
 export type AudioCueId =
   | 'train'
-  | 'steroid'
-  | 'matchStart'
-  | 'moveGood'
-  | 'moveBad'
-  | 'catchAlmost'
-  | 'catchWin'
-  | 'bossAlert'
-  | 'teamFull'
-  | 'escape'
-  | 'zoneShift';
+  | 'rep-success'
+  | 'rep-failure'
+  | 'spot-now'
+  | 'capture-success'
+  | 'capture-failure'
+  | 'level-up'
+  | 'rare-encounter'
+  | 'menu-navigate'
+  | 'route-transition'
+  | 'wild-alert'
+  | 'boss-alert'
+  | 'capture-advance'
+  | 'capture-resisted'
+  | 'team-full'
+  | 'recovery';
 
 export type SaveAudioSettings = {
   enabled: boolean;
@@ -21,35 +31,53 @@ export type SaveAudioSettings = {
   sfxVolume: number;
 };
 
+export type AudioToneDefinition = {
+  frequency: number;
+  durationMs: number;
+  gain: number;
+  wave: RetroWaveform;
+  offsetMs?: number;
+  slideToFrequency?: number;
+};
+
 export type AudioCueDefinition = {
   id: AudioCueId;
   label: string;
+  description: string;
+  tones: AudioToneDefinition[];
 };
 
-export type MusicProfile = {
-  id: MusicIntensity;
-  ambient: number[];
-  scout: number[];
-  boss: number[];
-  interval: number;
+export type MusicPatternStep = {
+  tones: AudioToneDefinition[];
+};
+
+export type MusicTrackDefinition = {
+  id: MusicTrackId;
+  label: string;
+  description: string;
+  stepMs: number;
+  steps: MusicPatternStep[];
+};
+
+export type AudioEngineSnapshot = {
+  supported: boolean;
+  unlocked: boolean;
+  enabled: boolean;
+  hidden: boolean;
+  disposed: boolean;
+  currentTrackId: MusicTrackId | null;
+  activeNodeCount: number;
+  musicLoopStarts: number;
 };
 
 export type AudioEngine = {
-  context: AudioContext;
-  masterGain: GainNode;
-  musicGain: GainNode;
-  sfxGain: GainNode;
-  musicTicker: ReturnType<typeof setInterval> | null;
-  enabled: boolean;
-  zone: MusicZoneState;
-  intensity: MusicIntensity;
-  step: number;
-  stepNotes: number[];
-  setEnabled: (value: boolean) => void;
+  unlock: () => Promise<boolean>;
+  setEnabled: (enabled: boolean) => void;
   setVolumes: (music: number, sfx: number) => void;
-  startMusic: (zone: MusicZoneState, intensity: MusicIntensity) => void;
+  setMusic: (trackId: MusicTrackId) => void;
   stopMusic: () => void;
-  pulseTone: (frequency: number, duration: number, gain: number, wave?: OscillatorType) => void;
-  emitSfx: (event: AudioCueId, intensity?: number) => void;
+  emitSfx: (cueId: AudioCueId, intensity?: number) => void;
+  setPageHidden: (hidden: boolean) => void;
+  getSnapshot: () => AudioEngineSnapshot;
   dispose: () => void;
 };

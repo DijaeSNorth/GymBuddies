@@ -1,0 +1,26 @@
+{
+  "id": "./",
+  "name": "Gym Buddies",
+  "short_name": "Gym Buddies",
+  "description": "An original creature-collection fitness RPG.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#061519",
+  "theme_color": "#061519",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
