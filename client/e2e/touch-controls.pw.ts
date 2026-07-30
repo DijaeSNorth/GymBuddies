@@ -5,6 +5,7 @@ import {
   collectRuntimeErrors,
   expectHealthyGameShell,
   startWithCurrentSave,
+  startWithEmptyStorage,
 } from './support/gameTestSupport';
 
 test('touch movement, menus, and Buddy styling work on a phone viewport', async ({
@@ -57,5 +58,54 @@ test('touch movement, menus, and Buddy styling work on a phone viewport', async 
   await expect(
     page.locator('.buddy-customizer .buddy-pixel-canvas'),
   ).toBeVisible();
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('Trainer Forge stays usable at a 390 by 844 phone viewport', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startWithEmptyStorage(page);
+  const runtimeErrors = collectRuntimeErrors(page);
+
+  await page.goto('/');
+  await expectHealthyGameShell(page);
+  const forge = page.locator('.trainer-studio-v2');
+  await expect(forge).toBeVisible();
+  await page.getByRole('button', { name: /Detail Forge/i }).tap();
+  await page.getByRole('tab', { name: 'Upper Body' }).tap();
+  const latControl = page.locator('#trainer-build-latWidth');
+  await latControl.scrollIntoViewIfNeeded();
+  await latControl.fill('10');
+  await expect(latControl).toHaveValue('10');
+
+  await page.getByRole('button', { name: 'Front / Back' }).tap();
+  await expect(page.getByText('Front', { exact: true })).toBeVisible();
+  await expect(page.getByText('Back', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'In-Game Size' }).tap();
+
+  const layout = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    pageWidth: document.documentElement.scrollWidth,
+    forgeWidth:
+      document.querySelector('.trainer-studio-v2')?.getBoundingClientRect()
+        .width ?? Number.POSITIVE_INFINITY,
+    smallestTarget: Math.min(
+      ...Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '.trainer-preview-tool-strip button',
+        ),
+      )
+        .filter((element) => element.offsetParent !== null)
+        .map((element) => element.getBoundingClientRect().height),
+    ),
+  }));
+  expect(layout.pageWidth).toBeLessThanOrEqual(layout.viewportWidth);
+  expect(layout.forgeWidth).toBeLessThanOrEqual(layout.viewportWidth);
+  expect(layout.smallestTarget).toBeGreaterThanOrEqual(38);
+  await page.screenshot({
+    path: testInfo.outputPath('trainer-forge-390x844.png'),
+    fullPage: false,
+  });
   expect(runtimeErrors).toEqual([]);
 });

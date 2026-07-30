@@ -106,7 +106,11 @@ export function BuddyIndex({
                   <span className="dex-num">{indexNumber(entry.dex)}</span>
                   <span className="dex-miniature" aria-hidden={!isSeen}>
                     {isSeen ? (
-                      <BuddySprite creature={entry} compact />
+                      <BuddySprite
+                        creature={entry}
+                        compact
+                        presentationContext="menu"
+                      />
                     ) : (
                       <span className="dex-unknown">?</span>
                     )}
@@ -144,7 +148,11 @@ export function BuddyIndex({
             <>
               <div className="buddy-index-profile">
                 <div className="buddy-index-sprite-stage">
-                  <BuddySprite creature={selected} compact />
+                  <BuddySprite
+                    creature={selected}
+                    compact
+                    presentationContext="menu"
+                  />
                 </div>
                 <div>
                   <span className="dex-num">{indexNumber(selected.dex)}</span>

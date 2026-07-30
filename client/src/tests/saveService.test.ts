@@ -9,6 +9,10 @@ import {
   SAVE_KEY,
 } from '../game/content/save';
 import { createRepresentativeTestSaves } from '../game/debug/representativeSaves';
+import {
+  DEFAULT_TRAINER_APPEARANCE,
+  TRAINER_BUILD_ATTRIBUTES,
+} from '../game/content/trainerAppearance';
 import { remapKeyboardBinding } from '../game/input/actionMap';
 import { createDefaultSaveData } from '../game/save/saveDefaults';
 import {
@@ -54,6 +58,91 @@ function representativeJson(id: string) {
 }
 
 describe('versioned save migrations', () => {
+  it('migrates v18 Buddy cosmetics to species-safe v2 defaults', () => {
+    const current = createDefaultSaveData();
+    const legacy = JSON.parse(JSON.stringify(current)) as Record<string, any>;
+    legacy.schemaVersion = 18;
+    legacy.version = 'v18';
+    legacy.team[0].cosmetics.version = 1;
+    delete legacy.team[0].cosmetics.physiquePresetId;
+    delete legacy.team[0].cosmetics.physique;
+    const originalPower = legacy.team[0].creature.power;
+
+    const imported = importSaveJson(JSON.stringify(legacy));
+
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.appliedMigrations).toEqual(['v18-to-v19']);
+    expect(imported.save.team[0]!.cosmetics?.version).toBe(2);
+    expect(imported.save.team[0]!.cosmetics?.physiquePresetId).toContain(
+      imported.save.team[0]!.creature.id,
+    );
+    expect(imported.save.team[0]!.cosmetics?.physique).toBeDefined();
+    expect(imported.save.team[0]!.creature.power).toBe(originalPower);
+  });
+
+  it('migrates v17 to visual progression without changing the trainer appearance', () => {
+    const current = createDefaultSaveData();
+    const legacy = JSON.parse(JSON.stringify(current)) as Record<string, any>;
+    const appearance = structuredClone(legacy.trainer.appearance);
+    legacy.schemaVersion = 17;
+    legacy.version = 'v17';
+    delete legacy.visualProgression;
+
+    const imported = importSaveJson(JSON.stringify(legacy));
+
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.appliedMigrations).toEqual([
+      'v17-to-v18',
+      'v18-to-v19',
+    ]);
+    expect(imported.save.schemaVersion).toBe(19);
+    expect(imported.save.trainer.appearance).toEqual(appearance);
+    expect(imported.save.visualProgression.baselineAppearance).toEqual(
+      appearance,
+    );
+    expect(imported.save.visualProgression.development.chest).toBe(0);
+    expect(imported.save.visualProgression.preferences.developmentLevel).toBe(
+      'standard',
+    );
+  });
+
+  it('migrates a v16 trainer appearance to v3 without changing progression', () => {
+    const current = createDefaultSaveData();
+    const legacy = JSON.parse(JSON.stringify(current)) as Record<string, any>;
+    legacy.schemaVersion = 16;
+    legacy.version = 'v16';
+    legacy.trainingFatigue = 43;
+    legacy.trainer.appearance.version = 2;
+    legacy.trainer.appearance.build.shoulderWidth = 9;
+    for (const attribute of TRAINER_BUILD_ATTRIBUTES.slice(22)) {
+      delete legacy.trainer.appearance.build[attribute.id];
+    }
+    delete legacy.trainer.appearance.outfit.logoShapeId;
+    delete legacy.trainer.appearance.outfit.chalkMarksId;
+    delete legacy.trainer.appearance.colors.trimColorId;
+    delete legacy.trainer.appearance.colors.logoColorId;
+    delete legacy.trainer.appearance.accessories.towelId;
+
+    const imported = importSaveJson(JSON.stringify(legacy));
+
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.appliedMigrations).toEqual([
+      'v16-to-v17',
+      'v17-to-v18',
+      'v18-to-v19',
+    ]);
+    expect(imported.save.schemaVersion).toBe(19);
+    expect(imported.save.trainer.appearance.version).toBe(3);
+    expect(imported.save.trainer.appearance.build.shoulderWidth).toBe(9);
+    expect(imported.save.trainer.appearance.build.latWidth).toBe(
+      DEFAULT_TRAINER_APPEARANCE.build.latWidth,
+    );
+    expect(imported.save.trainingFatigue).toBe(43);
+  });
+
   it('migrates a v14 flat-color trainer into stable cosmetic option IDs', () => {
     const current = createDefaultSaveData();
     const legacyTrainer = {
@@ -81,11 +170,14 @@ describe('versioned save migrations', () => {
     expect(imported.appliedMigrations).toEqual([
       'v14-to-v15',
       'v15-to-v16',
+      'v16-to-v17',
+      'v17-to-v18',
+      'v18-to-v19',
     ]);
-    expect(imported.save.schemaVersion).toBe(16);
-    expect(imported.save.team.every((buddy) => buddy.cosmetics?.version === 1))
+    expect(imported.save.schemaVersion).toBe(19);
+    expect(imported.save.team.every((buddy) => buddy.cosmetics?.version === 2))
       .toBe(true);
-    expect(imported.save.trainer.appearance.version).toBe(2);
+    expect(imported.save.trainer.appearance.version).toBe(3);
     expect(imported.save.trainer.appearance.colors.skinToneId).toBeTruthy();
     expect(imported.save.trainer.appearance.hair.colorId).toBeTruthy();
     expect(imported.save.trainer.appearancePresets).toEqual([]);
@@ -117,8 +209,13 @@ describe('versioned save migrations', () => {
 
     expect(imported.ok).toBe(true);
     if (!imported.ok) return;
-    expect(imported.appliedMigrations).toEqual(['v15-to-v16']);
-    expect(imported.save.team[0]!.cosmetics?.version).toBe(1);
+    expect(imported.appliedMigrations).toEqual([
+      'v15-to-v16',
+      'v16-to-v17',
+      'v17-to-v18',
+      'v18-to-v19',
+    ]);
+    expect(imported.save.team[0]!.cosmetics?.version).toBe(2);
     expect(imported.save.team[0]!.level).toBe(original.level);
     expect(imported.save.team[0]!.xp).toBe(original.xp);
     expect(imported.save.team[0]!.form).toBe(original.form);
@@ -147,6 +244,9 @@ describe('versioned save migrations', () => {
       'v13-to-v14',
       'v14-to-v15',
       'v15-to-v16',
+      'v16-to-v17',
+      'v17-to-v18',
+      'v18-to-v19',
     ]);
     expect(imported.save.accessibility).toEqual({
       ...legacyAccessibility,
@@ -178,9 +278,9 @@ describe('versioned save migrations', () => {
     expect(result.source).toBe('legacy-v12');
     expect(result.recovered).toBe(true);
     expect(result.canAutosave).toBe(true);
-    expect(result.save.schemaVersion).toBe(16);
-    expect(result.save.version).toBe('v16');
-    expect(result.save.trainer.appearance.version).toBe(2);
+    expect(result.save.schemaVersion).toBe(19);
+    expect(result.save.version).toBe('v19');
+    expect(result.save.trainer.appearance.version).toBe(3);
     expect(result.save.accessibility).toEqual({
       reducedMotion: true,
       screenShake: false,
@@ -219,6 +319,9 @@ describe('versioned save migrations', () => {
       'v13-to-v14',
       'v14-to-v15',
       'v15-to-v16',
+      'v16-to-v17',
+      'v17-to-v18',
+      'v18-to-v19',
     ]);
     expect(imported.issues.length).toBeGreaterThan(0);
     expect(imported.save.team).toHaveLength(1);

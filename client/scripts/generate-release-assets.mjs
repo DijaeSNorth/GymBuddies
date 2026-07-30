@@ -146,22 +146,38 @@ copyFileSync(
   resolve(buildRoot, publicAssetManifestPath),
 );
 
-const filesToCache = listBuildFiles().filter((path) => path !== 'sw.js');
+const releaseFiles = listBuildFiles().filter((path) => path !== 'sw.js');
+const deferredAssetPaths = new Set(
+  assetManifest.assets
+    .filter(
+      (asset) =>
+        asset.loadGroup &&
+        asset.loadGroup !== 'core',
+    )
+    .map((asset) => `${assetManifest.basePath}/${asset.path}`),
+);
+const filesToCache = releaseFiles.filter(
+  (path) => !deferredAssetPaths.has(path),
+);
 const releaseHash = createHash('sha256');
 releaseHash.update(packageJson.version);
 releaseHash.update(deployment.basePath);
-for (const path of filesToCache) {
+for (const path of releaseFiles) {
   releaseHash.update(path);
   releaseHash.update(readFileSync(resolve(buildRoot, path)));
 }
 const cacheVersion = releaseHash.digest('hex').slice(0, 16);
 const cacheName = `gym-buddies-core-${cacheVersion}`;
 const precacheUrls = filesToCache.map((path) => `./${path}`);
+const deferredUrls = [...deferredAssetPaths]
+  .filter((path) => releaseFiles.includes(path))
+  .map((path) => `./${path}`);
 
 const serviceWorker = `/* Gym Buddies ${packageJson.version}; cache ${cacheVersion}. */
 const CACHE_PREFIX = 'gym-buddies-core-';
 const CACHE_NAME = ${JSON.stringify(cacheName)};
 const PRECACHE_URLS = ${JSON.stringify(precacheUrls, null, 2)};
+const DEFERRED_URLS = new Set(${JSON.stringify(deferredUrls, null, 2)}.map((path) => new URL(path, self.registration.scope).href));
 const OFFLINE_DOCUMENT = new URL('./index.html', self.registration.scope).href;
 
 self.addEventListener('install', (event) => {
@@ -209,7 +225,17 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request)),
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request).then((response) => {
+        if (!response.ok || !DEFERRED_URLS.has(request.url)) {
+          return response;
+        }
+        const copy = response.clone();
+        void caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        return response;
+      });
+    }),
   );
 });
 `;
@@ -217,5 +243,5 @@ self.addEventListener('fetch', (event) => {
 writeBuildFile('sw.js', serviceWorker);
 
 process.stdout.write(
-  `Release assets generated for ${deployment.basePath} (${cacheName}, ${filesToCache.length} cached files).\n`,
+  `Release assets generated for ${deployment.basePath} (${cacheName}, ${filesToCache.length} precached files, ${deferredUrls.length} lazy presentation files).\n`,
 );

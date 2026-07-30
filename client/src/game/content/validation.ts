@@ -12,12 +12,14 @@ import {
 } from './buddyCharacters';
 import { BOSS_ROSTERS } from './bosses';
 import { BOSS_CHARACTER_DESIGNS } from './bossCharacters';
+import { TRAINER_POSE_DEFINITIONS } from './bodybuilding';
 import {
   GYM_LEADER_CHARACTER_DESIGNS,
   HANDCRAFTED_CHARACTER_DESIGNS,
   MUSCULAR_BODY_ARCHETYPES,
   NPC_APPEARANCE_TEMPLATES,
   NPC_CHARACTER_SEEDS,
+  NPC_OUTFIT_COMBINATIONS,
   RIVAL_CHARACTER_DESIGNS,
 } from './characters';
 import {
@@ -50,10 +52,18 @@ import {
   TRAINER_BUILD_MIN,
   TRAINER_COLOR_OPTIONS,
   TRAINER_PHYSIQUE_PRESETS,
+  TRAINER_RANDOMIZATION_FILTERS,
+  TRAINER_RANDOMIZATION_PRESET_IDS,
   TRAINER_SKIN_TONES,
 } from './trainerAppearance';
 import { STARTING_TUTORIAL_GYM_ID, TUTORIAL_STEPS } from './tutorial';
 import { WORKOUT_LOAD_DEFINITIONS } from './workoutLoads';
+import {
+  BODYBUILDING_CHALLENGES,
+  DEVELOPMENT_PRESENTATION_LEVELS,
+  MACHINE_VISUAL_DEVELOPMENT_PATTERNS,
+  TRAINER_DEVELOPMENT_GROUPS,
+} from './visualProgression';
 import { TEAM_SIZE } from './save';
 import { BUDDY_DISCIPLINES } from '../types';
 import { validateTrainerAppearance } from '../systems/trainerAppearance';
@@ -93,6 +103,7 @@ export function collectGameContentValidationErrors() {
   validateUniqueIds('Trainer focus definitions', TRAINER_FOCUS_DEFINITIONS, errors);
   validateUniqueIds('Trainer cosmetic build attributes', TRAINER_BUILD_ATTRIBUTES, errors);
   validateUniqueIds('Trainer physique presets', TRAINER_PHYSIQUE_PRESETS, errors);
+  validateUniqueIds('Trainer randomization filters', TRAINER_RANDOMIZATION_FILTERS, errors);
   validateUniqueIds('Trainer skin tones', TRAINER_SKIN_TONES, errors);
   validateUniqueIds('Trainer palette colors', TRAINER_COLOR_OPTIONS, errors);
   Object.entries(TRAINER_APPEARANCE_OPTION_GROUPS).forEach(
@@ -100,12 +111,35 @@ export function collectGameContentValidationErrors() {
       validateUniqueIds(`Trainer ${group} options`, entries, errors);
     },
   );
-  if (TRAINER_PHYSIQUE_PRESETS.length !== 8) {
+  if (TRAINER_BUILD_ATTRIBUTES.length !== 61) {
     errors.push(
-      `Trainer cosmetics must define eight physique presets; found ${TRAINER_PHYSIQUE_PRESETS.length}.`,
+      `Trainer cosmetics must define all 61 independent build controls; found ${TRAINER_BUILD_ATTRIBUTES.length}.`,
+    );
+  }
+  if (TRAINER_PHYSIQUE_PRESETS.length < 26) {
+    errors.push(
+      `Trainer cosmetics must define at least 26 physique presets; found ${TRAINER_PHYSIQUE_PRESETS.length}.`,
     );
   }
   const buildIds = TRAINER_BUILD_ATTRIBUTES.map((attribute) => attribute.id);
+  const trainerPhysiquePresetIds = new Set(
+    TRAINER_PHYSIQUE_PRESETS.map(({ id }) => id),
+  );
+  for (const filter of TRAINER_RANDOMIZATION_FILTERS) {
+    const referencedPresetIds = TRAINER_RANDOMIZATION_PRESET_IDS[filter.id];
+    if (referencedPresetIds.length === 0) {
+      errors.push(
+        `Trainer randomization filter "${filter.id}" has no physique presets.`,
+      );
+    }
+    for (const presetId of referencedPresetIds) {
+      if (!trainerPhysiquePresetIds.has(presetId)) {
+        errors.push(
+          `Trainer randomization filter "${filter.id}" references missing physique preset "${presetId}".`,
+        );
+      }
+    }
+  }
   for (const preset of TRAINER_PHYSIQUE_PRESETS) {
     if (
       Object.keys(preset.build).length !== buildIds.length ||
@@ -130,6 +164,7 @@ export function collectGameContentValidationErrors() {
   validateUniqueIds('Buddy character designs', BUDDY_CHARACTER_DESIGNS, errors);
   validateUniqueIds('Buddy palette colors', BUDDY_PALETTE_COLORS, errors);
   validateUniqueIds('Muscular body archetypes', MUSCULAR_BODY_ARCHETYPES, errors);
+  validateUniqueIds('Trainer pose definitions', TRAINER_POSE_DEFINITIONS, errors);
   validateUniqueIds('NPC appearance templates', NPC_APPEARANCE_TEMPLATES, errors);
   validateUniqueIds('NPC character seeds', NPC_CHARACTER_SEEDS, errors);
   validateUniqueIds(
@@ -148,6 +183,26 @@ export function collectGameContentValidationErrors() {
   );
   validateUniqueIds('Routes', WORLD_ROUTE_PATHS, errors);
   validateUniqueIds('Workout loads', WORKOUT_LOAD_DEFINITIONS, errors);
+  validateUniqueIds(
+    'Visual development groups',
+    TRAINER_DEVELOPMENT_GROUPS,
+    errors,
+  );
+  validateUniqueIds(
+    'Visual development presentation levels',
+    DEVELOPMENT_PRESENTATION_LEVELS,
+    errors,
+  );
+  validateUniqueIds(
+    'Bodybuilding challenges',
+    BODYBUILDING_CHALLENGES,
+    errors,
+  );
+  validateUniqueIds(
+    'Bodybuilding challenge rewards',
+    BODYBUILDING_CHALLENGES.map((challenge) => challenge.reward),
+    errors,
+  );
   validateUniqueIds('Capture moves', CAPTURE_MOVES, errors);
   validateUniqueIds('Capture battle speeds', CAPTURE_BATTLE_SPEEDS, errors);
   validateUniqueIds(
@@ -245,6 +300,40 @@ export function collectGameContentValidationErrors() {
         `Buddy character design "${design.id}" references missing species "${design.speciesId}".`,
       );
     }
+    if (
+      design.physiquePresets.length < 5 ||
+      !design.anatomyProfile.protectedFeatures.length ||
+      Object.values(design.anatomyProfile.regionLabels).some(
+        (label) => !label.trim(),
+      )
+    ) {
+      errors.push(
+        `Buddy character design "${design.id}" has incomplete species-safe physique data.`,
+      );
+    }
+    validateUniqueIds(
+      `Buddy character design "${design.id}" physique presets`,
+      design.physiquePresets,
+      errors,
+    );
+    for (const preset of design.physiquePresets) {
+      const normalized = normalizeBuddyCosmetics(design.speciesId, {
+        ...design.defaultCosmetics,
+        physiquePresetId: preset.id,
+        bodySizeId: preset.bodySizeId,
+        muscleDefinitionId: preset.muscleDefinitionId,
+        physique: preset.physique,
+      });
+      if (
+        normalized.physiquePresetId !== preset.id ||
+        JSON.stringify(normalized.physique) !==
+          JSON.stringify(preset.physique)
+      ) {
+        errors.push(
+          `Buddy physique preset "${preset.id}" is not species-safe after normalization.`,
+        );
+      }
+    }
     for (const [label, options] of [
       ['body variations', design.bodyVariations],
       ['patterns', design.patternOptions],
@@ -274,6 +363,29 @@ export function collectGameContentValidationErrors() {
     );
   }
 
+  const expectedBossPresentationTiers = new Set([
+    'normal',
+    'pumped',
+    'overload',
+    'final-round',
+    'defeated',
+  ]);
+  for (const design of BOSS_CHARACTER_DESIGNS) {
+    if (
+      design.presentationTiers.length !==
+        expectedBossPresentationTiers.size ||
+      design.presentationTiers.some(
+        (tier) => !expectedBossPresentationTiers.has(tier.tier),
+      ) ||
+      new Set(design.presentationTiers.map((tier) => tier.id)).size !==
+        design.presentationTiers.length
+    ) {
+      errors.push(
+        `Boss character design "${design.id}" has incomplete presentation tiers.`,
+      );
+    }
+  }
+
   if (
     GYM_LEADER_CHARACTER_DESIGNS.length !== 6 ||
     RIVAL_CHARACTER_DESIGNS.length < 3 ||
@@ -285,6 +397,19 @@ export function collectGameContentValidationErrors() {
   }
   const archetypeIds = new Set(
     MUSCULAR_BODY_ARCHETYPES.map((entry) => entry.id),
+  );
+  const physiquePresetIds = new Set(
+    TRAINER_PHYSIQUE_PRESETS.map((entry) => entry.id),
+  );
+  for (const archetype of MUSCULAR_BODY_ARCHETYPES) {
+    if (!physiquePresetIds.has(archetype.physiquePresetId)) {
+      errors.push(
+        `Body archetype "${archetype.id}" references missing physique preset "${archetype.physiquePresetId}".`,
+      );
+    }
+  }
+  const trainerPoseIds = new Set(
+    TRAINER_POSE_DEFINITIONS.map((entry) => entry.id),
   );
   for (const design of HANDCRAFTED_CHARACTER_DESIGNS) {
     if (!archetypeIds.has(design.appearance.archetypeId)) {
@@ -298,10 +423,42 @@ export function collectGameContentValidationErrors() {
         trainerAppearanceFromCharacterDesign(design),
       ).map((issue) => `Character "${design.id}": ${issue}`),
     );
+    if (
+      !trainerPoseIds.has(design.idlePose) ||
+      !trainerPoseIds.has(design.signaturePose) ||
+      !trainerPoseIds.has(design.victoryPose) ||
+      !design.primaryMuscleEmphasis ||
+      design.regionalMuscleEmphasis.length < 2 ||
+      !design.idleAnimationId.trim() ||
+      !design.warmupAnimationId.trim() ||
+      !design.lossReactionId.trim() ||
+      !design.alternateLateGameOutfit.id.trim() ||
+      !design.gymAccessoryId.trim() ||
+      !design.sponsorPatch.id.trim()
+    ) {
+      errors.push(
+        `Character "${design.id}" has incomplete bodybuilding presentation metadata.`,
+      );
+    }
   }
   const npcTemplateIds = new Set(
     NPC_APPEARANCE_TEMPLATES.map((entry) => entry.id),
   );
+  const npcOutfitIds = new Set(
+    NPC_OUTFIT_COMBINATIONS.map((entry) => entry.id),
+  );
+  for (const template of NPC_APPEARANCE_TEMPLATES) {
+    if (
+      template.regionalOutfitIds.length < 2 ||
+      template.regionalOutfitIds.some((id) => !npcOutfitIds.has(id)) ||
+      template.trainingSpecialtyIds.length < 2 ||
+      template.posePreferenceIds.length < 2
+    ) {
+      errors.push(
+        `NPC appearance template "${template.id}" has incomplete deterministic variation data.`,
+      );
+    }
+  }
   for (const seed of NPC_CHARACTER_SEEDS) {
     if (!npcTemplateIds.has(seed.templateId)) {
       errors.push(
@@ -365,6 +522,23 @@ export function collectGameContentValidationErrors() {
   }
 
   const machineIds = new Set(ALL_TRAINING_MACHINES.map((machine) => machine.id));
+  const visualDevelopmentMachineIds = new Set(
+    Object.keys(MACHINE_VISUAL_DEVELOPMENT_PATTERNS),
+  );
+  for (const machineId of machineIds) {
+    if (!visualDevelopmentMachineIds.has(machineId)) {
+      errors.push(
+        `Training machine "${machineId}" has no visual development pattern.`,
+      );
+    }
+  }
+  for (const machineId of visualDevelopmentMachineIds) {
+    if (!machineIds.has(machineId)) {
+      errors.push(
+        `Visual development pattern references missing machine "${machineId}".`,
+      );
+    }
+  }
   const machineById = new Map(ALL_TRAINING_MACHINES.map((machine) => [machine.id, machine]));
   const assignedMachineIds = new Set<string>();
   const focusIds = new Set(TRAINER_FOCUS_DEFINITIONS.map((focus) => focus.id));
@@ -698,7 +872,6 @@ export function collectGameContentValidationErrors() {
       continue;
     }
     const cosmetics = normalizeBuddyCosmetics(boss.speciesId, {
-      version: 1,
       primaryPaletteId: design.primaryPaletteId,
       secondaryPaletteId: design.secondaryPaletteId,
       accentPaletteId: design.accentPaletteId,
@@ -722,6 +895,7 @@ export function collectGameContentValidationErrors() {
     }
     if (
       !design.trainingPhilosophy.trim() ||
+      !design.primaryMuscleEmphasis ||
       !design.signatureClothing.trim() ||
       !design.signatureEquipment.trim() ||
       !design.battleStance.trim() ||

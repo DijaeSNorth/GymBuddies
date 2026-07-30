@@ -3,7 +3,14 @@ import { useMemo, useState } from 'react';
 import {
   BUDDY_BODY_SIZE_OPTIONS,
   BUDDY_DEFINITION_OPTIONS,
+  BUDDY_EMPHASIS_OPTIONS,
+  BUDDY_MASS_OPTIONS,
   BUDDY_PALETTE_COLORS,
+  BUDDY_POSE_OPTIONS,
+  BUDDY_POSTURE_OPTIONS,
+  BUDDY_PUMP_OPTIONS,
+  BUDDY_STANCE_OPTIONS,
+  BUDDY_SYMMETRY_OPTIONS,
   getBuddyCharacterDesign,
 } from '../../game/content/buddyCharacters';
 import {
@@ -16,8 +23,11 @@ import type {
   BuddyCosmetics,
   BuddyFacingDirection,
   BuddyPose,
+  BuddyPhysiqueRegion,
+  BuddyPhysiqueSettings,
   BuddyVisualOption,
 } from '../../game/types';
+import type { BuddyShowcasePose } from '../../game/assets/types';
 import { BuddySprite } from './BuddySprite';
 
 type BuddyCustomizerProps = {
@@ -33,17 +43,20 @@ const DIRECTIONS: BuddyFacingDirection[] = [
   'back',
   'left',
 ];
-const POSES: BuddyPose[] = [
-  'idle',
-  'walking',
-  'running',
-  'training',
-  'victory',
-  'fatigue',
-  'capture',
-  'entrance',
-];
 
+function showcasePoseFor(
+  direction: BuddyFacingDirection,
+  pose: BuddyPose,
+): BuddyShowcasePose {
+  if (pose === 'victory') return 'victory-pose';
+  if (pose === 'fatigue') return 'fatigue-pose';
+  if (pose === 'front-flex') return 'front-double-biceps';
+  if (pose === 'back-flex') return 'back-double-biceps';
+  if (pose === 'side-pose') return 'side-chest';
+  if (direction === 'back') return 'back-relaxed';
+  if (direction === 'left' || direction === 'right') return 'side-chest';
+  return 'front-relaxed';
+}
 function OptionSelect({
   id,
   label,
@@ -106,13 +119,56 @@ export function BuddyCustomizer({
     const current = cosmetics.accessoryIds.filter(
       (entry) => entry !== 'accessory-none',
     );
+    const selectedOption = design.accessoryOptions.find(
+      (entry) => entry.id === id,
+    );
+    const withoutSameSlot = selectedOption?.slot
+      ? current.filter((entry) => {
+          const option = design.accessoryOptions.find(
+            (candidate) => candidate.id === entry,
+          );
+          return option?.slot !== selectedOption.slot;
+        })
+      : current;
     const next = current.includes(id)
       ? current.filter((entry) => entry !== id)
-      : [...current, id].slice(-2);
+      : [...withoutSameSlot, id].slice(-4);
     updateCosmetics({
       accessoryIds: next.length > 0 ? next : ['accessory-none'],
     });
   }
+
+  function updatePhysique(
+    patch: Partial<BuddyPhysiqueSettings>,
+  ) {
+    updateCosmetics({
+      physiquePresetId: cosmetics.physiquePresetId,
+      physique: {
+        ...cosmetics.physique,
+        ...patch,
+      },
+    });
+  }
+
+  function applyPhysiquePreset(id: string) {
+    const preset = design.physiquePresets.find((entry) => entry.id === id);
+    if (!preset) return;
+    updateCosmetics({
+      physiquePresetId: preset.id,
+      bodySizeId: preset.bodySizeId,
+      muscleDefinitionId: preset.muscleDefinitionId,
+      physique: { ...preset.physique },
+    });
+  }
+
+  const physiqueFieldByRegion = {
+    shoulders: 'shoulderEmphasisId',
+    chest: 'chestEmphasisId',
+    back: 'backEmphasisId',
+    arms: 'armEmphasisId',
+    core: 'coreEmphasisId',
+    legs: 'legEmphasisId',
+  } as const satisfies Record<BuddyPhysiqueRegion, keyof BuddyPhysiqueSettings>;
 
   function randomize() {
     const result = randomizeBuddyCosmetics(
@@ -151,8 +207,13 @@ export function BuddyCustomizer({
             direction={DIRECTIONS[directionIndex]}
             label={`${buddy.nickname} customization preview`}
             pose={pose}
+            presentationContext="showcase"
             reducedMotion={reducedMotion}
-            scale={4}
+            scale={2}
+            showcasePose={showcasePoseFor(
+              DIRECTIONS[directionIndex]!,
+              pose,
+            )}
           />
           <div className="buddy-preview-controls">
             <button
@@ -200,6 +261,13 @@ export function BuddyCustomizer({
           </label>
 
           <div className="buddy-customizer-grid">
+            <OptionSelect
+              id="buddy-physique-preset"
+              label="Species build preset"
+              options={design.physiquePresets}
+              value={cosmetics.physiquePresetId}
+              onChange={applyPhysiquePreset}
+            />
             <OptionSelect
               id="buddy-primary-palette"
               label="Primary palette"
@@ -308,17 +376,103 @@ export function BuddyCustomizer({
             <OptionSelect
               id="buddy-preview-pose"
               label="Preview animation"
-              options={POSES.map((id) => ({
-                id,
-                label: id.replace('-', ' '),
-              }))}
+              options={BUDDY_POSE_OPTIONS}
               value={pose}
               onChange={(id) => setPose(id as BuddyPose)}
             />
           </div>
 
           <fieldset>
-            <legend>Training accessories · choose up to two</legend>
+            <legend>Species-aware physique presentation</legend>
+            <p className="buddy-customizer-help">
+              These controls change only how {buddy.creature.name}'s own
+              anatomy communicates strength. Protected features:{' '}
+              {design.anatomyProfile.protectedFeatures.join(', ')}.
+            </p>
+            <div className="buddy-customizer-grid">
+              {(
+                Object.keys(physiqueFieldByRegion) as BuddyPhysiqueRegion[]
+              ).map((region) => {
+                const field = physiqueFieldByRegion[region];
+                return (
+                  <OptionSelect
+                    id={`buddy-physique-${region}`}
+                    key={region}
+                    label={design.anatomyProfile.regionLabels[region]}
+                    options={BUDDY_EMPHASIS_OPTIONS}
+                    value={cosmetics.physique[field]}
+                    onChange={(value) =>
+                      updatePhysique({
+                        [field]: value,
+                      } as Partial<BuddyPhysiqueSettings>)
+                    }
+                  />
+                );
+              })}
+              <OptionSelect
+                id="buddy-overall-mass"
+                label="Overall mass"
+                options={BUDDY_MASS_OPTIONS}
+                value={cosmetics.physique.overallMassId}
+                onChange={(overallMassId) =>
+                  updatePhysique({
+                    overallMassId:
+                      overallMassId as BuddyPhysiqueSettings['overallMassId'],
+                  })
+                }
+              />
+              <OptionSelect
+                id="buddy-symmetry"
+                label="Symmetry"
+                options={BUDDY_SYMMETRY_OPTIONS}
+                value={cosmetics.physique.symmetryId}
+                onChange={(symmetryId) =>
+                  updatePhysique({
+                    symmetryId:
+                      symmetryId as BuddyPhysiqueSettings['symmetryId'],
+                  })
+                }
+              />
+              <OptionSelect
+                id="buddy-stance"
+                label="Stance"
+                options={BUDDY_STANCE_OPTIONS}
+                value={cosmetics.physique.stanceId}
+                onChange={(stanceId) =>
+                  updatePhysique({
+                    stanceId: stanceId as BuddyPhysiqueSettings['stanceId'],
+                  })
+                }
+              />
+              <OptionSelect
+                id="buddy-posture"
+                label="Posture"
+                options={BUDDY_POSTURE_OPTIONS}
+                value={cosmetics.physique.postureId}
+                onChange={(postureId) =>
+                  updatePhysique({
+                    postureId:
+                      postureId as BuddyPhysiqueSettings['postureId'],
+                  })
+                }
+              />
+              <OptionSelect
+                id="buddy-pump"
+                label="Pump effect"
+                options={BUDDY_PUMP_OPTIONS}
+                value={cosmetics.physique.pumpEffectId}
+                onChange={(pumpEffectId) =>
+                  updatePhysique({
+                    pumpEffectId:
+                      pumpEffectId as BuddyPhysiqueSettings['pumpEffectId'],
+                  })
+                }
+              />
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Training accessories · one per slot, up to four</legend>
             <div className="buddy-accessory-grid">
               {design.accessoryOptions
                 .filter((entry) => entry.id !== 'accessory-none')

@@ -1,0 +1,352 @@
+:root {
+  --lab-ink: #061519;
+  --lab-deep: #0c2b2f;
+  --lab-iron: #285057;
+  --lab-mist: #b9d8c4;
+  --lab-chalk: #eef2d0;
+  --lab-mint: #68d39b;
+  --lab-coral: #ef6a5b;
+  --lab-amber: #f2c14e;
+}
+
+.sprite-lab {
+  min-height: 100vh;
+  padding: clamp(14px, 3vw, 38px);
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  background:
+    linear-gradient(145deg, rgba(40, 80, 87, 0.28), transparent 48%),
+    var(--lab-ink);
+  color: var(--lab-chalk);
+  font-family: "Trebuchet MS", system-ui, sans-serif;
+}
+
+.sprite-lab__header,
+.sprite-lab__header nav,
+.sprite-lab__scale {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sprite-lab__header p,
+.sprite-lab__header span {
+  margin: 0;
+  color: var(--lab-mist);
+  font: 11px/1.5 "Lucida Console", monospace;
+}
+
+.sprite-lab__header p {
+  color: var(--lab-mint);
+  text-transform: uppercase;
+}
+
+.sprite-lab__header h1 {
+  margin: 5px 0;
+  font-size: clamp(28px, 6vw, 60px);
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.sprite-lab a,
+.sprite-lab button,
+.sprite-lab select {
+  min-height: 42px;
+  border: 1px solid var(--lab-iron);
+  border-radius: 0;
+  background: var(--lab-deep);
+  color: var(--lab-chalk);
+  font: inherit;
+}
+
+.sprite-lab a {
+  padding: 10px 12px;
+  text-decoration: none;
+}
+
+.sprite-lab button {
+  padding: 8px 11px;
+  cursor: pointer;
+}
+
+.sprite-lab a:focus-visible,
+.sprite-lab button:focus-visible,
+.sprite-lab select:focus-visible,
+.sprite-lab input:focus-visible {
+  outline: 2px solid var(--lab-amber);
+  outline-offset: 2px;
+}
+
+.sprite-lab__controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--lab-iron);
+  background: rgba(12, 43, 47, 0.8);
+}
+
+.sprite-lab__controls label {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: var(--lab-mist);
+  font-size: 11px;
+}
+
+.sprite-lab__controls select {
+  min-width: 0;
+  padding: 7px;
+}
+
+.sprite-lab__controls .sprite-lab__checkbox-control {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.sprite-lab__checkbox-control input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--lab-mint);
+}
+
+.sprite-lab__workspace {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.65fr) minmax(280px, 1.7fr) minmax(210px, 0.8fr);
+  gap: 12px;
+}
+
+.sprite-lab__layers,
+.sprite-lab__receipt {
+  padding: 14px;
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  border: 1px solid var(--lab-iron);
+  background: rgba(12, 43, 47, 0.76);
+}
+
+.sprite-lab__layers h2,
+.sprite-lab__receipt h2 {
+  margin: 0 0 6px;
+  color: var(--lab-amber);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.sprite-lab__layers label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 10px "Lucida Console", monospace;
+}
+
+.sprite-lab__layers input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--lab-mint);
+}
+
+.sprite-lab__toggles {
+  margin-top: 8px;
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--lab-iron);
+}
+
+.sprite-lab__preview-column {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.sprite-lab__scale {
+  justify-content: flex-start;
+}
+
+.sprite-lab__scale button[aria-pressed="true"] {
+  border-color: var(--lab-mint);
+  background: var(--lab-iron);
+  color: var(--lab-mint);
+}
+
+.sprite-lab__stage {
+  position: relative;
+  min-height: max(260px, calc(var(--frame-size) + 64px));
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  border: 1px solid var(--lab-iron);
+}
+
+.sprite-lab__stage.background-checker {
+  background:
+    repeating-conic-gradient(#dce6df 0 25%, #aebfb8 0 50%) 0 0 / 16px 16px;
+}
+
+.sprite-lab__stage.background-light {
+  background: #eef2d0;
+}
+
+.sprite-lab__stage.background-dark {
+  background: #061519;
+}
+
+.sprite-lab__stage.background-route {
+  background:
+    linear-gradient(#8cc9bc 0 54%, #4b8466 54% 72%, #315e4d 72% 100%);
+}
+
+.sprite-lab__stage.background-gym {
+  background:
+    linear-gradient(90deg, transparent 49%, rgba(238, 242, 208, 0.12) 50% 51%, transparent 52%),
+    linear-gradient(#285057 0 62%, #a67149 62% 68%, #714830 68% 100%);
+}
+
+.sprite-lab__stage.background-battle {
+  background:
+    radial-gradient(circle at 50% 68%, #315e4d 0 22%, transparent 23%),
+    linear-gradient(#183e42 0 60%, #0c2b2f 60% 100%);
+}
+
+.sprite-lab__stage .buddy-pixel-canvas {
+  position: relative;
+  z-index: 1;
+}
+
+.sprite-lab .buddy-pixel-canvas.silhouette-only {
+  filter: brightness(0);
+}
+
+.sprite-lab__stage.background-dark .buddy-pixel-canvas.silhouette-only,
+.sprite-lab__compare .buddy-pixel-canvas.silhouette-only {
+  filter: brightness(0) invert(1);
+}
+
+.sprite-lab__stage.show-bounds::before {
+  content: "";
+  position: absolute;
+  width: var(--frame-size);
+  height: var(--frame-size);
+  border: 1px dashed var(--lab-coral);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sprite-lab__stage.show-anchor::after {
+  content: "";
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--lab-amber);
+  background:
+    linear-gradient(90deg, transparent 5px, var(--lab-amber) 5px 6px, transparent 6px),
+    linear-gradient(transparent 5px, var(--lab-amber) 5px 6px, transparent 6px);
+  transform:
+    translate(
+      calc(var(--anchor-x) - var(--frame-size) / 2),
+      calc(var(--anchor-y) - var(--frame-size) / 2)
+    )
+    translate(-5px, -5px);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.sprite-lab__compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sprite-lab__compare figure {
+  margin: 0;
+  padding: 12px;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  border: 1px solid var(--lab-iron);
+  background:
+    repeating-conic-gradient(rgba(185, 216, 196, 0.08) 0 25%, transparent 0 50%) 0 0 / 14px 14px,
+    var(--lab-deep);
+}
+
+.sprite-lab__compare figcaption {
+  color: var(--lab-mist);
+  font-size: 10px;
+}
+
+.sprite-lab__receipt dl {
+  margin: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.sprite-lab__receipt dl div {
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(40, 80, 87, 0.65);
+}
+
+.sprite-lab__receipt dt {
+  color: var(--lab-mint);
+  font: 9px "Lucida Console", monospace;
+  text-transform: uppercase;
+}
+
+.sprite-lab__receipt dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.sprite-lab__receipt p {
+  color: var(--lab-coral);
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .sprite-lab__workspace {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+
+  .sprite-lab__receipt {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .sprite-lab__header,
+  .sprite-lab__header nav {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sprite-lab__controls,
+  .sprite-lab__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sprite-lab__layers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sprite-lab__layers h2,
+  .sprite-lab__toggles {
+    grid-column: 1 / -1;
+  }
+
+  .sprite-lab__receipt {
+    grid-column: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-lab * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}

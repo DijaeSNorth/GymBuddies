@@ -42,6 +42,7 @@ import {
   normalizeTrainerAppearancePresets,
   validateTrainerAppearance,
 } from '../systems/trainerAppearance';
+import { normalizeVisualProgression } from './visualProgressionValidation';
 import type {
   BossSchedule,
   Buddy,
@@ -453,6 +454,14 @@ export function normalizeSaveData(
       caughtDex.push(buddy.creature.dex);
     }
   }
+  const trainer = normalizeTrainer(raw.trainer, fallback.trainer, issues);
+  const visualProgression = normalizeVisualProgression(
+    raw.visualProgression,
+    fallback.visualProgression,
+    trainer.appearance,
+    bossGameplayTimeMs,
+    issues,
+  );
 
   return {
     save: {
@@ -490,13 +499,14 @@ export function normalizeSaveData(
           issues,
         ),
       },
+      visualProgression,
       hasStarterSet: booleanValue(
         raw.hasStarterSet,
         fallback.hasStarterSet,
       ),
       unlockedZoneIds,
       visitedZoneIds,
-      trainer: normalizeTrainer(raw.trainer, fallback.trainer, issues),
+      trainer,
       trainerEquipmentBonuses: {
         power: clamp(
           finiteNumber(

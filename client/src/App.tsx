@@ -12,9 +12,11 @@ import {
   JourneyRestartDialog,
   TrainerCreationScreen,
 } from './ui/trainer/TrainerCreationScreen';
+import { PhysiqueReviewPanel } from './ui/trainer/PhysiqueReviewPanel';
 import { BuddyIndex } from './ui/buddies/BuddyIndex';
 import { BuddySprite as PixelCreature } from './ui/buddies/BuddySprite';
 import { BuddyCustomizer } from './ui/buddies/BuddyCustomizer';
+import type { BuddyBattlePose } from './game/assets/types';
 import {
   BUDDY_STAT_LIMITS,
   FATIGUE_BALANCE,
@@ -159,6 +161,10 @@ import {
 } from './game/save/saveService';
 import { recordMachineMastery } from './game/systems/progressionModel';
 import {
+  recordBodybuildingChallengeResult,
+  resolveBodybuildingChallenge,
+} from './game/systems/bodybuildingChallenges';
+import {
   createOverworldState,
   findFacingInteractable,
   getOverworldDirectionAvailability,
@@ -193,6 +199,15 @@ import {
   validateTrainerCreationDraft,
 } from './game/systems/trainerCreation';
 import {
+  applyDeepRecoveryToVisualProgression,
+  applyWorkoutVisualProgression,
+  calculatePhysiqueRatings,
+  createDefaultVisualProgressionState,
+  createPhysiqueSnapshot,
+  deriveTrainerVisualPresentation,
+  getCurrentPump,
+} from './game/systems/visualProgression';
+import {
   calculateTrainerPhysiqueLevel as trainerPhysiqueLevel,
 } from './game/systems/trainerProgression';
 import {
@@ -217,6 +232,9 @@ import type {
   AudioCueId,
   BossChallengeStress,
   BossChallengeTier,
+  BossPresentationTier,
+  BodybuildingChallengeId,
+  BodybuildingChallengeResult,
   Buddy,
   BuddySpecies as Creature,
   CardinalDirection,
@@ -234,7 +252,9 @@ import type {
   TrainerCreationDraft,
   TrainerEmote,
   TrainerMuscleId,
+  TrainerPose,
   TrainerStartMode,
+  TrainerVisualProgressionPreferences,
   WorkoutLoadTier,
   WorkoutSession,
   WorldPosition,
@@ -493,6 +513,9 @@ export default function App() {
   const [trainerStartMode, setTrainerStartMode] =
     useState<TrainerStartMode>('guided');
   const [buddyCustomizationOpen, setBuddyCustomizationOpen] = useState(false);
+  const [physiqueReviewOpen, setPhysiqueReviewOpen] = useState(false);
+  const [bodybuildingChallengeResult, setBodybuildingChallengeResult] =
+    useState<BodybuildingChallengeResult | null>(null);
   const [restartConfirmationOpen, setRestartConfirmationOpen] = useState(false);
   const [trainerEmote, setTrainerEmote] = useState<TrainerEmote>('neutral');
   const [trainerEmoteUntil, setTrainerEmoteUntil] = useState(0);
@@ -572,6 +595,40 @@ export default function App() {
       ? 'READY'
       : formatRemainingTime(activeBossAvailability.remainingMs);
   const trainer = save.trainer;
+  const trainerVisualPresentation = useMemo(
+    () =>
+      deriveTrainerVisualPresentation({
+        baseAppearance: trainer.appearance,
+        state: save.visualProgression,
+        gameplayTimeMs: save.bossGameplayTimeMs,
+        fatigue: save.trainingFatigue,
+      }),
+    [
+      save.bossGameplayTimeMs,
+      save.trainingFatigue,
+      save.visualProgression,
+      trainer.appearance,
+    ],
+  );
+  const physiqueRatings = useMemo(
+    () =>
+      calculatePhysiqueRatings({
+        trainer,
+        development: save.visualProgression.development,
+        pump: getCurrentPump(
+          save.visualProgression,
+          save.bossGameplayTimeMs,
+        ),
+        fatigue: save.trainingFatigue,
+        recentTrainingCount: save.visualProgression.recentTraining.length,
+      }),
+    [
+      save.bossGameplayTimeMs,
+      save.trainingFatigue,
+      save.visualProgression,
+      trainer,
+    ],
+  );
   const workoutPreview = useMemo(
     () =>
       activeBuddy && activeMachine
@@ -629,8 +686,25 @@ export default function App() {
   const encounterBossCharacterDesign = getBossCharacterDesign(
     encounter?.bossId,
   );
+  const encounterBossPresentationTier: BossPresentationTier =
+    match?.status === 'captured' || match?.status === 'full-party'
+      ? 'defeated'
+      : match?.isBossChallengeActive && match.bossChallengeMisses >= 3
+        ? 'overload'
+        : match && match.round >= Math.max(2, match.maxRounds - 1)
+          ? 'final-round'
+          : match && match.round > 1
+            ? 'pumped'
+            : 'normal';
+  const encounterBossPresentation = encounterBossCharacterDesign
+    ?.presentationTiers.find(
+      (entry) => entry.tier === encounterBossPresentationTier,
+    );
   const encounterBossCosmetics = encounterBossCharacterDesign
-    ? bossBuddyCosmetics(encounterBossCharacterDesign)
+    ? bossBuddyCosmetics(
+        encounterBossCharacterDesign,
+        encounterBossPresentationTier,
+      )
     : null;
   const dialoguePortrait: DialoguePortrait = encounter?.creature
     ? {
@@ -682,6 +756,40 @@ export default function App() {
       : match?.status === 'escape'
         ? 'buddy-reaction-escape'
         : '';
+  const selectedMoveBattlePose: BuddyBattlePose =
+    captureAnimation?.tone === 'counter'
+      ? 'counter'
+      : captureAnimation?.moveId === 'burst'
+        ? 'shoulder-burst'
+        : captureAnimation?.moveId === 'grind'
+          ? 'iron-grind'
+          : captureAnimation?.moveId === 'snap'
+            ? 'snapping-hook'
+            : 'neutral-battle';
+  const capturePlayerBattlePose: BuddyBattlePose = captureAnimation
+    ? selectedMoveBattlePose
+    : match?.status === 'captured' ||
+        match?.status === 'full-party'
+      ? 'capture-success'
+      : match?.status === 'failed-pin'
+        ? 'near-pin'
+        : match?.status === 'escape'
+          ? 'defeat'
+          : 'neutral-battle';
+  const captureOpponentBattlePose: BuddyBattlePose = captureAnimation
+    ? captureAnimation.tone === 'resisted'
+      ? 'counter'
+      : 'near-pin'
+    : match?.status === 'captured' ||
+        match?.status === 'full-party'
+      ? 'defeat'
+      : match?.status === 'near-capture'
+        ? 'near-pin'
+        : match?.status === 'escape'
+          ? 'escape'
+          : match?.status === 'failed-pin'
+            ? 'victory'
+            : 'neutral-battle';
   const encounterChallengeMachine = encounter?.isBoss ? getBossChallengeMachine(encounter, encounterZone) : null;
   const encounterTrainerPressure = encounter ? trainerArenaPressure(trainer, activeMachine, encounterZone) : 0;
   const encounterBuddyPressure = encounter && activeBuddy ? buddyArenaPressure(activeBuddy) : 0;
@@ -1528,6 +1636,9 @@ export default function App() {
       visitedZoneIds: ['home'],
       tutorialStep: startWithTutorial ? 0 : TUTORIAL_STEPS.length,
       trainer: trainerProfile,
+      visualProgression: createDefaultVisualProgressionState(
+        trainerProfile.appearance,
+      ),
     }));
     setOverworldState(createOverworldState('home-gym'));
     setWorldPlayerPos(WORLD_ZONE_POSITIONS[STARTING_ZONE_ID] ?? WORLD_ZONE_POSITIONS.home);
@@ -1576,6 +1687,134 @@ export default function App() {
         },
       })),
     }));
+  }
+
+  function setVisualProgressionPreferences(
+    preferences: TrainerVisualProgressionPreferences,
+  ) {
+    setSave((state) => ({
+      ...state,
+      visualProgression: {
+        ...state.visualProgression,
+        preferences: { ...preferences },
+      },
+    }));
+  }
+
+  function openPhysiqueReview() {
+    if (activeZone.id !== 'home') {
+      setMessage('The Physique Review studio is available inside Home Gym.');
+      return;
+    }
+    setBodybuildingChallengeResult(null);
+    setPhysiqueReviewOpen(true);
+    handleGameplayPauseChange(true);
+  }
+
+  function closePhysiqueReview() {
+    setPhysiqueReviewOpen(false);
+    handleGameplayPauseChange(false);
+  }
+
+  function savePhysiqueSnapshot(label?: string) {
+    setSave((state) => ({
+      ...state,
+      visualProgression: createPhysiqueSnapshot({
+        state: state.visualProgression,
+        appearance: state.trainer.appearance,
+        gameplayTimeMs: state.bossGameplayTimeMs,
+        fatigue: state.trainingFatigue,
+        label,
+      }),
+    }));
+    setMessage(
+      label === 'Pixel portrait'
+        ? 'Pixel portrait saved inside Physique Review.'
+        : 'Physique progress snapshot saved.',
+    );
+  }
+
+  function runBodybuildingChallenge(input: {
+    challengeId: BodybuildingChallengeId;
+    selectedPose: TrainerPose;
+    timingPrecision: number;
+    preparation: number;
+    outfitAlignment: number;
+  }) {
+    const result = consumeRandomResult((randomState) =>
+      resolveBodybuildingChallenge(
+        {
+          ...input,
+          fatigue: save.trainingFatigue,
+          development: save.visualProgression.development,
+          pump: getCurrentPump(
+            save.visualProgression,
+            save.bossGameplayTimeMs,
+          ),
+          trainingHistory: save.visualProgression.recentTraining,
+          trainerMuscles: save.trainer.muscles,
+        },
+        randomState,
+      ),
+    );
+    setBodybuildingChallengeResult(result);
+    setSave((state) => ({
+      ...state,
+      visualProgression: recordBodybuildingChallengeResult(
+        state.visualProgression,
+        result,
+      ),
+    }));
+    setMessage(
+      result.completed
+        ? `Stage challenge cleared at ${result.score}/100. A new presentation reward was unlocked.`
+        : `Stage challenge scored ${result.score}/100. Recovery, timing, pose, outfit, and training history all contribute.`,
+    );
+    playAudioCue(result.completed ? 'level-up' : 'menu-navigate', 0.74);
+  }
+
+  function adjustVisualProgressionDebug(
+    group: keyof SaveData['visualProgression']['development'],
+    target: 'development' | 'pump',
+    delta: number,
+  ) {
+    if (!import.meta.env.DEV) return;
+    setSave((state) => {
+      const visualProgression = state.visualProgression;
+      if (target === 'development') {
+        return {
+          ...state,
+          visualProgression: {
+            ...visualProgression,
+            development: {
+              ...visualProgression.development,
+              [group]: clamp(
+                visualProgression.development[group] + delta,
+                0,
+                100,
+              ),
+            },
+          },
+        };
+      }
+      const currentPump = getCurrentPump(
+        visualProgression,
+        state.bossGameplayTimeMs,
+      );
+      return {
+        ...state,
+        visualProgression: {
+          ...visualProgression,
+          pump: {
+            levels: {
+              ...currentPump,
+              [group]: clamp(currentPump[group] + delta, 0, 100),
+            },
+            updatedAtGameplayMs: state.bossGameplayTimeMs,
+          },
+        },
+      };
+    });
   }
 
   function reopenTrainerSetup() {
@@ -2136,6 +2375,15 @@ export default function App() {
       ),
       workoutMomentum: resolution.workoutMomentum,
       trainingFatigue: resolution.trainingFatigue,
+      visualProgression: applyWorkoutVisualProgression({
+        state: state.visualProgression,
+        machineId: machine.id,
+        gameplayTimeMs: state.bossGameplayTimeMs,
+        loadTier: session.loadTier,
+        outcome,
+        quality: session.sessionQuality,
+        volume: Math.max(session.repResults.length, session.repCount),
+      }),
       machineTrainingHistory: {
         lastMachineId: machine.id,
         repeatedUses:
@@ -2408,6 +2656,10 @@ export default function App() {
     setSave((state) => ({
       ...state,
       trainingFatigue: recovery.trainingFatigue,
+      visualProgression: applyDeepRecoveryToVisualProgression(
+        state.visualProgression,
+        state.bossGameplayTimeMs,
+      ),
       deloadTokens: recovery.deloadTokens,
       machineTrainingHistory: {
         lastMachineId: null,
@@ -3277,7 +3529,10 @@ function resolveMatch(
         shirt: trainer.top,
         skin: trainer.skin,
       },
-      trainerAppearance: trainer.appearance,
+      trainerAppearance: trainerVisualPresentation.appearance,
+      trainerIdleSequence: Math.floor(save.bossGameplayTimeMs / 1_000),
+      trainerPumpIntensity: trainerVisualPresentation.pumpIntensity,
+      trainerRecovery: trainerVisualPresentation.recovery,
       visitedZoneIds: overworldProgression.visitedZoneIds,
     }),
     [
@@ -3301,7 +3556,10 @@ function resolveMatch(
       overworldState.transitionSequence,
       presentationEffect,
       trainer.hair,
-      trainer.appearance,
+      trainerVisualPresentation.appearance,
+      trainerVisualPresentation.pumpIntensity,
+      trainerVisualPresentation.recovery,
+      save.bossGameplayTimeMs,
       trainer.name,
       trainer.skin,
       trainer.top,
@@ -3481,8 +3739,14 @@ function resolveMatch(
         directionAvailability={overworldDirectionAvailability}
         effectSkippable={Boolean(captureAnimation || bossEntrance || zoneTransit)}
         keyboardBindings={save.input.keyboardBindings}
+        visualProgression={save.visualProgression.preferences}
         movementDisabled={Boolean(
-          isTraveling || encounter || match || workoutSession || restartConfirmationOpen,
+          isTraveling ||
+            encounter ||
+            match ||
+            workoutSession ||
+            restartConfirmationOpen ||
+            physiqueReviewOpen,
         )}
         onAction={handlePresentationAction}
         onAccessibilityChange={setAccessibilitySettings}
@@ -3490,6 +3754,7 @@ function resolveMatch(
         onKeyboardBindingsChange={setKeyboardBindings}
         onPauseChange={handleGameplayPauseChange}
         onSkipEffect={skipPresentationSequence}
+        onVisualProgressionChange={setVisualProgressionPreferences}
         partyCount={save.team.length}
         primaryActionDisabled={Boolean(
           restartConfirmationOpen ||
@@ -3777,12 +4042,25 @@ function resolveMatch(
 
           <div className="panel-head-row">
             <h3>Trainer Profile</h3>
-            <button
-              className="secondary-btn micro-btn"
-              onClick={reopenTrainerSetup}
-            >
-              Edit Trainer
-            </button>
+            <div className="action-row">
+              {activeZone.id === 'home' ? (
+                <button
+                  className="primary-btn micro-btn"
+                  data-testid="open-physique-review"
+                  onClick={openPhysiqueReview}
+                  type="button"
+                >
+                  Physique Review
+                </button>
+              ) : null}
+              <button
+                className="secondary-btn micro-btn"
+                onClick={reopenTrainerSetup}
+                type="button"
+              >
+                Edit Trainer
+              </button>
+            </div>
           </div>
           <p className="small-note">
             {trainer.name} · Physique Level {String(trainerPhysique).padStart(2, '0')} ·
@@ -3893,8 +4171,10 @@ function resolveMatch(
                   <PixelCreature
                     cosmetics={activeBuddy.cosmetics}
                     creature={activeBuddy.creature}
+                    presentationContext="menu"
                     pose={workoutSession ? 'training' : 'idle'}
                     reducedMotion={save.accessibility.reducedMotion}
+                    scale={2.4}
                   />
                 </div>
                 <div className="active-copy">
@@ -3950,10 +4230,14 @@ function resolveMatch(
                   }
                   frame={workoutFrame}
                   keyboardBindings={save.input.keyboardBindings}
+                  machineName={activeMachine?.name ?? 'Training station'}
                   paused={gameplayPaused}
                   preview={workoutPreview}
+                  primaryMuscleGroups={activeMachine?.primaryMuscleGroups ?? []}
+                  reducedMotion={save.accessibility.reducedMotion}
                   selectedLoad={selectedWorkoutLoad}
                   session={workoutSession}
+                  trainerAppearance={trainerVisualPresentation.appearance}
                   onAction={performWorkoutAction}
                   onSelectLoad={setSelectedWorkoutLoad}
                   onStart={sendToWorkout}
@@ -4055,6 +4339,7 @@ function resolveMatch(
                     {activeBuddy ? (
                       <PixelCreature
                         animated
+                        battlePose={capturePlayerBattlePose}
                         cosmetics={activeBuddy.cosmetics}
                         creature={activeBuddy.creature}
                         pose={
@@ -4064,6 +4349,7 @@ function resolveMatch(
                               ? 'capture'
                               : 'idle'
                         }
+                        presentationContext="battle"
                         reducedMotion={save.accessibility.reducedMotion}
                       />
                     ) : <span>None</span>}
@@ -4071,7 +4357,7 @@ function resolveMatch(
                   </div>
                   <div className="combat-vs">VS</div>
                   <div
-                    className={`combat-figure ${encounter.isBoss ? 'combat-figure-opponent' : ''} ${captureOpponentReactionClass}`}
+                    className={`combat-figure ${encounter.isBoss ? 'combat-figure-opponent' : ''} ${encounterBossPresentation?.arenaLightingClass ?? ''} ${captureOpponentReactionClass}`}
                   >
                     <PixelCreature
                       animationCueId={
@@ -4083,10 +4369,15 @@ function resolveMatch(
                           : encounterBossCharacterDesign?.entranceAnimationId
                       }
                       animated
+                      battlePose={captureOpponentBattlePose}
+                      bossId={encounterBoss?.id}
+                      bossTier={encounterBossPresentation?.tier}
                       cosmetics={encounterBossCosmetics}
                       creature={encounter.creature}
                       pose={
-                        encounter.isBoss &&
+                        encounter.isBoss && encounterBossPresentation
+                          ? encounterBossPresentation.poseId
+                          : encounter.isBoss &&
                         (match?.status === 'escape' ||
                           match?.status === 'failed-pin' ||
                           match?.status === 'near-capture')
@@ -4098,6 +4389,7 @@ function resolveMatch(
                               ? 'entrance'
                               : 'idle'
                       }
+                      presentationContext="battle"
                       reducedMotion={save.accessibility.reducedMotion}
                     />
                     <span>{encounter.creature.name}</span>
@@ -4481,6 +4773,23 @@ function resolveMatch(
       <footer className="status-bar">
         <strong>Broadcast:</strong> {message}
       </footer>
+      {physiqueReviewOpen ? (
+        <PhysiqueReviewPanel
+          buddy={activeBuddy ?? undefined}
+          challengeResult={bodybuildingChallengeResult}
+          fatigue={save.trainingFatigue}
+          onChallenge={runBodybuildingChallenge}
+          onClose={closePhysiqueReview}
+          onDebugAdjust={adjustVisualProgressionDebug}
+          onPreferencesChange={setVisualProgressionPreferences}
+          onSaveSnapshot={savePhysiqueSnapshot}
+          presentation={trainerVisualPresentation}
+          ratings={physiqueRatings}
+          reducedMotion={save.accessibility.reducedMotion}
+          trainer={save.trainer}
+          visualProgression={save.visualProgression}
+        />
+      ) : null}
       <JourneyRestartDialog
         onCancel={() => setRestartConfirmationOpen(false)}
         onConfirm={restartOpeningProcess}

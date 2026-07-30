@@ -14,6 +14,7 @@ import {
 import type {
   TrainerAppearance,
   TrainerFacingDirection,
+  TrainerMuscleHighlightRegion,
   TrainerPose,
 } from '../../game/types';
 
@@ -23,9 +24,11 @@ interface TrainerPixelSpriteProps {
   className?: string;
   direction?: TrainerFacingDirection;
   label?: string;
+  highlightRegion?: TrainerMuscleHighlightRegion;
   pose?: TrainerPose;
   reducedMotion?: boolean;
   scale?: number;
+  silhouette?: boolean;
 }
 
 export function TrainerPixelSprite({
@@ -33,10 +36,12 @@ export function TrainerPixelSprite({
   appearance,
   className = '',
   direction = 'front',
+  highlightRegion,
   label = 'Trainer preview',
   pose = 'idle',
   reducedMotion = false,
   scale = 5,
+  silhouette = false,
 }: TrainerPixelSpriteProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [animationFrame, setAnimationFrame] = useState(0);
@@ -63,12 +68,38 @@ export function TrainerPixelSprite({
       animationFrame,
     );
     drawTrainerFrameToCanvas(context, frame);
-  }, [animationFrame, appearance, direction, pose]);
+    if (highlightRegion) {
+      const bounds = {
+        'upper-body': { x: 2, y: 7, width: 24, height: 15 },
+        core: { x: 6, y: 17, width: 16, height: 10 },
+        'lower-body': { x: 4, y: 23, width: 20, height: 12 },
+      }[highlightRegion];
+      context.fillStyle = '#f2c14e';
+      context.fillRect(bounds.x, bounds.y, 4, 1);
+      context.fillRect(bounds.x, bounds.y, 1, 4);
+      context.fillRect(bounds.x + bounds.width - 4, bounds.y, 4, 1);
+      context.fillRect(bounds.x + bounds.width - 1, bounds.y, 1, 4);
+      context.fillRect(bounds.x, bounds.y + bounds.height - 1, 4, 1);
+      context.fillRect(bounds.x, bounds.y + bounds.height - 4, 1, 4);
+      context.fillRect(
+        bounds.x + bounds.width - 4,
+        bounds.y + bounds.height - 1,
+        4,
+        1,
+      );
+      context.fillRect(
+        bounds.x + bounds.width - 1,
+        bounds.y + bounds.height - 4,
+        1,
+        4,
+      );
+    }
+  }, [animationFrame, appearance, direction, highlightRegion, pose]);
 
   return (
     <canvas
       aria-label={`${label}: ${direction}, ${pose}`}
-      className={`trainer-pixel-canvas ${className}`.trim()}
+      className={`trainer-pixel-canvas ${silhouette ? 'trainer-silhouette-canvas' : ''} ${className}`.trim()}
       height={TRAINER_PIXEL_HEIGHT}
       ref={canvasRef}
       role="img"

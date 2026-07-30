@@ -4,6 +4,7 @@ import {
 } from 'react';
 
 import { CAPTURE_BATTLE_SPEEDS } from '../../game/content/captureBalance';
+import { DEVELOPMENT_PRESENTATION_LEVELS } from '../../game/content/visualProgression';
 import {
   DEFAULT_KEYBOARD_BINDINGS,
   GAMEPAD_PROFILE_LABELS,
@@ -18,6 +19,7 @@ import type {
   KeyboardBindingMap,
   PlayerInputAction,
   SaveAccessibilitySettings,
+  TrainerVisualProgressionPreferences,
 } from '../../game/types';
 
 interface InputAccessibilityPanelProps {
@@ -25,10 +27,14 @@ interface InputAccessibilityPanelProps {
   battleSpeed: CaptureBattleSpeed;
   gamepadProfile: GamepadProfileId;
   keyboardBindings: KeyboardBindingMap;
+  visualProgression: TrainerVisualProgressionPreferences;
   onAccessibilityChange: (settings: SaveAccessibilitySettings) => void;
   onBattleSpeedChange: (speed: CaptureBattleSpeed) => void;
   onKeyboardBindingsChange: (bindings: KeyboardBindingMap) => void;
   onRemap: (action: PlayerInputAction, code: string) => void;
+  onVisualProgressionChange: (
+    preferences: TrainerVisualProgressionPreferences,
+  ) => void;
 }
 
 function cloneDefaultBindings(): KeyboardBindingMap {
@@ -49,6 +55,8 @@ export function InputAccessibilityPanel({
   onBattleSpeedChange,
   onKeyboardBindingsChange,
   onRemap,
+  onVisualProgressionChange,
+  visualProgression,
 }: InputAccessibilityPanelProps) {
   const [listeningAction, setListeningAction] =
     useState<PlayerInputAction | null>(null);
@@ -104,6 +112,26 @@ export function InputAccessibilityPanel({
             <option value="standard">Standard</option>
             <option value="fast">Fast</option>
             <option value="instant">Instant</option>
+          </select>
+        </label>
+        <label className="gb-settings-field">
+          <span>Training development</span>
+          <select
+            aria-label="Training development intensity"
+            value={visualProgression.developmentLevel}
+            onChange={(event) =>
+              onVisualProgressionChange({
+                ...visualProgression,
+                developmentLevel: event.target
+                  .value as TrainerVisualProgressionPreferences['developmentLevel'],
+              })
+            }
+          >
+            {DEVELOPMENT_PRESENTATION_LEVELS.map((level) => (
+              <option key={level.id} value={level.id}>
+                {level.label}
+              </option>
+            ))}
           </select>
         </label>
         <label className="gb-settings-field">
@@ -182,6 +210,49 @@ export function InputAccessibilityPanel({
             }
           />
           <span>High-contrast interface</span>
+        </label>
+        <label className="gb-menu-toggle">
+          <input
+            type="checkbox"
+            checked={
+              visualProgression.developmentLevel !== 'cosmetic-only'
+            }
+            onChange={(event) =>
+              onVisualProgressionChange({
+                ...visualProgression,
+                developmentLevel: event.target.checked
+                  ? 'standard'
+                  : 'cosmetic-only',
+              })
+            }
+          />
+          <span>Show Training Development</span>
+        </label>
+        <label className="gb-menu-toggle">
+          <input
+            type="checkbox"
+            checked={visualProgression.showPumpEffects}
+            onChange={(event) =>
+              onVisualProgressionChange({
+                ...visualProgression,
+                showPumpEffects: event.target.checked,
+              })
+            }
+          />
+          <span>Show workout pump highlights</span>
+        </label>
+        <label className="gb-menu-toggle">
+          <input
+            type="checkbox"
+            checked={visualProgression.showFatigueEffects}
+            onChange={(event) =>
+              onVisualProgressionChange({
+                ...visualProgression,
+                showFatigueEffects: event.target.checked,
+              })
+            }
+          />
+          <span>Show fatigue and recovery stance</span>
         </label>
       </div>
 

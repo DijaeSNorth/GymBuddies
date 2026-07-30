@@ -8,6 +8,8 @@ import {
 
 import {
   DEFAULT_TRAINER_APPEARANCE,
+  TRAINER_BUILD_ATTRIBUTES,
+  TRAINER_RANDOMIZATION_FILTERS,
   cloneTrainerAppearance,
   getTrainerPhysiquePresetById,
 } from '../../game/content/trainerAppearance';
@@ -27,19 +29,20 @@ import type {
   TrainerAppearancePreset,
   TrainerCreationDraft,
   TrainerFacingDirection,
+  TrainerForgeMode,
   TrainerMuscleId,
   TrainerPose,
+  TrainerRandomizationFilter,
   TrainerStartMode,
 } from '../../game/types';
 import {
   TRAINER_CUSTOMIZATION_TABS,
   TrainerCustomizationControls,
 } from './TrainerCustomizationControls';
-import { TrainerPixelSprite } from './TrainerPixelSprite';
 import {
-  TRAINER_DIRECTIONS,
   TrainerPreviewControls,
 } from './TrainerPreviewControls';
+import { TrainerPreviewWorkbench } from './TrainerPreviewWorkbench';
 import './trainerCreation.css';
 
 interface TrainerCreationScreenProps {
@@ -221,10 +224,13 @@ export function TrainerCreationScreen({
   const nextGamepadRepeatAtRef = useRef(0);
   const [activeTab, setActiveTab] =
     useState<TrainerAppearanceCategory>('build');
+  const [forgeMode, setForgeMode] =
+    useState<TrainerForgeMode>('quick');
+  const [randomizationFilter, setRandomizationFilter] =
+    useState<TrainerRandomizationFilter>('any-physique');
   const [direction, setDirection] =
     useState<TrainerFacingDirection>('front');
   const [pose, setPose] = useState<TrainerPose>('idle');
-  const [compareBefore, setCompareBefore] = useState(false);
   const [undoStack, setUndoStack] = useState<TrainerAppearance[]>([]);
   const [redoStack, setRedoStack] = useState<TrainerAppearance[]>([]);
 
@@ -264,13 +270,23 @@ export function TrainerCreationScreen({
   }, [draft.appearance, onAppearanceChange, redoStack]);
 
   const resetCategory = useCallback(() => {
-    if (activeTab === 'preview') {
-      commitAppearance(cloneTrainerAppearance(DEFAULT_TRAINER_APPEARANCE));
-      return;
-    }
     const next = cloneTrainerAppearance(draft.appearance);
-    if (activeTab === 'build') {
-      next.build = { ...DEFAULT_TRAINER_APPEARANCE.build };
+    if (
+      activeTab === 'build' ||
+      activeTab === 'upper-body' ||
+      activeTab === 'core' ||
+      activeTab === 'lower-body'
+    ) {
+      for (const attribute of TRAINER_BUILD_ATTRIBUTES) {
+        if (
+          forgeMode === 'quick'
+            ? attribute.quick
+            : attribute.region === activeTab
+        ) {
+          next.build[attribute.id] =
+            DEFAULT_TRAINER_APPEARANCE.build[attribute.id];
+        }
+      }
     } else if (activeTab === 'face') {
       next.face = { ...DEFAULT_TRAINER_APPEARANCE.face };
     } else if (activeTab === 'hair') {
@@ -281,9 +297,11 @@ export function TrainerCreationScreen({
       next.colors = { ...DEFAULT_TRAINER_APPEARANCE.colors };
     } else if (activeTab === 'accessories') {
       next.accessories = { ...DEFAULT_TRAINER_APPEARANCE.accessories };
+    } else if (activeTab === 'poses' || activeTab === 'saved-looks') {
+      return;
     }
     commitAppearance(next);
-  }, [activeTab, commitAppearance, draft.appearance]);
+  }, [activeTab, commitAppearance, draft.appearance, forgeMode]);
 
   const applyPhysiquePreset = (presetId: string) => {
     const preset = getTrainerPhysiquePresetById(presetId);
@@ -295,21 +313,27 @@ export function TrainerCreationScreen({
     onPhysiquePresetSelect(preset.id);
   };
 
-  const rotate = (directionStep: -1 | 1) => {
-    const current = TRAINER_DIRECTIONS.indexOf(direction);
-    setDirection(
-      TRAINER_DIRECTIONS[
-        (current + directionStep + TRAINER_DIRECTIONS.length) %
-          TRAINER_DIRECTIONS.length
-      ]!,
-    );
-  };
-
   const randomize = () => {
     randomSeedRef.current =
       (Math.imul(randomSeedRef.current, 1664525) + 1013904223) >>> 0;
-    commitAppearance(randomizeTrainerAppearance(randomSeedRef.current));
+    commitAppearance(
+      randomizeTrainerAppearance(
+        randomSeedRef.current,
+        randomizationFilter,
+      ),
+    );
   };
+
+  useEffect(() => {
+    if (
+      forgeMode === 'quick' &&
+      (activeTab === 'upper-body' ||
+        activeTab === 'core' ||
+        activeTab === 'lower-body')
+    ) {
+      setActiveTab('build');
+    }
+  }, [activeTab, forgeMode]);
 
   useEffect(() => {
     if (!window.matchMedia('(pointer: fine)').matches) return;
@@ -474,64 +498,16 @@ export function TrainerCreationScreen({
               <p>{direction} · {pose}</p>
             </div>
           </div>
-          <div
-            className={`trainer-preview-stage ${
-              compareBefore ? 'trainer-preview-comparison' : ''
-            }`}
-          >
-            {compareBefore ? (
-              <figure>
-                <TrainerPixelSprite
-                  appearance={initialAppearanceRef.current}
-                  direction={direction}
-                  label="Before customization"
-                  pose={pose}
-                  reducedMotion={reducedMotion}
-                  scale={3.2}
-                />
-                <figcaption>Before</figcaption>
-              </figure>
-            ) : null}
-            <figure>
-              <TrainerPixelSprite
-                appearance={draft.appearance}
-                direction={direction}
-                label="Current trainer"
-                pose={pose}
-                reducedMotion={reducedMotion}
-                scale={compareBefore ? 3.2 : 4.6}
-              />
-              <figcaption>{compareBefore ? 'Current' : draft.name || 'Trainer'}</figcaption>
-            </figure>
-          </div>
-          <div className="trainer-rotation-controls" aria-label="Preview rotation">
-            <button
-              aria-label="Rotate trainer left"
-              data-setup-control="true"
-              onClick={() => rotate(-1)}
-              type="button"
-            >
-              ↶
-            </button>
-            <span>{direction}</span>
-            <button
-              aria-label="Rotate trainer right"
-              data-setup-control="true"
-              onClick={() => rotate(1)}
-              type="button"
-            >
-              ↷
-            </button>
-          </div>
-          <button
-            aria-pressed={compareBefore}
-            className="trainer-compare-toggle"
-            data-setup-control="true"
-            onClick={() => setCompareBefore((active) => !active)}
-            type="button"
-          >
-            {compareBefore ? 'Hide Before View' : 'Compare Before & After'}
-          </button>
+          <TrainerPreviewWorkbench
+            appearance={draft.appearance}
+            direction={direction}
+            initialAppearance={initialAppearanceRef.current}
+            name={draft.name || 'Trainer'}
+            onDirectionChange={setDirection}
+            onPoseChange={setPose}
+            pose={pose}
+            reducedMotion={reducedMotion}
+          />
           <label className="trainer-name-field">
             Trainer name
             <input
@@ -567,12 +543,36 @@ export function TrainerCreationScreen({
               <p>Every option uses a stable content ID.</p>
             </div>
           </div>
+          <div className="trainer-forge-mode" aria-label="Trainer Forge mode">
+            <button
+              aria-pressed={forgeMode === 'quick'}
+              className={forgeMode === 'quick' ? 'active' : ''}
+              data-setup-control="true"
+              onClick={() => setForgeMode('quick')}
+              type="button"
+            >
+              <strong>Quick Forge</strong>
+              <small>Presets and essential silhouette controls</small>
+            </button>
+            <button
+              aria-pressed={forgeMode === 'detail'}
+              className={forgeMode === 'detail' ? 'active' : ''}
+              data-setup-control="true"
+              onClick={() => setForgeMode('detail')}
+              type="button"
+            >
+              <strong>Detail Forge</strong>
+              <small>Every regional proportion and comparison tool</small>
+            </button>
+          </div>
           <div
             aria-label="Trainer customization sections"
             className="trainer-custom-tabs"
             role="tablist"
           >
-            {TRAINER_CUSTOMIZATION_TABS.map((tab) => (
+            {TRAINER_CUSTOMIZATION_TABS.filter(
+              (tab) => forgeMode === 'detail' || !tab.detailOnly,
+            ).map((tab) => (
               <button
                 aria-controls={`trainer-tab-panel-${tab.id}`}
                 aria-selected={activeTab === tab.id}
@@ -589,6 +589,24 @@ export function TrainerCreationScreen({
             ))}
           </div>
           <div className="trainer-history-toolbar">
+            <label className="trainer-random-filter">
+              Random style
+              <select
+                data-setup-control="true"
+                onChange={(event) =>
+                  setRandomizationFilter(
+                    event.target.value as TrainerRandomizationFilter,
+                  )
+                }
+                value={randomizationFilter}
+              >
+                {TRAINER_RANDOMIZATION_FILTERS.map((filter) => (
+                  <option key={filter.id} value={filter.id}>
+                    {filter.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               data-setup-control="true"
               onClick={randomize}
@@ -614,10 +632,13 @@ export function TrainerCreationScreen({
             </button>
             <button
               data-setup-control="true"
+              disabled={
+                activeTab === 'poses' || activeTab === 'saved-looks'
+              }
               onClick={resetCategory}
               type="button"
             >
-              Reset {activeTab === 'preview' ? 'All Cosmetics' : activeTab}
+              Reset {activeTab.replace('-', ' ')}
             </button>
           </div>
           <section
@@ -629,11 +650,12 @@ export function TrainerCreationScreen({
             <TrainerCustomizationControls
               activeTab={activeTab}
               draft={draft}
+              forgeMode={forgeMode}
               onAppearanceChange={commitAppearance}
               onGameplayPresetSelect={onPresetSelect}
               onMuscleChange={onMuscleChange}
               onPhysiquePresetSelect={applyPhysiquePreset}
-              previewContent={
+              poseContent={
                 <TrainerPreviewControls
                   appearance={draft.appearance}
                   appearancePresets={draft.appearancePresets}
@@ -645,6 +667,22 @@ export function TrainerCreationScreen({
                   onDirectionChange={setDirection}
                   onPoseChange={setPose}
                   pose={pose}
+                  section="poses"
+                />
+              }
+              savedLooksContent={
+                <TrainerPreviewControls
+                  appearance={draft.appearance}
+                  appearancePresets={draft.appearancePresets}
+                  direction={direction}
+                  onAppearanceLoad={commitAppearance}
+                  onAppearancePresetsChange={
+                    onAppearancePresetsChange
+                  }
+                  onDirectionChange={setDirection}
+                  onPoseChange={setPose}
+                  pose={pose}
+                  section="saved-looks"
                 />
               }
             />

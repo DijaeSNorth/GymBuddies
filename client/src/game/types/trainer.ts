@@ -40,7 +40,46 @@ export type TrainerBuildAttributeId =
   | 'calfSize'
   | 'footSize'
   | 'muscleDefinition'
-  | 'bodyMass';
+  | 'bodyMass'
+  | 'clavicleWidth'
+  | 'shoulderRoundness'
+  | 'frontDeltSize'
+  | 'sideDeltSize'
+  | 'rearDeltSize'
+  | 'upperChestFullness'
+  | 'lowerChestFullness'
+  | 'latWidth'
+  | 'latFlare'
+  | 'midBackThickness'
+  | 'trapeziusHeight'
+  | 'trapeziusWidth'
+  | 'bicepsPeak'
+  | 'bicepsThickness'
+  | 'tricepsHorseshoeDefinition'
+  | 'forearmThickness'
+  | 'forearmVascularDefinition'
+  | 'ribcageWidth'
+  | 'waistTaper'
+  | 'abdominalDefinition'
+  | 'obliqueDefinition'
+  | 'serratusDefinition'
+  | 'midsectionThickness'
+  | 'hipWidth'
+  | 'gluteFullness'
+  | 'quadSweep'
+  | 'innerThighThickness'
+  | 'hamstringDrop'
+  | 'calfWidth'
+  | 'calfHeight'
+  | 'ankleThickness'
+  | 'bodyFatPresentation'
+  | 'muscleFullness'
+  | 'muscleSeparation'
+  | 'vascularity'
+  | 'pumpLevel'
+  | 'posture'
+  | 'stanceWidth'
+  | 'symmetryPreference';
 
 export type TrainerCosmeticBuild = Record<TrainerBuildAttributeId, number>;
 
@@ -74,6 +113,8 @@ export type TrainerOutfitAppearance = {
   wristWrapsId: string;
   elbowSleevesId: string;
   kneeSleevesId: string;
+  logoShapeId: string;
+  chalkMarksId: string;
 };
 
 export type TrainerAccessoryAppearance = {
@@ -82,6 +123,7 @@ export type TrainerAccessoryAppearance = {
   gymBagId: string;
   jewelryId: string;
   fantasyId: string;
+  towelId: string;
 };
 
 export type TrainerColorAppearance = {
@@ -95,10 +137,12 @@ export type TrainerColorAppearance = {
   shoeAccentId: string;
   accessoryPrimaryId: string;
   accessoryAccentId: string;
+  trimColorId: string;
+  logoColorId: string;
 };
 
 export type TrainerAppearance = {
-  version: 2;
+  version: 3;
   build: TrainerCosmeticBuild;
   face: TrainerFaceAppearance;
   hair: TrainerHairAppearance;
@@ -109,12 +153,52 @@ export type TrainerAppearance = {
 
 export type TrainerAppearanceCategory =
   | 'build'
+  | 'upper-body'
+  | 'core'
+  | 'lower-body'
   | 'face'
   | 'hair'
   | 'outfit'
   | 'colors'
   | 'accessories'
-  | 'preview';
+  | 'poses'
+  | 'saved-looks';
+
+export type TrainerBuildRegion =
+  | 'build'
+  | 'upper-body'
+  | 'core'
+  | 'lower-body';
+
+export type TrainerForgeMode = 'quick' | 'detail';
+
+export type TrainerRandomizationFilter =
+  | 'any-physique'
+  | 'heavy-builds'
+  | 'lean-builds'
+  | 'upper-body-dominant'
+  | 'lower-body-dominant'
+  | 'balanced'
+  | 'fantasy-gym-champion'
+  | 'realistic-athletic'
+  | 'wild-colors'
+  | 'neutral-colors';
+
+export type TrainerPreviewMode =
+  | 'single'
+  | 'before-after'
+  | 'front-back'
+  | 'mirrored'
+  | 'silhouette'
+  | 'muscle-highlight'
+  | 'clothing-compare';
+
+export type TrainerPreviewLighting = 'neutral' | 'stage' | 'gym';
+
+export type TrainerMuscleHighlightRegion =
+  | 'upper-body'
+  | 'core'
+  | 'lower-body';
 
 export type TrainerFacingDirection = 'front' | 'back' | 'left' | 'right';
 
@@ -126,7 +210,29 @@ export type TrainerPose =
   | 'victory'
   | 'fatigue'
   | 'capture'
-  | 'boss-introduction';
+  | 'boss-introduction'
+  | 'front-relaxed'
+  | 'back-relaxed'
+  | 'front-double-biceps'
+  | 'back-double-biceps'
+  | 'side-chest'
+  | 'side-triceps'
+  | 'most-muscular'
+  | 'abs-and-thigh'
+  | 'victory-flex'
+  | 'pre-workout-warmup'
+  | 'post-set-pump'
+  | 'fatigued-stance'
+  | 'confident-walk'
+  | 'boss-entrance-pose';
+
+export type TrainerPoseDefinition = {
+  id: TrainerPose;
+  label: string;
+  category: 'movement' | 'gameplay' | 'bodybuilding';
+  defaultDirection: TrainerFacingDirection;
+  silhouetteCue: string;
+};
 
 export type TrainerAppearancePreset = {
   id: string;
@@ -170,6 +276,8 @@ export type TrainerBuildAttribute = {
   detail: string;
   minimumLabel: string;
   maximumLabel: string;
+  region: TrainerBuildRegion;
+  quick: boolean;
 };
 
 export type TrainerPhysiquePreset = {
@@ -177,6 +285,13 @@ export type TrainerPhysiquePreset = {
   label: string;
   description: string;
   build: TrainerCosmeticBuild;
+};
+
+export type TrainerAppearanceExportEnvelope = {
+  format: 'gym-buddies-appearance';
+  version: 3;
+  exportedAt: string;
+  appearance: TrainerAppearance;
 };
 
 export type TrainerAppearanceOption = {

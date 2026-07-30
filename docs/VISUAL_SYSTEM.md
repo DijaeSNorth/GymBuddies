@@ -74,6 +74,35 @@ Fullscreen expands the containing presentation surface, not the Phaser resolutio
 
 Sprites should prioritize silhouette, stance, and one identifying feature over surface detail. Buddy species must remain distinguishable in monochrome before palette is applied.
 
+### Bodybuilding silhouette grammar
+
+Trainer and important-character sprites use three discrete visual bands for
+each major body region: athletic, developed, and showcase. The renderer changes
+actual geometry for shoulder span, trapezius rise, chest and back width, upper-
+and lower-arm thickness, waist width, glute and thigh depth, calf width, body
+mass, and muscle separation. The minimum band must still read as deliberately
+muscular; the maximum band must preserve gaps between arms, torso, and legs.
+
+Direction controls emphasis:
+
+- front views prioritize chest, biceps, core, quads, and shoulder-to-waist taper;
+- back views prioritize trapezius, lats, lower back, triceps, glutes,
+  hamstrings, and calves; and
+- side views prioritize torso depth, biceps or triceps according to pose,
+  glutes, hamstrings, and calf shape.
+
+Stable pose IDs cover front/back relaxed, front/back double biceps, side chest,
+side triceps, most muscular, abs-and-thigh, victory flex, warmup, post-set pump,
+fatigued stance, confident walk, and boss entrance. Poses share the same
+bottom-center anchor and remain inside 28×36 logical pixels.
+
+Clothing follows the geometry that generated the body. Sleeves are derived from
+upper-arm and forearm segments; tanks expose shoulder and back geometry;
+compression tops follow the current torso taper; shorts and leggings follow
+glute, quad, and hamstring bounds; belts follow waist width; and wraps and
+sleeves use limb anchors. A garment must never replace the outer muscular
+silhouette with a generic rectangle.
+
 ## Palette
 
 The default palette is **Kinetic Slate**, an eight-color system:

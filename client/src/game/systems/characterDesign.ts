@@ -3,6 +3,7 @@ import {
   MUSCULAR_BODY_ARCHETYPE_BY_ID,
   NPC_APPEARANCE_TEMPLATE_BY_ID,
   NPC_CHARACTER_SEED_BY_ID,
+  NPC_OUTFIT_COMBINATION_BY_ID,
 } from '../content/characters';
 import {
   DEFAULT_TRAINER_APPEARANCE,
@@ -49,15 +50,39 @@ export function createNpcCharacterDesign(
   state = face.randomState;
   const hair = choose(state, template.hairStyleIds);
   state = hair.randomState;
-  const top = choose(state, template.topIds);
-  state = top.randomState;
-  const bottoms = choose(state, template.bottomIds);
-  state = bottoms.randomState;
-  const accessory = choose(state, template.accessoryIds);
-  state = accessory.randomState;
+  const facialHair = choose(state, template.facialHairIds);
+  state = facialHair.randomState;
+  const eyebrows = choose(state, template.eyebrowIds);
+  state = eyebrows.randomState;
+  const outfitChoice = choose(state, template.regionalOutfitIds);
+  state = outfitChoice.randomState;
+  const outfit = NPC_OUTFIT_COMBINATION_BY_ID.get(outfitChoice.value);
+  if (!outfit) {
+    throw new Error(
+      `NPC character "${seed.id}" references missing outfit "${outfitChoice.value}".`,
+    );
+  }
+  const specialty = choose(state, template.trainingSpecialtyIds);
+  state = specialty.randomState;
   const expression = choose(state, template.expressionIds);
   state = expression.randomState;
   const idlePose = choose(state, template.idlePoseIds);
+  state = idlePose.randomState;
+  const posePreference = choose(state, template.posePreferenceIds);
+  const primaryMuscleEmphasis = {
+    power: 'bicepsSize',
+    technique: 'forearmSize',
+    endurance: 'quadSize',
+    mobility: 'calfSize',
+    recovery: 'upperBackWidth',
+  } as const;
+  const signaturePose = {
+    power: 'most-muscular',
+    technique: 'side-triceps',
+    endurance: 'abs-and-thigh',
+    mobility: 'side-chest',
+    recovery: 'back-double-biceps',
+  } as const;
   const appearance: CharacterAppearanceRecipe = {
     archetypeId: archetype.value,
     heightShift: (seed.seed % 3) - 1,
@@ -67,7 +92,16 @@ export function createNpcCharacterDesign(
       ? 'determined-narrow'
       : expression.value === 'warm'
         ? 'bright-arc'
-        : 'focused-round',
+          : 'focused-round',
+    eyebrowsId: eyebrows.value,
+    noseId: seed.seed % 2 === 0 ? 'broad' : 'straight',
+    mouthId:
+      expression.value === 'warm'
+        ? 'small-smile'
+        : expression.value === 'playful'
+          ? 'bold-smirk'
+          : 'steady',
+    facialHairId: facialHair.value,
     hairStyleId: hair.value,
     hairLengthId:
       hair.value === 'bald'
@@ -78,24 +112,23 @@ export function createNpcCharacterDesign(
           ? 'long'
           : 'short',
     hairColorId: seed.seed % 2 === 0 ? 'ink' : 'copper',
-    topId: top.value,
-    bottomsId: bottoms.value,
-    shoesId:
-      discipline.value === 'mobility' ? 'runner-light' : 'trainer-low',
+    topId: outfit.topId,
+    bottomsId: outfit.bottomsId,
+    shoesId: outfit.shoesId,
     glovesId:
       discipline.value === 'power' ? 'fingerless' : 'none',
     wristWrapsId: TRAINER_WRIST_WRAPS.some(
-      (entry) => entry.id === accessory.value,
+      (entry) => entry.id === outfit.accessoryId,
     )
-      ? accessory.value
+      ? outfit.accessoryId
       : 'none',
     headwearId: TRAINER_HEADWEAR.some(
-      (entry) => entry.id === accessory.value,
+      (entry) => entry.id === outfit.accessoryId,
     )
-      ? accessory.value
+      ? outfit.accessoryId
       : 'none',
-    beltId: TRAINER_BELTS.some((entry) => entry.id === accessory.value)
-      ? accessory.value
+    beltId: TRAINER_BELTS.some((entry) => entry.id === outfit.accessoryId)
+      ? outfit.accessoryId
       : 'none',
     primaryColorId: ['teal', 'coral', 'ocean', 'moss', 'plum'][
       seed.seed % 5
@@ -111,15 +144,49 @@ export function createNpcCharacterDesign(
     appearance,
     idlePose: idlePose.value,
     expressionId: expression.value,
-    trainingPhilosophy: seed.trainingPhilosophy,
-    signaturePose: 'training',
-    signatureClothing: `${template.label} modular training kit`,
-    signatureEquipment: `${discipline.value} route kit`,
+    primaryMuscleEmphasis: primaryMuscleEmphasis[discipline.value],
+    regionalMuscleEmphasis: [
+      primaryMuscleEmphasis[discipline.value],
+      discipline.value === 'power' ? 'shoulderWidth' : 'coreDefinition',
+    ],
+    trainingPhilosophy: `${seed.trainingPhilosophy} Specialty: ${specialty.value.replaceAll('-', ' ')}.`,
+    signaturePose: posePreference.value ?? signaturePose[discipline.value],
+    warmupAnimationId: `${seed.id}-${specialty.value}-warmup`,
+    victoryPose: signaturePose[discipline.value],
+    lossReactionId: `${seed.id}-route-reset`,
+    signatureClothing: `${template.label} ${outfit.regionId} modular training kit`,
+    signatureOutfitId: outfit.id,
+    alternateLateGameOutfit: {
+      id: `${seed.id}-summit-outfit`,
+      label: `${seed.name} summit route kit`,
+      topId: outfit.topId === 'hoodie-training' ? 'tank-racer' : 'hoodie-training',
+      bottomsId: outfit.bottomsId,
+      primaryColorId: appearance.accentColorId,
+      secondaryColorId: appearance.secondaryColorId,
+      accentColorId: appearance.primaryColorId,
+    },
+    signatureEquipment: `${discipline.value} ${specialty.value} route kit`,
+    gymAccessoryId: `${seed.id}-${outfit.regionId}-token`,
+    sponsorPatch: {
+      id: `${seed.id}-${outfit.regionId}-patch`,
+      label: `${outfit.regionId} route mark`,
+      symbol:
+        discipline.value === 'power'
+          ? 'spark'
+          : discipline.value === 'technique'
+            ? 'knot'
+            : discipline.value === 'endurance'
+              ? 'anchor'
+              : discipline.value === 'mobility'
+                ? 'arc'
+                : 'summit',
+    },
     battleStance:
       archetype.value === 'heavyweight-anchor'
         ? 'Grounded and patient'
         : 'Athletic route-ready stance',
     entranceAnimationId: `${seed.id}-route-arrival`,
+    idleAnimationId: `${seed.id}-${discipline.value}-physique-idle`,
     victoryAnimationId: `${seed.id}-route-salute`,
     handcrafted: false,
   };
@@ -134,6 +201,7 @@ export function getWorldCharacterDesign(id: string) {
 
 export function trainerAppearanceFromCharacterDesign(
   design: WorldCharacterDesign,
+  outfit: 'signature' | 'late-game' = 'signature',
 ): TrainerAppearance {
   const archetype = MUSCULAR_BODY_ARCHETYPE_BY_ID.get(
     design.appearance.archetypeId,
@@ -178,5 +246,20 @@ export function trainerAppearanceFromCharacterDesign(
   appearance.colors.shoeAccentId = design.appearance.accentColorId;
   appearance.colors.accessoryPrimaryId = design.appearance.accentColorId;
   appearance.colors.accessoryAccentId = design.appearance.primaryColorId;
+  if (outfit === 'late-game') {
+    appearance.outfit.topId = design.alternateLateGameOutfit.topId;
+    appearance.outfit.bottomsId =
+      design.alternateLateGameOutfit.bottomsId;
+    appearance.colors.topPrimaryId =
+      design.alternateLateGameOutfit.primaryColorId;
+    appearance.colors.topSecondaryId =
+      design.alternateLateGameOutfit.secondaryColorId;
+    appearance.colors.topAccentId =
+      design.alternateLateGameOutfit.accentColorId;
+  }
+  appearance.face.eyebrowsId = design.appearance.eyebrowsId;
+  appearance.face.noseId = design.appearance.noseId;
+  appearance.face.mouthId = design.appearance.mouthId;
+  appearance.face.facialHairId = design.appearance.facialHairId;
   return appearance;
 }

@@ -9,8 +9,10 @@ import {
 import {
   DEFAULT_TRAINER_APPEARANCE,
   DEFAULT_TRAINER_PHYSIQUE_PRESET_ID,
+  MAX_SAVED_APPEARANCE_PRESETS,
   TRAINER_BUILD_ATTRIBUTES,
   TRAINER_PHYSIQUE_PRESETS,
+  TRAINER_RANDOMIZATION_FILTERS,
   cloneTrainerAppearance,
   getTrainerPhysiquePresetById,
 } from '../game/content/trainerAppearance';
@@ -28,7 +30,10 @@ import {
   validateTrainerCreationDraft,
 } from '../game/systems/trainerCreation';
 import {
+  exportTrainerAppearanceJson,
+  importTrainerAppearanceJson,
   normalizeTrainerAppearance,
+  normalizeTrainerAppearancePresets,
   randomizeTrainerAppearance,
   validateTrainerAppearance,
 } from '../game/systems/trainerAppearance';
@@ -56,15 +61,15 @@ const profile: TrainerProfile = {
 };
 
 describe('trainer creation foundation', () => {
-  it('provides eight cosmetic physique presets and 22 independent build controls', () => {
-    expect(TRAINER_PHYSIQUE_PRESETS).toHaveLength(8);
-    expect(TRAINER_BUILD_ATTRIBUTES).toHaveLength(22);
+  it('provides 26 editable physique presets and 61 independent build controls', () => {
+    expect(TRAINER_PHYSIQUE_PRESETS).toHaveLength(26);
+    expect(TRAINER_BUILD_ATTRIBUTES).toHaveLength(61);
     expect(
       getTrainerPhysiquePresetById(DEFAULT_TRAINER_PHYSIQUE_PRESET_ID),
     ).toBeDefined();
     TRAINER_PHYSIQUE_PRESETS.forEach((preset) => {
       expect(preset.id).toBeTruthy();
-      expect(Object.keys(preset.build)).toHaveLength(22);
+      expect(Object.keys(preset.build)).toHaveLength(61);
       Object.values(preset.build).forEach((value) => {
         expect(value).toBeGreaterThanOrEqual(0);
         expect(value).toBeLessThanOrEqual(10);
@@ -140,6 +145,35 @@ describe('trainer creation foundation', () => {
     expect(first.build.quadSize).toBeGreaterThanOrEqual(5);
   });
 
+  it('keeps every controlled randomization filter valid and muscular', () => {
+    for (const [filterIndex, filter] of TRAINER_RANDOMIZATION_FILTERS.entries()) {
+      for (let sample = 0; sample < 12; sample += 1) {
+        const appearance = randomizeTrainerAppearance(
+          filterIndex * 100 + sample + 1,
+          filter.id,
+        );
+        expect(validateTrainerAppearance(appearance)).toEqual([]);
+        expect(appearance.build.shoulderWidth).toBeGreaterThanOrEqual(5);
+        expect(appearance.build.chestSize).toBeGreaterThanOrEqual(5);
+        expect(appearance.build.quadSize).toBeGreaterThanOrEqual(5);
+      }
+    }
+  });
+
+  it('normalizes minimum and maximum values for every new regional control', () => {
+    const advanced = TRAINER_BUILD_ATTRIBUTES.slice(22);
+    expect(advanced).toHaveLength(39);
+    for (const attribute of advanced) {
+      for (const value of [0, 10]) {
+        const appearance = cloneTrainerAppearance(DEFAULT_TRAINER_APPEARANCE);
+        appearance.build[attribute.id] = value;
+        const normalized = normalizeTrainerAppearance(appearance);
+        expect(normalized.appearance.build[attribute.id]).toBe(value);
+        expect(normalized.issues).toEqual([]);
+      }
+    }
+  });
+
   it('repairs missing or removed stable option IDs with safe defaults', () => {
     const malformed = cloneTrainerAppearance(DEFAULT_TRAINER_APPEARANCE);
     malformed.face.shapeId = 'removed-face';
@@ -159,13 +193,13 @@ describe('trainer creation foundation', () => {
     expect(result.issues).toHaveLength(3);
   });
 
-  it('serializes a completed profile through save schema v16', () => {
+  it('serializes a completed profile through save schema v19', () => {
     const draft = createTrainerCreationDraft(profile);
     expect(validateTrainerCreationDraft(draft)).toEqual([]);
     const savedProfile = trainerProfileFromCreationDraft(draft);
-    expect(savedProfile.appearance.version).toBe(2);
+    expect(savedProfile.appearance.version).toBe(3);
     expect(savedProfile.appearance).toEqual(draft.appearance);
-    expect(SAVE_VERSION).toBe('v16');
+    expect(SAVE_VERSION).toBe('v19');
     expect(JSON.parse(JSON.stringify(savedProfile))).toEqual(savedProfile);
 
     expect(
@@ -184,6 +218,77 @@ describe('trainer creation foundation', () => {
     expect(next.appearancePresets[0]?.id).toBe('player-look.power-blue');
     expect(next.appearancePresets[0]?.appearance).toEqual(draft.appearance);
     expect(next.appearancePresets[0]?.appearance).not.toBe(draft.appearance);
+  });
+
+  it('caps, de-duplicates, and repairs saved looks by stable ID', () => {
+    const raw = Array.from(
+      { length: MAX_SAVED_APPEARANCE_PRESETS + 2 },
+      (_, index) => ({
+        id: index < 2 ? 'duplicate-look' : `look-${index}`,
+        name: `Look ${index}`,
+        appearance: {
+          ...cloneTrainerAppearance(DEFAULT_TRAINER_APPEARANCE),
+          outfit: {
+            ...DEFAULT_TRAINER_APPEARANCE.outfit,
+            topId: index === 3 ? 'removed-top' : 'tank-stringer',
+          },
+        },
+      }),
+    );
+    const normalized = normalizeTrainerAppearancePresets(raw);
+
+    expect(normalized.presets).toHaveLength(MAX_SAVED_APPEARANCE_PRESETS);
+    expect(new Set(normalized.presets.map(({ id }) => id)).size).toBe(
+      MAX_SAVED_APPEARANCE_PRESETS,
+    );
+    expect(normalized.presets[3]?.appearance.outfit.topId).toBe(
+      DEFAULT_TRAINER_APPEARANCE.outfit.topId,
+    );
+    expect(normalized.issues.length).toBeGreaterThan(1);
+  });
+
+  it('exports and imports appearance-only JSON without progression data', () => {
+    const appearance = cloneTrainerAppearance(DEFAULT_TRAINER_APPEARANCE);
+    appearance.build.latFlare = 10;
+    appearance.outfit.topId = 'tank-stringer';
+    const json = exportTrainerAppearanceJson(
+      appearance,
+      '2026-07-29T00:00:00.000Z',
+    );
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    const imported = importTrainerAppearanceJson(json);
+
+    expect(parsed).not.toHaveProperty('muscles');
+    expect(parsed).not.toHaveProperty('team');
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.appearance).toEqual(appearance);
+    expect(imported.issues).toEqual([]);
+  });
+
+  it('repairs removed IDs in older appearance-only exports', () => {
+    const legacy = cloneTrainerAppearance(DEFAULT_TRAINER_APPEARANCE) as unknown as {
+      version: number;
+      outfit: { topId: string };
+    };
+    legacy.version = 2;
+    legacy.outfit.topId = 'retired-stringer';
+    const imported = importTrainerAppearanceJson(
+      JSON.stringify({
+        format: 'gym-buddies-appearance',
+        version: 2,
+        exportedAt: '2026-07-29T00:00:00.000Z',
+        appearance: legacy,
+      }),
+    );
+
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.appearance.version).toBe(3);
+    expect(imported.appearance.outfit.topId).toBe(
+      DEFAULT_TRAINER_APPEARANCE.outfit.topId,
+    );
+    expect(imported.issues.length).toBeGreaterThan(0);
   });
 
   it('saves an edited appearance without resetting journey progression', () => {

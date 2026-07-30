@@ -1,16 +1,69 @@
 import type {
   BossCharacterDesign,
+  BossPresentationTier,
+  BossPresentationTierDesign,
   BuddyCosmetics,
 } from '../types';
 import { getBuddyCharacterDesign } from './buddyCharacters';
 
 type BossDesignSeed = Omit<
   BossCharacterDesign,
-  'id' | 'appendageVariantId'
+  'id' | 'appendageVariantId' | 'presentationTiers'
 > & {
-  speciesId: string;
   alternateAppendage?: boolean;
 };
+
+function createPresentationTiers(
+  bossId: string,
+): BossPresentationTierDesign[] {
+  return [
+    {
+      id: `${bossId}-presentation-normal`,
+      tier: 'normal',
+      label: 'Normal',
+      poseId: 'boss-entrance',
+      equipmentCue: 'Signature equipment secured',
+      arenaLightingClass: 'boss-lighting-normal',
+      motionCue: 'Measured breathing',
+    },
+    {
+      id: `${bossId}-presentation-pumped`,
+      tier: 'pumped',
+      label: 'Pumped',
+      poseId: 'front-flex',
+      equipmentCue: 'Wraps tightened',
+      arenaLightingClass: 'boss-lighting-pumped',
+      motionCue: 'Confident pump pulse',
+    },
+    {
+      id: `${bossId}-presentation-overload`,
+      tier: 'overload',
+      label: 'Overload',
+      poseId: 'side-pose',
+      equipmentCue: 'Overload bands engaged',
+      arenaLightingClass: 'boss-lighting-overload',
+      motionCue: 'Heavy controlled breathing',
+    },
+    {
+      id: `${bossId}-presentation-final-round`,
+      tier: 'final-round',
+      label: 'Final Round',
+      poseId: 'back-flex',
+      equipmentCue: 'Champion crest revealed',
+      arenaLightingClass: 'boss-lighting-final',
+      motionCue: 'Final stance lock',
+    },
+    {
+      id: `${bossId}-presentation-defeated`,
+      tier: 'defeated',
+      label: 'Defeated',
+      poseId: 'fatigue',
+      equipmentCue: 'Equipment lowered safely',
+      arenaLightingClass: 'boss-lighting-defeated',
+      motionCue: 'Respectful recovery breath',
+    },
+  ];
+}
 
 function bossDesign(seed: BossDesignSeed): BossCharacterDesign {
   const speciesDesign = getBuddyCharacterDesign(seed.speciesId);
@@ -20,6 +73,7 @@ function bossDesign(seed: BossDesignSeed): BossCharacterDesign {
     appendageVariantId:
       speciesDesign.appendageOptions[seed.alternateAppendage ? 1 : 0]?.id ??
       speciesDesign.defaultCosmetics.appendageVariantId,
+    presentationTiers: createPresentationTiers(seed.bossId),
   };
 }
 
@@ -28,6 +82,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'home-watchman',
     speciesId: 'brawny-bear',
     buildLabel: 'Compact mat strongman',
+    primaryMuscleEmphasis: 'forearms',
     trainingPhilosophy: 'A safe brace creates room for the next attempt.',
     signaturePoseId: 'victory-grounded',
     signatureClothing: 'Moss wrist wraps with chalk edge stitching',
@@ -49,6 +104,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'home-librarian',
     speciesId: 'buff-otter',
     buildLabel: 'Lean mobility coach',
+    primaryMuscleEmphasis: 'core',
     trainingPhilosophy: 'A clean reset is a technical victory.',
     signaturePoseId: 'victory-spring',
     signatureClothing: 'Tide headband and pale route sash',
@@ -71,6 +127,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'a-rhino',
     speciesId: 'ripped-rhino',
     buildLabel: 'Upper-body rail specialist',
+    primaryMuscleEmphasis: 'shoulders',
     trainingPhilosophy: 'Press along one honest line and defend it.',
     signaturePoseId: 'victory-flex',
     signatureClothing: 'Coral shoulder bands',
@@ -93,6 +150,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'a-bison',
     speciesId: 'boulder-bison',
     buildLabel: 'Heavy carry anchor',
+    primaryMuscleEmphasis: 'back',
     trainingPhilosophy: 'Pressure should rise slowly enough to control.',
     signaturePoseId: 'victory-grounded',
     signatureClothing: 'Redline chain draped below the hump',
@@ -114,6 +172,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'b-wolf',
     speciesId: 'iron-wolf',
     buildLabel: 'Lean counter specialist',
+    primaryMuscleEmphasis: 'back',
     trainingPhilosophy: 'The smallest angle change can reverse a pull.',
     signaturePoseId: 'victory-spring',
     signatureClothing: 'Blue hand tape and split-tail marker',
@@ -136,6 +195,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'b-boar',
     speciesId: 'muscled-boar',
     buildLabel: 'Low-set hip-drive powerlifter',
+    primaryMuscleEmphasis: 'chest',
     trainingPhilosophy: 'Build tension first; ring the bell once.',
     signaturePoseId: 'victory-flex',
     signatureClothing: 'Copper lifting belt',
@@ -157,6 +217,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'h1-gryphon',
     speciesId: 'prismantle',
     buildLabel: 'Angular shoulder technician',
+    primaryMuscleEmphasis: 'shoulders',
     trainingPhilosophy: 'Every facet offers a new line of control.',
     signaturePoseId: 'victory-spring',
     signatureClothing: 'Violet fin wraps',
@@ -179,6 +240,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'h1-gorilla',
     speciesId: 'manyfold',
     buildLabel: 'Four-arm recovery relay',
+    primaryMuscleEmphasis: 'shoulders',
     trainingPhilosophy: 'One arm works while another prepares the reset.',
     signaturePoseId: 'victory-grounded',
     signatureClothing: 'Alternating mint forearm wraps',
@@ -200,6 +262,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'h2-hydra',
     speciesId: 'vaultwyrm',
     buildLabel: 'Coiled endurance arch',
+    primaryMuscleEmphasis: 'core',
     trainingPhilosophy: 'A complete loop distributes every hard pull.',
     signaturePoseId: 'victory-grounded',
     signatureClothing: 'Dark clasp belt',
@@ -222,6 +285,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'h2-manticore',
     speciesId: 'crownquill',
     buildLabel: 'Crowned foreleg power athlete',
+    primaryMuscleEmphasis: 'chest',
     trainingPhilosophy: 'Honor the setup before claiming the drive.',
     signaturePoseId: 'victory-flex',
     signatureClothing: 'Gold crown chain',
@@ -243,6 +307,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'h3-pegasus',
     speciesId: 'manyfold',
     buildLabel: 'Long-line four-arm summit mover',
+    primaryMuscleEmphasis: 'shoulders',
     trainingPhilosophy: 'Balance appears when every limb accepts a role.',
     signaturePoseId: 'victory-spring',
     signatureClothing: 'Chalk and gold alternating wraps',
@@ -265,6 +330,7 @@ export const BOSS_CHARACTER_DESIGNS: BossCharacterDesign[] = [
     bossId: 'h3-pegas',
     speciesId: 'prismantle',
     buildLabel: 'Compact prism control master',
+    primaryMuscleEmphasis: 'shoulders',
     trainingPhilosophy: 'Precision is strength with nothing wasted.',
     signaturePoseId: 'victory-grounded',
     signatureClothing: 'Gold-edged violet fin sleeves',
@@ -294,9 +360,15 @@ export function getBossCharacterDesign(bossId?: string) {
 
 export function bossBuddyCosmetics(
   design: BossCharacterDesign,
+  tier: BossPresentationTier = 'normal',
 ): BuddyCosmetics {
-  return {
-    version: 1,
+  const speciesDesign = getBuddyCharacterDesign(design.speciesId);
+  const basePreset =
+    speciesDesign.physiquePresets.find((entry) =>
+      entry.id.endsWith('-physique-specialized'),
+    ) ?? speciesDesign.physiquePresets[1]!;
+  const base: BuddyCosmetics = {
+    version: 2,
     primaryPaletteId: design.primaryPaletteId,
     secondaryPaletteId: design.secondaryPaletteId,
     accentPaletteId: design.accentPaletteId,
@@ -309,5 +381,79 @@ export function bossBuddyCosmetics(
     expressionId: design.expressionId,
     victoryPoseId: design.signaturePoseId,
     entranceAnimationId: design.entranceAnimationId,
+    physiquePresetId: basePreset.id,
+    physique: {
+      ...basePreset.physique,
+      postureId: 'proud',
+      stanceId: 'planted',
+    },
+  };
+  const primaryField = {
+    shoulders: 'shoulderEmphasisId',
+    chest: 'chestEmphasisId',
+    back: 'backEmphasisId',
+    core: 'coreEmphasisId',
+    forearms: 'armEmphasisId',
+    legs: 'legEmphasisId',
+  } as const;
+  if (tier === 'normal') return base;
+  if (tier === 'pumped') {
+    return {
+      ...base,
+      muscleDefinitionId: 'etched',
+      physique: {
+        ...base.physique,
+        [primaryField[design.primaryMuscleEmphasis]]: 'pronounced',
+        pumpEffectId: 'full',
+      },
+    };
+  }
+  if (tier === 'overload') {
+    return {
+      ...base,
+      patternId: 'pattern-strength-lines',
+      muscleDefinitionId: 'etched',
+      accessoryIds: [
+        ...base.accessoryIds.filter((id) => id !== 'accessory-none'),
+        'accessory-elbow-sleeves',
+      ],
+      physique: {
+        ...base.physique,
+        [primaryField[design.primaryMuscleEmphasis]]: 'pronounced',
+        overallMassId: 'heavy-mass',
+        pumpEffectId: 'full',
+        postureId: 'towering',
+      },
+    };
+  }
+  if (tier === 'final-round') {
+    return {
+      ...base,
+      patternId: 'pattern-strength-lines',
+      muscleDefinitionId: 'etched',
+      accessoryIds: [
+        ...base.accessoryIds.filter((id) => id !== 'accessory-none'),
+        'accessory-victory-medal',
+      ],
+      rareTraitId: 'rare-glow-lines',
+      physique: {
+        ...base.physique,
+        [primaryField[design.primaryMuscleEmphasis]]: 'pronounced',
+        symmetryId: 'stage',
+        pumpEffectId: 'full',
+        postureId: 'proud',
+      },
+    };
+  }
+  return {
+    ...base,
+    expressionId: 'sleepy',
+    rareTraitId: 'rare-none',
+    physique: {
+      ...base.physique,
+      pumpEffectId: 'none',
+      postureId: 'coiled',
+      stanceId: 'narrow',
+    },
   };
 }
