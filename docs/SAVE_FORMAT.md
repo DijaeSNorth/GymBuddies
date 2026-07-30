@@ -7,7 +7,7 @@ preserves the complete v12 prototype where its data is recognizable, repairs
 recoverable fields, refuses unknown future formats, and never deletes stored
 data as a side effect of a failed load.
 
-The current schema is **16** (`version: "v16"`).
+The current schema is **19** (`version: "v19"`).
 
 ## Storage slots
 
@@ -30,11 +30,11 @@ Manual exports and newly written browser saves use this envelope:
 ```json
 {
   "format": "gym-buddies-save",
-  "schemaVersion": 16,
+  "schemaVersion": 19,
   "savedAt": "2026-07-28T12:00:00.000Z",
   "state": {
-    "schemaVersion": 16,
-    "version": "v16"
+    "schemaVersion": 19,
+    "version": "v19"
   }
 }
 ```
@@ -45,19 +45,20 @@ the envelope.
 The importer also accepts an unwrapped state object for compatibility with
 older and developer-authored saves.
 
-## Schema 16 state
+## Schema 19 state
 
 All fields below are JSON primitives, arrays, or plain objects.
 
 | Field | Type | Meaning and validation |
 | --- | --- | --- |
-| `schemaVersion` | `16` | Numeric schema identity. |
-| `version` | `"v16"` | Human-readable compatibility marker. |
+| `schemaVersion` | `19` | Numeric schema identity. |
+| `version` | `"v19"` | Human-readable compatibility marker. |
 | `trainingFatigue` | number | Clamped to the configured fatigue range. |
 | `workoutMomentum` | number | Clamped to the configured momentum range. |
 | `deloadTokens` | integer | Clamped to the configured token limit. |
 | `captureBattleSpeed` | string | Must match a configured battle-speed ID. |
 | `machineTrainingHistory` | object | Last machine ID, repeated uses, and validated mastery by stable machine ID. |
+| `visualProgression` | object | Cosmetic baseline, capped long-term development, temporary pump, compact recent-training records, progress snapshots, presentation preferences, and optional challenge progress. |
 | `hasStarterSet` | boolean | Whether the mandatory opening is complete. |
 | `unlockedZoneIds` | string array | Normalized against current world content and reachability rules. |
 | `visitedZoneIds` | string array | Known journey gym IDs; inferred progress is retained where possible. |
@@ -79,7 +80,7 @@ All fields below are JSON primitives, arrays, or plain objects.
 
 ### Serialized Buddy state
 
-New schema-16 files do not duplicate static species content. Each party entry
+New schema-19 files do not duplicate static species content. Each party entry
 stores:
 
 ```json
@@ -88,7 +89,7 @@ stores:
   "nickname": "Bramblift",
   "speciesId": "brawny-bear",
   "cosmetics": {
-    "version": 1,
+    "version": 2,
     "primaryPaletteId": "bark",
     "secondaryPaletteId": "moss",
     "accentPaletteId": "sand",
@@ -100,7 +101,21 @@ stores:
     "rareTraitId": "rare-none",
     "expressionId": "steady",
     "victoryPoseId": "victory-flex",
-    "entranceAnimationId": "entrance-stride"
+    "entranceAnimationId": "entrance-stride",
+    "physiquePresetId": "brawny-bear-physique-balanced",
+    "physique": {
+      "shoulderEmphasisId": "balanced",
+      "chestEmphasisId": "balanced",
+      "backEmphasisId": "balanced",
+      "armEmphasisId": "balanced",
+      "coreEmphasisId": "balanced",
+      "legEmphasisId": "balanced",
+      "overallMassId": "balanced-mass",
+      "symmetryId": "balanced",
+      "stanceId": "athletic",
+      "postureId": "neutral",
+      "pumpEffectId": "warm"
+    }
   },
   "level": 4,
   "hp": 30,
@@ -116,7 +131,7 @@ stores:
 At load time, `speciesId` is resolved against the current original Gym Buddies
 content catalog. The v12 form containing an embedded `creature` object remains
 accepted; the migration resolves its stable species identity and writes the
-compact schema-16 form on the next safe save.
+compact schema-19 form on the next safe save.
 
 ## Migration support
 
@@ -178,11 +193,57 @@ variation, accessories, expressions, victory pose, and entrance animation are
 presentation data. They never modify level, HP, Power, Form, Mobility, Volume,
 fatigue, equipment bonuses, or discipline calculations.
 
+### v16 to v17
+
+The explicit `v16-to-v17` migration:
+
+1. preserves all trainer, Buddy, route, gym, workout, boss, audio, input, and
+   accessibility state;
+2. adds `schemaVersion: 17` and `version: "v17"`;
+3. upgrades trainer appearance to version 3;
+4. fills the 39 new fictional regional proportion controls from safe,
+   muscular defaults while retaining all original 22 values;
+5. adds stable IDs for trim and fictional logo colors, logo shape, chalk
+   marks, and gym towel; and
+6. normalizes saved looks independently, replacing unavailable content IDs
+   without modifying progression.
+
+Appearance-only exports use their own `gym-buddies-appearance` envelope and a
+64 KB import limit. They contain cosmetics only and cannot change gameplay
+muscles, equipment bonuses, fatigue, levels, Buddies, or journey progress.
+
+### v17 to v18
+
+The explicit `v17-to-v18` migration:
+
+1. preserves the complete version-3 Trainer Forge appearance exactly;
+2. copies that appearance into a comparison-only visual baseline;
+3. initializes capped development and temporary pump values at zero;
+4. adds visual intensity, pump, and fatigue-presentation preferences;
+5. adds compact stable-ID training records, physique snapshots, and optional
+   bodybuilding-challenge progress; and
+6. stores no rendered frames, Phaser objects, DOM references, audio nodes, or
+   wall-clock timers.
+
+Changing Trainer Forge cosmetics later never deletes development. Hiding
+development or pump only changes presentation preferences. The beginning
+baseline and saved snapshots are normal JSON appearance records and are
+repaired with the same safe stable-ID defaults as the live trainer.
+
+### v18 to v19
+
+The explicit `v18-to-v19` migration preserves every gameplay value and upgrades
+only Buddy presentation records. Each party Buddy receives a species-scoped
+physique preset ID plus bounded shoulder, chest, back, limb, core, leg, mass,
+symmetry, stance, posture, and pump presentation values. Removed or invalid
+cosmetic IDs recover to that species' safe defaults. Species stats, combat
+balance, fatigue, progression, and trainer cosmetics are not changed.
+
 A versionless object containing recognizable v12 fields such as `trainer`,
 `team`, or `bossSchedules` is treated as inferred v12. The load result records a
 warning so this inference is visible rather than silent.
 
-Schemas older than 12 are unsupported. Schemas newer than 16 are preserved
+Schemas older than 12 are unsupported. Schemas newer than 19 are preserved
 untouched and automatic saving is paused so an older game build cannot destroy
 newer data.
 
@@ -285,8 +346,8 @@ duplicate claims after reload.
 
 In development builds, Save Management exposes representative fixtures for:
 
-- a new schema-16 journey;
-- a progressed schema-16 journey;
+- a new schema-18 journey;
+- a progressed schema-18 journey;
 - a complete v12 journey;
 - a partial v12 journey with a legacy boss timestamp; and
 - deliberately corrupted JSON.

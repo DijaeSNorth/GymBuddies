@@ -12,6 +12,7 @@ import type {
   TrainerProfile,
 } from './trainer';
 import type { MachineTrainingHistory } from './training';
+import type { TrainerVisualProgressionState } from './visualProgression';
 
 export type SaveAccessibilitySettings = {
   reducedMotion: boolean;
@@ -22,13 +23,14 @@ export type SaveAccessibilitySettings = {
 };
 
 export type SaveData = {
-  schemaVersion: 16;
-  version: 'v16';
+  schemaVersion: 19;
+  version: 'v19';
   trainingFatigue: number;
   workoutMomentum: number;
   deloadTokens: number;
   captureBattleSpeed: CaptureBattleSpeed;
   machineTrainingHistory: MachineTrainingHistory;
+  visualProgression: TrainerVisualProgressionState;
   hasStarterSet: boolean;
   unlockedZoneIds: string[];
   visitedZoneIds: string[];
@@ -59,7 +61,7 @@ export type SerializedSaveState = Omit<SaveData, 'team'> & {
 
 export type SaveExportEnvelope = {
   format: 'gym-buddies-save';
-  schemaVersion: 16;
+  schemaVersion: 19;
   savedAt: string;
   state: SerializedSaveState;
 };

@@ -57,7 +57,7 @@ test('new-game onboarding creates a versioned guided-journey save', async ({
     .toEqual({
       hasStarterSet: true,
       name: 'Morgan',
-      schemaVersion: 16,
+      schemaVersion: 19,
       tutorialStep: 0,
     });
 
@@ -79,24 +79,106 @@ test('legacy saves migrate in the rendered application', async ({
   await expect(page.getByRole('heading', { name: 'Live route view' })).toBeVisible();
   await expect
     .poll(async () => (await readCurrentSaveState(page))?.schemaVersion)
-    .toBe(16);
+    .toBe(19);
+});
+
+test('Trainer Forge supports keyboard and standard gamepad navigation', async ({
+  page,
+}) => {
+  await startWithEmptyStorage(page);
+  await page.addInitScript(() => {
+    const buttons = Array.from({ length: 16 }, () => ({
+      pressed: false,
+      touched: false,
+      value: 0,
+    }));
+    Object.defineProperty(window, '__trainerForgeGamepadButtons', {
+      configurable: true,
+      value: buttons,
+    });
+    Object.defineProperty(navigator, 'getGamepads', {
+      configurable: true,
+      value: () => [
+        {
+          axes: [0, 0, 0, 0],
+          buttons,
+          connected: true,
+          id: 'Gym Buddies Test Controller',
+          index: 0,
+          mapping: 'standard',
+          timestamp: performance.now(),
+          vibrationActuator: null,
+        },
+      ],
+    });
+  });
+
+  await page.goto('/');
+  await expectHealthyGameShell(page);
+  const name = page.getByLabel('Trainer name');
+  await name.focus();
+  await page.keyboard.press('Tab');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.activeElement?.getAttribute('data-setup-control') ??
+          'missing',
+      ),
+    )
+    .toBe('true');
+
+  await name.focus();
+  await page.evaluate(() => {
+    const buttons = (
+      window as unknown as {
+        __trainerForgeGamepadButtons: Array<{ pressed: boolean; value: number }>;
+      }
+    ).__trainerForgeGamepadButtons;
+    buttons[13]!.pressed = true;
+    buttons[13]!.value = 1;
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.activeElement?.getAttribute('aria-label') ?? '',
+      ),
+    )
+    .not.toBe('Trainer name');
+  await page.evaluate(() => {
+    const button = (
+      window as unknown as {
+        __trainerForgeGamepadButtons: Array<{ pressed: boolean; value: number }>;
+      }
+    ).__trainerForgeGamepadButtons[13]!;
+    button.pressed = false;
+    button.value = 0;
+  });
 });
 
 test('detailed trainer customization persists stable IDs and saved looks', async ({
   page,
-}) => {
+}, testInfo) => {
   await startWithEmptyStorage(page);
   const runtimeErrors = collectRuntimeErrors(page);
 
   await page.goto('/');
   await expectHealthyGameShell(page);
   await page.getByLabel('Trainer name').fill('Forge Avery');
+  await page.getByRole('button', { name: /Detail Forge/i }).click();
 
   await page
     .getByRole('button', { name: /Classic Bodybuilder/i })
     .click();
+  await page.getByRole('tab', { name: 'Upper Body' }).click();
   await expect(page.locator('#trainer-build-shoulderWidth')).toHaveValue('9');
   await page.locator('#trainer-build-shoulderWidth').fill('10');
+  await page.locator('#trainer-build-latWidth').fill('10');
+  await page.getByRole('button', { name: /Quick Forge/i }).click();
+  await expect(page.getByRole('tab', { name: 'Upper Body' })).toHaveCount(0);
+  await page.getByRole('button', { name: /Detail Forge/i }).click();
+  await page.getByRole('tab', { name: 'Upper Body' }).click();
+  await expect(page.locator('#trainer-build-latWidth')).toHaveValue('10');
 
   await page.getByRole('tab', { name: 'Face' }).click();
   await page.getByLabel('Face shape').selectOption('diamond-defined');
@@ -130,16 +212,30 @@ test('detailed trainer customization persists stable IDs and saved looks', async
     'wide-headband',
   );
 
-  await page.getByRole('tab', { name: 'Preview' }).click();
-  await page.getByRole('button', { name: /right trainer/i }).click();
-  await page.getByRole('button', { name: 'Victory' }).click();
-  await page
-    .getByRole('button', { name: 'Compare Before & After' })
-    .click();
+  await page.getByRole('button', { name: 'Before / After' }).click();
   await expect(page.getByText('Before', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Poses' }).click();
+  await page.getByRole('button', { name: /right trainer/i }).click();
+  await page.getByRole('button', { name: 'Victory', exact: true }).click();
+  await page.getByRole('tab', { name: 'Saved Looks' }).click();
   await page.getByLabel('Appearance preset name').fill('Arena Look');
   await page.getByRole('button', { name: 'Save Current Look' }).click();
   await expect(page.getByText('Arena Look', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Duplicate' }).click();
+  await page.getByRole('button', { name: 'Rename' }).first().click();
+  await page.getByLabel('Rename Arena Look').fill('Stage Look');
+  await page.getByRole('button', { name: 'Save Name' }).click();
+  await expect(
+    page.locator('.trainer-saved-presets strong').filter({
+      hasText: 'Stage Look',
+    }),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Compare two looks' }))
+    .toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('trainer-forge-saved-looks.png'),
+    fullPage: false,
+  });
 
   await page.getByText('Normal Start', { exact: true }).click();
   await page
@@ -154,7 +250,7 @@ test('detailed trainer customization persists stable IDs and saved looks', async
       const trainer = state?.trainer as
         | {
             appearance?: {
-              build?: { shoulderWidth?: number };
+              build?: { shoulderWidth?: number; latWidth?: number };
               face?: { shapeId?: string; facePaintId?: string };
               hair?: { styleId?: string; lengthId?: string };
               outfit?: { topId?: string; bottomsId?: string };
@@ -170,6 +266,7 @@ test('detailed trainer customization persists stable IDs and saved looks', async
       return {
         schemaVersion: state?.schemaVersion,
         shoulderWidth: trainer?.appearance?.build?.shoulderWidth,
+        latWidth: trainer?.appearance?.build?.latWidth,
         faceShape: trainer?.appearance?.face?.shapeId,
         facePaint: trainer?.appearance?.face?.facePaintId,
         hairStyle: trainer?.appearance?.hair?.styleId,
@@ -179,7 +276,7 @@ test('detailed trainer customization persists stable IDs and saved looks', async
         topColor: trainer?.appearance?.colors?.topPrimaryId,
         headwear: trainer?.appearance?.accessories?.headwearId,
         bag: trainer?.appearance?.accessories?.gymBagId,
-        presetName: trainer?.appearancePresets?.[0]?.name,
+        presetNames: trainer?.appearancePresets?.map(({ name }) => name),
         presetHasStableId: Boolean(
           trainer?.appearancePresets?.[0]?.id?.startsWith(
             'trainer-look-',
@@ -188,8 +285,9 @@ test('detailed trainer customization persists stable IDs and saved looks', async
       };
     })
     .toEqual({
-        schemaVersion: 16,
+      schemaVersion: 19,
       shoulderWidth: 10,
+      latWidth: 10,
       faceShape: 'diamond-defined',
       facePaint: 'split-chevron',
       hairStyle: 'bald',
@@ -199,7 +297,7 @@ test('detailed trainer customization persists stable IDs and saved looks', async
       topColor: 'plum',
       headwear: 'wide-headband',
       bag: 'duffel-small',
-      presetName: 'Arena Look',
+      presetNames: ['Stage Look', 'Arena Look Copy'],
       presetHasStableId: true,
     });
   expect(runtimeErrors).toEqual([]);
@@ -239,8 +337,15 @@ test('Buddy customization stays species-readable and persists cosmetic-only IDs'
   const canvas = page.locator('.buddy-customizer .buddy-pixel-canvas');
   await expect(canvas).toBeVisible();
   const pixels = await canvas.evaluate((element) => {
-    const context = (element as HTMLCanvasElement).getContext('2d');
-    const data = context?.getImageData(0, 0, 24, 24).data ?? [];
+    const canvasElement = element as HTMLCanvasElement;
+    const context = canvasElement.getContext('2d');
+    const data =
+      context?.getImageData(
+        0,
+        0,
+        canvasElement.width,
+        canvasElement.height,
+      ).data ?? [];
     let opaque = 0;
     const colors = new Set<string>();
     for (let index = 0; index < data.length; index += 4) {

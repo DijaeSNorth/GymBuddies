@@ -8,8 +8,30 @@ const debugView = new URLSearchParams(window.location.search).get('debug');
 const showAssetPreview =
   import.meta.env.DEV &&
   (debugView === 'assets' || debugView === 'characters');
+const showSpriteStripLab =
+  import.meta.env.DEV && debugView === 'sprites';
+const showBatch02Review =
+  import.meta.env.DEV && debugView === 'batch02-review';
+const showBatch03Review =
+  import.meta.env.DEV && debugView === 'batch03-review';
 
-if (showAssetPreview) {
+if (showBatch03Review) {
+  void import('./ui/debug/Batch03ReviewScreen').then(
+    ({ Batch03ReviewScreen }) => {
+      appRoot.render(<Batch03ReviewScreen />);
+    },
+  );
+} else if (showBatch02Review) {
+  void import('./ui/debug/Batch02ReviewScreen').then(
+    ({ Batch02ReviewScreen }) => {
+      appRoot.render(<Batch02ReviewScreen />);
+    },
+  );
+} else if (showSpriteStripLab) {
+  void import('./ui/debug/SpriteStripLab').then(({ SpriteStripLab }) => {
+    appRoot.render(<SpriteStripLab />);
+  });
+} else if (showAssetPreview) {
   void import('./ui/debug/AssetPreviewScreen').then(({ AssetPreviewScreen }) => {
     appRoot.render(<AssetPreviewScreen />);
   });

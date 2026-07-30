@@ -150,6 +150,13 @@ numbers, and plain objects remain serializable.
 - a rescue timeout; and
 - relative HP, fatigue, form, and XP consequences.
 
+`client/src/tests/visualProgression.test.ts` and
+`visualProgressionIntegration.test.ts` additionally verify machine
+specializations, technique-weighted development, rescued-set partial credit,
+pump buildup and active-time decay, deep-recovery decay, immutable cosmetics,
+all four visual intensity levels, fatigue presentation, snapshots, ratings,
+and the complete workout-to-visual-history integration.
+
 ## Balance questions
 
 - Does the 850 ms rescue period feel fair on lower-refresh mobile devices?

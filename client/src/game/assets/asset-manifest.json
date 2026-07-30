@@ -123,6 +123,94 @@
       "durationMs": 70,
       "anchor": "center"
     },
+    "buddy-authored-strip": {
+      "id": "buddy-authored-strip",
+      "mediaType": "image",
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "columns": 24,
+      "rows": 1,
+      "frameCount": 24,
+      "durationMs": 220,
+      "anchor": "bottom-center"
+    },
+    "buddy-boss-tier-overlay": {
+      "id": "buddy-boss-tier-overlay",
+      "mediaType": "image",
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "columns": 5,
+      "rows": 1,
+      "frameCount": 5,
+      "durationMs": 180,
+      "anchor": "bottom-center"
+    },
+    "buddy-menu-32": {
+      "id": "buddy-menu-32",
+      "mediaType": "image",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "columns": 4,
+      "rows": 1,
+      "frameCount": 4,
+      "durationMs": 260,
+      "anchor": "bottom-center",
+      "directions": ["front", "back", "left", "right"]
+    },
+    "buddy-battle-48": {
+      "id": "buddy-battle-48",
+      "mediaType": "image",
+      "frameWidth": 48,
+      "frameHeight": 48,
+      "columns": 12,
+      "rows": 1,
+      "frameCount": 12,
+      "durationMs": 240,
+      "anchor": "bottom-center"
+    },
+    "buddy-boss-battle-64": {
+      "id": "buddy-boss-battle-64",
+      "mediaType": "image",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "columns": 12,
+      "rows": 5,
+      "frameCount": 60,
+      "durationMs": 260,
+      "anchor": "bottom-center"
+    },
+    "buddy-showcase-64": {
+      "id": "buddy-showcase-64",
+      "mediaType": "image",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "columns": 10,
+      "rows": 1,
+      "frameCount": 10,
+      "durationMs": 320,
+      "anchor": "bottom-center"
+    },
+    "buddy-boss-showcase-64": {
+      "id": "buddy-boss-showcase-64",
+      "mediaType": "image",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "columns": 10,
+      "rows": 5,
+      "frameCount": 50,
+      "durationMs": 340,
+      "anchor": "bottom-center"
+    },
+    "buddy-dialogue-64": {
+      "id": "buddy-dialogue-64",
+      "mediaType": "image",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "columns": 1,
+      "rows": 1,
+      "frameCount": 1,
+      "anchor": "center"
+    },
     "sfx-cue": {
       "id": "sfx-cue",
       "mediaType": "audio",
@@ -321,6 +409,1058 @@
       "description": "Six-frame arm-wrestling lock pulse."
     },
     {
+      "key": "buddy.brawny-bear.authored.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/brawny-bear/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "description": "Pilot review strip for Bramblift front-facing authored body and poses."
+    },
+    {
+      "key": "buddy.brawny-bear.authored.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/brawny-bear/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "description": "Pilot review strip for Bramblift back-facing authored body and poses."
+    },
+    {
+      "key": "buddy.brawny-bear.authored.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/brawny-bear/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "description": "Pilot review strip for Bramblift left-facing authored body and poses."
+    },
+    {
+      "key": "buddy.iron-wolf.authored.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/iron-wolf/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "description": "Pilot review strip for Rivetjack front-facing authored body and poses."
+    },
+    {
+      "key": "buddy.iron-wolf.authored.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/iron-wolf/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "description": "Pilot review strip for Rivetjack back-facing authored body and poses."
+    },
+    {
+      "key": "buddy.iron-wolf.authored.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/iron-wolf/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "description": "Pilot review strip for Rivetjack left-facing authored body and poses."
+    },
+    {
+      "key": "buddy.prismantle.authored.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/prismantle/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "description": "Pilot review strip for Prismantle front-facing handcrafted base poses."
+    },
+    {
+      "key": "buddy.prismantle.authored.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/prismantle/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "description": "Pilot review strip for Prismantle back-facing handcrafted base poses."
+    },
+    {
+      "key": "buddy.prismantle.authored.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/prismantle/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "description": "Pilot review strip for Prismantle left-facing handcrafted base poses."
+    },
+    {
+      "key": "buddy.prismantle.authored.right",
+      "category": "buddies",
+      "path": "buddies/handcrafted/prismantle/base-right.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "description": "Pilot review strip for Prismantle's intentionally asymmetric right-facing poses."
+    },
+    {
+      "key": "boss.home-watchman.authored.tiers",
+      "category": "buddies",
+      "path": "buddies/handcrafted/bosses/home-watchman-tiers.png",
+      "standardId": "buddy-boss-tier-overlay",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "description": "Five authored presentation overlays for the Bramblift-based Mat Watchman boss."
+    },
+    {
+      "key": "buddy.brawny-bear.authored.v2.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/brawny-bear/versions/v2/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "final",
+      "assetVersion": "2.0.0",
+      "approval": {
+        "approvalDate": "2026-07-29",
+        "artistSource": "Gym Buddies deterministic pilot pixel-art pipeline and project-owned review references",
+        "reviewerNote": "Passed silhouette, geometry, palette, resolver, desktop, mobile, and visual-signature validation."
+      },
+      "description": "Second-pass Bramblift front strip with a stronger grappler taper and pose-specific weight."
+    },
+    {
+      "key": "buddy.brawny-bear.authored.v2.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/brawny-bear/versions/v2/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "final",
+      "assetVersion": "2.0.0",
+      "approval": {
+        "approvalDate": "2026-07-29",
+        "artistSource": "Gym Buddies deterministic pilot pixel-art pipeline and project-owned review references",
+        "reviewerNote": "Passed silhouette, geometry, palette, resolver, desktop, mobile, and visual-signature validation."
+      },
+      "description": "Second-pass Bramblift back strip with a broad upper back and planted lower body."
+    },
+    {
+      "key": "buddy.brawny-bear.authored.v2.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/brawny-bear/versions/v2/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "final",
+      "assetVersion": "2.0.0",
+      "approval": {
+        "approvalDate": "2026-07-29",
+        "artistSource": "Gym Buddies deterministic pilot pixel-art pipeline and project-owned review references",
+        "reviewerNote": "Passed silhouette, geometry, palette, resolver, desktop, mobile, and visual-signature validation."
+      },
+      "description": "Second-pass Bramblift side strip with a readable muzzle, torso depth, and grappler lean."
+    },
+    {
+      "key": "buddy.iron-wolf.authored.v2.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/iron-wolf/versions/v2/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "final",
+      "assetVersion": "2.0.0",
+      "approval": {
+        "approvalDate": "2026-07-29",
+        "artistSource": "Gym Buddies deterministic pilot pixel-art pipeline and project-owned review references",
+        "reviewerNote": "Passed silhouette, geometry, palette, resolver, desktop, mobile, and visual-signature validation."
+      },
+      "description": "Second-pass Rivetjack front strip with lean shoulder, forelimb, and athletic leg emphasis."
+    },
+    {
+      "key": "buddy.iron-wolf.authored.v2.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/iron-wolf/versions/v2/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "final",
+      "assetVersion": "2.0.0",
+      "approval": {
+        "approvalDate": "2026-07-29",
+        "artistSource": "Gym Buddies deterministic pilot pixel-art pipeline and project-owned review references",
+        "reviewerNote": "Passed silhouette, geometry, palette, resolver, desktop, mobile, and visual-signature validation."
+      },
+      "description": "Second-pass Rivetjack back strip with a tapered torso and spring-loaded haunch silhouette."
+    },
+    {
+      "key": "buddy.iron-wolf.authored.v2.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/iron-wolf/versions/v2/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "final",
+      "assetVersion": "2.0.0",
+      "approval": {
+        "approvalDate": "2026-07-29",
+        "artistSource": "Gym Buddies deterministic pilot pixel-art pipeline and project-owned review references",
+        "reviewerNote": "Passed silhouette, geometry, palette, resolver, desktop, mobile, and visual-signature validation."
+      },
+      "description": "Second-pass Rivetjack side strip with an explosive forward line and readable tail mechanics."
+    },
+    {
+      "key": "buddy.prismantle.authored.v2.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/prismantle/versions/v2/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "final",
+      "assetVersion": "2.0.0",
+      "approval": {
+        "approvalDate": "2026-07-29",
+        "artistSource": "Gym Buddies deterministic pilot pixel-art pipeline and project-owned review references",
+        "reviewerNote": "Passed silhouette, geometry, palette, resolver, desktop, mobile, and visual-signature validation."
+      },
+      "description": "Second-pass Prismantle front strip with a strong faceted core and asymmetric wing rhythm."
+    },
+    {
+      "key": "buddy.prismantle.authored.v2.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/prismantle/versions/v2/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "final",
+      "assetVersion": "2.0.0",
+      "approval": {
+        "approvalDate": "2026-07-29",
+        "artistSource": "Gym Buddies deterministic pilot pixel-art pipeline and project-owned review references",
+        "reviewerNote": "Passed silhouette, geometry, palette, resolver, desktop, mobile, and visual-signature validation."
+      },
+      "description": "Second-pass Prismantle back strip with authored crest, fins, and rear-facet emphasis."
+    },
+    {
+      "key": "buddy.prismantle.authored.v2.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/prismantle/versions/v2/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "final",
+      "assetVersion": "2.0.0",
+      "approval": {
+        "approvalDate": "2026-07-29",
+        "artistSource": "Gym Buddies deterministic pilot pixel-art pipeline and project-owned review references",
+        "reviewerNote": "Passed silhouette, geometry, palette, resolver, desktop, mobile, and visual-signature validation."
+      },
+      "description": "Second-pass Prismantle authored left profile; this frame is never used as a mirrored substitute."
+    },
+    {
+      "key": "buddy.prismantle.authored.v2.right",
+      "category": "buddies",
+      "path": "buddies/handcrafted/prismantle/versions/v2/base-right.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "final",
+      "assetVersion": "2.0.0",
+      "approval": {
+        "approvalDate": "2026-07-29",
+        "artistSource": "Gym Buddies deterministic pilot pixel-art pipeline and project-owned review references",
+        "reviewerNote": "Passed silhouette, geometry, palette, resolver, desktop, mobile, and visual-signature validation."
+      },
+      "description": "Second-pass Prismantle authored right profile preserving intentional fin asymmetry."
+    },
+    {
+      "key": "boss.home-watchman.authored.v2.tiers",
+      "category": "buddies",
+      "path": "buddies/handcrafted/bosses/versions/v2/home-watchman-tiers.png",
+      "standardId": "buddy-boss-tier-overlay",
+      "paletteId": "kinetic-slate",
+      "status": "final",
+      "assetVersion": "2.0.0",
+      "approval": {
+        "approvalDate": "2026-07-29",
+        "artistSource": "Gym Buddies deterministic pilot pixel-art pipeline and project-owned review references",
+        "reviewerNote": "Passed tier-distinction, geometry, palette, resolver, desktop, mobile, and visual-signature validation."
+      },
+      "description": "Second-pass Mat Watchman tier overlays using posture, equipment, breath, lighting, and defeat-state differences."
+    },
+    {
+      "key": "buddy.brawny-bear.presentation.v1.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/brawny-bear/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "core",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 32-pixel Bramblift menu directions."
+    },
+    {
+      "key": "buddy.brawny-bear.presentation.v1.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/brawny-bear/battle-48.png",
+      "standardId": "buddy-battle-48",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "battle",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 48-pixel Bramblift capture-battle poses."
+    },
+    {
+      "key": "buddy.brawny-bear.presentation.v1.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/brawny-bear/showcase-64.png",
+      "standardId": "buddy-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "showcase",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 64-pixel Bramblift physique showcase poses."
+    },
+    {
+      "key": "buddy.brawny-bear.presentation.v1.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/brawny-bear/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "portrait",
+      "assetVersion": "1.0.0",
+      "description": "Static 64-pixel Bramblift introduction portrait."
+    },
+    {
+      "key": "buddy.iron-wolf.presentation.v1.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/iron-wolf/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "core",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 32-pixel Rivetjack menu directions."
+    },
+    {
+      "key": "buddy.iron-wolf.presentation.v1.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/iron-wolf/battle-48.png",
+      "standardId": "buddy-battle-48",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "battle",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 48-pixel Rivetjack capture-battle poses."
+    },
+    {
+      "key": "buddy.iron-wolf.presentation.v1.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/iron-wolf/showcase-64.png",
+      "standardId": "buddy-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "showcase",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 64-pixel Rivetjack physique showcase poses."
+    },
+    {
+      "key": "buddy.iron-wolf.presentation.v1.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/iron-wolf/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "portrait",
+      "assetVersion": "1.0.0",
+      "description": "Static 64-pixel Rivetjack introduction portrait."
+    },
+    {
+      "key": "buddy.prismantle.presentation.v1.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/prismantle/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "core",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 32-pixel Prismantle menu directions."
+    },
+    {
+      "key": "buddy.prismantle.presentation.v1.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/prismantle/battle-48.png",
+      "standardId": "buddy-battle-48",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "battle",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 48-pixel Prismantle capture-battle poses."
+    },
+    {
+      "key": "buddy.prismantle.presentation.v1.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/prismantle/showcase-64.png",
+      "standardId": "buddy-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "showcase",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 64-pixel Prismantle physique showcase poses."
+    },
+    {
+      "key": "buddy.prismantle.presentation.v1.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/prismantle/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "portrait",
+      "assetVersion": "1.0.0",
+      "description": "Static 64-pixel Prismantle introduction portrait."
+    },
+    {
+      "key": "boss.home-watchman.presentation.v1.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/home-watchman/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "core",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 32-pixel Mat Watchman menu directions."
+    },
+    {
+      "key": "boss.home-watchman.presentation.v1.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/home-watchman/battle-64.png",
+      "standardId": "buddy-boss-battle-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "battle",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 64-pixel Mat Watchman battle poses across five tiers."
+    },
+    {
+      "key": "boss.home-watchman.presentation.v1.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/home-watchman/showcase-64.png",
+      "standardId": "buddy-boss-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "showcase",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 64-pixel Mat Watchman showcase poses across five tiers."
+    },
+    {
+      "key": "boss.home-watchman.presentation.v1.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/home-watchman/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "portrait",
+      "assetVersion": "1.0.0",
+      "description": "Static 64-pixel Mat Watchman introduction portrait."
+    },
+    {
+      "key": "buddy.ripped-rhino.authored.v1.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/ripped-rhino/versions/v1/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Railhorn front strip with rigid chest and shoulder plates."
+    },
+    {
+      "key": "buddy.ripped-rhino.authored.v1.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/ripped-rhino/versions/v1/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Railhorn back strip with a segmented dorsal carapace."
+    },
+    {
+      "key": "buddy.ripped-rhino.authored.v1.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/ripped-rhino/versions/v1/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Railhorn left strip preserving its rail horn and low center of gravity."
+    },
+    {
+      "key": "buddy.ripped-rhino.authored.v1.right",
+      "category": "buddies",
+      "path": "buddies/handcrafted/ripped-rhino/versions/v1/base-right.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Railhorn authored right strip; no mirrored horn substitute."
+    },
+    {
+      "key": "buddy.spotmole.authored.v1.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/spotmole/versions/v1/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Spotmole compact front strip with shovel-hand wraps."
+    },
+    {
+      "key": "buddy.spotmole.authored.v1.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/spotmole/versions/v1/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Spotmole back strip preserving the low shoulder ruff."
+    },
+    {
+      "key": "buddy.spotmole.authored.v1.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/spotmole/versions/v1/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Spotmole left profile with short powerful limbs."
+    },
+    {
+      "key": "buddy.spotmole.authored.v1.right",
+      "category": "buddies",
+      "path": "buddies/handcrafted/spotmole/versions/v1/base-right.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Spotmole authored right profile preserving shovel-hand asymmetry."
+    },
+    {
+      "key": "buddy.titan-gorilla.authored.v1.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/titan-gorilla/versions/v1/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Knuckledge heavy-biped front strip with slab knuckles."
+    },
+    {
+      "key": "buddy.titan-gorilla.authored.v1.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/titan-gorilla/versions/v1/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Knuckledge back strip emphasizing the high bridge."
+    },
+    {
+      "key": "buddy.titan-gorilla.authored.v1.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/titan-gorilla/versions/v1/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Knuckledge left heavy-biped profile."
+    },
+    {
+      "key": "buddy.titan-gorilla.authored.v1.right",
+      "category": "buddies",
+      "path": "buddies/handcrafted/titan-gorilla/versions/v1/base-right.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only Knuckledge authored right heavy-biped profile."
+    },
+    {
+      "key": "boss.a-rhino.authored.v1.tiers",
+      "category": "buddies",
+      "path": "buddies/handcrafted/bosses/versions/v1/a-rhino-tiers.png",
+      "standardId": "buddy-boss-tier-overlay",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "assetVersion": "1.0.0",
+      "description": "Review-only A-Rhino tier overlays using seams, harness state, impact, and posture without armor inflation."
+    },
+    {
+      "key": "buddy.ripped-rhino.presentation.v1.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/ripped-rhino/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "core",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 32-pixel Railhorn menu directions."
+    },
+    {
+      "key": "buddy.ripped-rhino.presentation.v1.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/ripped-rhino/battle-48.png",
+      "standardId": "buddy-battle-48",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "battle",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 48-pixel Railhorn battle poses."
+    },
+    {
+      "key": "buddy.ripped-rhino.presentation.v1.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/ripped-rhino/showcase-64.png",
+      "standardId": "buddy-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "showcase",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 64-pixel Railhorn physique and armor showcase poses."
+    },
+    {
+      "key": "buddy.ripped-rhino.presentation.v1.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/ripped-rhino/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "portrait",
+      "assetVersion": "1.0.0",
+      "description": "Static 64-pixel Railhorn introduction portrait."
+    },
+    {
+      "key": "buddy.spotmole.presentation.v1.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/spotmole/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "core",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 32-pixel Spotmole menu directions."
+    },
+    {
+      "key": "buddy.spotmole.presentation.v1.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/spotmole/battle-48.png",
+      "standardId": "buddy-battle-48",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "battle",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 48-pixel Spotmole battle poses."
+    },
+    {
+      "key": "buddy.spotmole.presentation.v1.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/spotmole/showcase-64.png",
+      "standardId": "buddy-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "showcase",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 64-pixel Spotmole compact-powerhouse showcase poses."
+    },
+    {
+      "key": "buddy.spotmole.presentation.v1.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/spotmole/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "portrait",
+      "assetVersion": "1.0.0",
+      "description": "Static 64-pixel Spotmole introduction portrait."
+    },
+    {
+      "key": "buddy.titan-gorilla.presentation.v1.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/titan-gorilla/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "core",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 32-pixel Knuckledge menu directions."
+    },
+    {
+      "key": "buddy.titan-gorilla.presentation.v1.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/titan-gorilla/battle-48.png",
+      "standardId": "buddy-battle-48",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "battle",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 48-pixel Knuckledge battle poses."
+    },
+    {
+      "key": "buddy.titan-gorilla.presentation.v1.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/titan-gorilla/showcase-64.png",
+      "standardId": "buddy-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "showcase",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 64-pixel Knuckledge heavy-biped showcase poses."
+    },
+    {
+      "key": "buddy.titan-gorilla.presentation.v1.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/titan-gorilla/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "portrait",
+      "assetVersion": "1.0.0",
+      "description": "Static 64-pixel Knuckledge introduction portrait."
+    },
+    {
+      "key": "boss.a-rhino.presentation.v1.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/a-rhino/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "core",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 32-pixel A-Rhino menu directions."
+    },
+    {
+      "key": "boss.a-rhino.presentation.v1.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/a-rhino/battle-64.png",
+      "standardId": "buddy-boss-battle-64",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "battle",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 64-pixel A-Rhino battle poses across five armor-safe tiers."
+    },
+    {
+      "key": "boss.a-rhino.presentation.v1.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/a-rhino/showcase-64.png",
+      "standardId": "buddy-boss-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "showcase",
+      "assetVersion": "1.0.0",
+      "description": "Resolution-native 64-pixel A-Rhino showcase poses across five armor-safe tiers."
+    },
+    {
+      "key": "boss.a-rhino.presentation.v1.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v1/a-rhino/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "revision-required",
+      "loadGroup": "portrait",
+      "assetVersion": "1.0.0",
+      "description": "Static 64-pixel A-Rhino boss introduction portrait."
+    },
+    {
+      "key": "buddy.titan-tortoise.authored.v3.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/titan-tortoise/versions/v3/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Plastrong front strip with separate dome, plastron, openings, and exposed limbs."
+    },
+    {
+      "key": "buddy.titan-tortoise.authored.v3.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/titan-tortoise/versions/v3/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Plastrong back strip preserving full dome depth and seam direction."
+    },
+    {
+      "key": "buddy.titan-tortoise.authored.v3.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/titan-tortoise/versions/v3/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only individually authored Plastrong left dome profile."
+    },
+    {
+      "key": "buddy.titan-tortoise.authored.v3.right",
+      "category": "buddies",
+      "path": "buddies/handcrafted/titan-tortoise/versions/v3/base-right.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only individually authored Plastrong right dome profile."
+    },
+    {
+      "key": "buddy.ripped-rhino.authored.v3.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/ripped-rhino/versions/v3/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Railhorn v3 low-profile armored front strip."
+    },
+    {
+      "key": "buddy.ripped-rhino.authored.v3.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/ripped-rhino/versions/v3/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Railhorn v3 low-profile armored back strip."
+    },
+    {
+      "key": "buddy.ripped-rhino.authored.v3.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/ripped-rhino/versions/v3/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Railhorn v3 authored left strip."
+    },
+    {
+      "key": "buddy.ripped-rhino.authored.v3.right",
+      "category": "buddies",
+      "path": "buddies/handcrafted/ripped-rhino/versions/v3/base-right.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Railhorn v3 authored right strip."
+    },
+    {
+      "key": "buddy.boulder-bison.authored.v3.front",
+      "category": "buddies",
+      "path": "buddies/handcrafted/boulder-bison/versions/v3/base-front.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Cairnox front strip with exposed limbs under a rigid stacked torso."
+    },
+    {
+      "key": "buddy.boulder-bison.authored.v3.back",
+      "category": "buddies",
+      "path": "buddies/handcrafted/boulder-bison/versions/v3/base-back.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Cairnox back strip with separated torso and pillar limbs."
+    },
+    {
+      "key": "buddy.boulder-bison.authored.v3.left",
+      "category": "buddies",
+      "path": "buddies/handcrafted/boulder-bison/versions/v3/base-left.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Cairnox authored left rigid-torso profile."
+    },
+    {
+      "key": "buddy.boulder-bison.authored.v3.right",
+      "category": "buddies",
+      "path": "buddies/handcrafted/boulder-bison/versions/v3/base-right.png",
+      "standardId": "buddy-authored-strip",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Cairnox authored right rigid-torso profile."
+    },
+    {
+      "key": "boss.dome-warden.authored.v3.tiers",
+      "category": "buddies",
+      "path": "buddies/handcrafted/bosses/versions/v3/dome-warden-tiers.png",
+      "standardId": "buddy-boss-tier-overlay",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Dome Warden tier overlay using seams, posture, mounts, and expression without shell scaling."
+    },
+    {
+      "key": "buddy.titan-tortoise.presentation.v3.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/titan-tortoise/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "core",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Plastrong menu directions."
+    },
+    {
+      "key": "buddy.titan-tortoise.presentation.v3.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/titan-tortoise/battle-48.png",
+      "standardId": "buddy-battle-48",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "battle",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Plastrong battle actions."
+    },
+    {
+      "key": "buddy.titan-tortoise.presentation.v3.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/titan-tortoise/showcase-64.png",
+      "standardId": "buddy-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "showcase",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Plastrong physique and pose showcase."
+    },
+    {
+      "key": "buddy.titan-tortoise.presentation.v3.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/titan-tortoise/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "portrait",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Plastrong introduction portrait."
+    },
+    {
+      "key": "buddy.ripped-rhino.presentation.v3.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/ripped-rhino/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "core",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Railhorn v3 menu directions."
+    },
+    {
+      "key": "buddy.ripped-rhino.presentation.v3.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/ripped-rhino/battle-48.png",
+      "standardId": "buddy-battle-48",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "battle",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Railhorn v3 battle actions."
+    },
+    {
+      "key": "buddy.ripped-rhino.presentation.v3.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/ripped-rhino/showcase-64.png",
+      "standardId": "buddy-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "showcase",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Railhorn v3 showcase poses."
+    },
+    {
+      "key": "buddy.ripped-rhino.presentation.v3.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/ripped-rhino/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "portrait",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Railhorn v3 introduction portrait."
+    },
+    {
+      "key": "buddy.boulder-bison.presentation.v3.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/boulder-bison/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "core",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Cairnox menu directions."
+    },
+    {
+      "key": "buddy.boulder-bison.presentation.v3.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/boulder-bison/battle-48.png",
+      "standardId": "buddy-battle-48",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "battle",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Cairnox battle actions."
+    },
+    {
+      "key": "buddy.boulder-bison.presentation.v3.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/boulder-bison/showcase-64.png",
+      "standardId": "buddy-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "showcase",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Cairnox showcase poses."
+    },
+    {
+      "key": "buddy.boulder-bison.presentation.v3.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/boulder-bison/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "portrait",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Cairnox introduction portrait."
+    },
+    {
+      "key": "boss.dome-warden.presentation.v3.menu",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/dome-warden/menu-32.png",
+      "standardId": "buddy-menu-32",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "core",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Dome Warden menu directions."
+    },
+    {
+      "key": "boss.dome-warden.presentation.v3.battle",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/dome-warden/battle-64.png",
+      "standardId": "buddy-boss-battle-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "battle",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Dome Warden battle actions across five rigid-shell-safe tiers."
+    },
+    {
+      "key": "boss.dome-warden.presentation.v3.showcase",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/dome-warden/showcase-64.png",
+      "standardId": "buddy-boss-showcase-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "showcase",
+      "assetVersion": "3.0.0",
+      "description": "Resolution-native Dome Warden showcase poses across five tiers."
+    },
+    {
+      "key": "boss.dome-warden.presentation.v3.portrait",
+      "category": "buddies",
+      "path": "buddies/handcrafted/presentation/v3/dome-warden/portrait-64.png",
+      "standardId": "buddy-dialogue-64",
+      "paletteId": "kinetic-slate",
+      "status": "review",
+      "loadGroup": "portrait",
+      "assetVersion": "3.0.0",
+      "description": "Review-only Dome Warden boss introduction portrait."
+    },
+    {
       "key": "audio.ui-confirm",
       "category": "audio",
       "path": "audio/ui-confirm.wav",
@@ -347,5 +1487,1138 @@
       "durationMs": 180,
       "description": "Original competitive-lock confirmation cue."
     }
-  ]
+  ],
+  "buddySpritePipeline": {
+    "version": 1,
+    "frameWidth": 24,
+    "frameHeight": 24,
+    "anchor": "bottom-center",
+    "markerPaletteId": "kinetic-slate",
+    "poseLayout": {
+      "idle": { "startFrame": 0, "frameCount": 2, "durationMs": 300 },
+      "walking": { "startFrame": 2, "frameCount": 2, "durationMs": 170 },
+      "running": { "startFrame": 4, "frameCount": 2, "durationMs": 120 },
+      "training": { "startFrame": 6, "frameCount": 2, "durationMs": 200 },
+      "fatigue": { "startFrame": 8, "frameCount": 2, "durationMs": 420 },
+      "capture": { "startFrame": 10, "frameCount": 2, "durationMs": 180 },
+      "victory": { "startFrame": 12, "frameCount": 2, "durationMs": 260 },
+      "front-flex": { "startFrame": 14, "frameCount": 2, "durationMs": 320 },
+      "back-flex": { "startFrame": 16, "frameCount": 2, "durationMs": 320 },
+      "side-pose": { "startFrame": 18, "frameCount": 2, "durationMs": 300 },
+      "boss-entrance": { "startFrame": 20, "frameCount": 2, "durationMs": 220 },
+      "rare-entrance": { "startFrame": 22, "frameCount": 2, "durationMs": 200 }
+    },
+    "layerOrder": [
+      "shadow",
+      "base-body",
+      "physique-overlay",
+      "appendage-variant",
+      "marking",
+      "equipment",
+      "accessory",
+      "expression",
+      "pump",
+      "rare-trait",
+      "boss-tier"
+    ],
+    "profiles": [
+      {
+        "speciesId": "brawny-bear",
+        "rendererMode": "hybrid",
+        "anatomyFamilyId": "broad-mammal",
+        "baseStrips": {
+          "front": "buddy.brawny-bear.authored.front",
+          "back": "buddy.brawny-bear.authored.back",
+          "left": "buddy.brawny-bear.authored.left"
+        },
+        "baseStripCandidates": {
+          "front": [
+            "buddy.brawny-bear.authored.v2.front",
+            "buddy.brawny-bear.authored.front"
+          ],
+          "back": [
+            "buddy.brawny-bear.authored.v2.back",
+            "buddy.brawny-bear.authored.back"
+          ],
+          "left": [
+            "buddy.brawny-bear.authored.v2.left",
+            "buddy.brawny-bear.authored.left"
+          ]
+        },
+        "layerBindings": {
+          "shadow": [{ "rendererId": "procedural.buddy-shadow" }],
+          "physique-overlay": [{ "rendererId": "procedural.buddy-physique" }],
+          "appendage-variant": [{ "rendererId": "procedural.buddy-appendage" }],
+          "marking": [{ "rendererId": "procedural.buddy-marking" }],
+          "equipment": [{ "rendererId": "procedural.buddy-equipment" }],
+          "accessory": [{ "rendererId": "procedural.buddy-accessory" }],
+          "expression": [{ "rendererId": "procedural.buddy-expression" }],
+          "pump": [{ "rendererId": "procedural.buddy-pump" }],
+          "rare-trait": [{ "rendererId": "procedural.buddy-rare" }],
+          "boss-tier": [
+            {
+              "assetKey": "boss.home-watchman.authored.tiers",
+              "optional": true
+            }
+          ]
+        },
+        "mirrorRightFromLeft": true,
+        "asymmetricFeatureIds": [],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "titan-tortoise",
+        "rendererMode": "handcrafted",
+        "anatomyFamilyId": "armored-shelled",
+        "baseStrips": {
+          "front": "buddy.titan-tortoise.authored.v3.front",
+          "back": "buddy.titan-tortoise.authored.v3.back",
+          "left": "buddy.titan-tortoise.authored.v3.left",
+          "right": "buddy.titan-tortoise.authored.v3.right"
+        },
+        "baseStripCandidates": {
+          "front": ["buddy.titan-tortoise.authored.v3.front"],
+          "back": ["buddy.titan-tortoise.authored.v3.back"],
+          "left": ["buddy.titan-tortoise.authored.v3.left"],
+          "right": ["buddy.titan-tortoise.authored.v3.right"]
+        },
+        "layerBindings": {
+          "shadow": [{ "rendererId": "procedural.buddy-shadow" }],
+          "physique-overlay": [{ "rendererId": "batch03.dome-shell-physique" }],
+          "appendage-variant": [{ "rendererId": "procedural.buddy-appendage" }],
+          "marking": [{ "rendererId": "procedural.buddy-marking" }],
+          "equipment": [{ "rendererId": "batch03.plastrong-equipment-mounts" }],
+          "accessory": [{ "rendererId": "batch03.plastrong-accessory-modules" }],
+          "expression": [{ "rendererId": "procedural.buddy-expression" }],
+          "pump": [{ "rendererId": "batch03.flexible-tissue-pump" }],
+          "rare-trait": [{ "rendererId": "procedural.buddy-rare" }]
+        },
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["shell-ridge"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "iron-wolf",
+        "rendererMode": "hybrid",
+        "anatomyFamilyId": "lean-quadruped",
+        "baseStrips": {
+          "front": "buddy.iron-wolf.authored.front",
+          "back": "buddy.iron-wolf.authored.back",
+          "left": "buddy.iron-wolf.authored.left"
+        },
+        "baseStripCandidates": {
+          "front": [
+            "buddy.iron-wolf.authored.v2.front",
+            "buddy.iron-wolf.authored.front"
+          ],
+          "back": [
+            "buddy.iron-wolf.authored.v2.back",
+            "buddy.iron-wolf.authored.back"
+          ],
+          "left": [
+            "buddy.iron-wolf.authored.v2.left",
+            "buddy.iron-wolf.authored.left"
+          ]
+        },
+        "layerBindings": {
+          "shadow": [{ "rendererId": "procedural.buddy-shadow" }],
+          "physique-overlay": [{ "rendererId": "procedural.buddy-physique" }],
+          "appendage-variant": [{ "rendererId": "procedural.buddy-appendage" }],
+          "marking": [{ "rendererId": "procedural.buddy-marking" }],
+          "equipment": [{ "rendererId": "procedural.buddy-equipment" }],
+          "accessory": [{ "rendererId": "procedural.buddy-accessory" }],
+          "expression": [{ "rendererId": "procedural.buddy-expression" }],
+          "pump": [{ "rendererId": "procedural.buddy-pump" }],
+          "rare-trait": [{ "rendererId": "procedural.buddy-rare" }]
+        },
+        "mirrorRightFromLeft": true,
+        "asymmetricFeatureIds": [],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "muscled-boar",
+        "rendererMode": "procedural",
+        "anatomyFamilyId": "broad-mammal",
+        "baseStrips": {},
+        "layerBindings": {},
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["mismatched-tusks"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "ripped-rhino",
+        "rendererMode": "handcrafted",
+        "anatomyFamilyId": "armored-shelled",
+        "baseStrips": {
+          "front": "buddy.ripped-rhino.authored.v1.front",
+          "back": "buddy.ripped-rhino.authored.v1.back",
+          "left": "buddy.ripped-rhino.authored.v1.left",
+          "right": "buddy.ripped-rhino.authored.v1.right"
+        },
+        "baseStripCandidates": {
+          "front": [
+            "buddy.ripped-rhino.authored.v3.front",
+            "buddy.ripped-rhino.authored.v1.front"
+          ],
+          "back": [
+            "buddy.ripped-rhino.authored.v3.back",
+            "buddy.ripped-rhino.authored.v1.back"
+          ],
+          "left": [
+            "buddy.ripped-rhino.authored.v3.left",
+            "buddy.ripped-rhino.authored.v1.left"
+          ],
+          "right": [
+            "buddy.ripped-rhino.authored.v3.right",
+            "buddy.ripped-rhino.authored.v1.right"
+          ]
+        },
+        "layerBindings": {
+          "shadow": [{ "rendererId": "procedural.buddy-shadow" }],
+          "physique-overlay": [{ "rendererId": "procedural.buddy-physique" }],
+          "appendage-variant": [{ "rendererId": "procedural.buddy-appendage" }],
+          "marking": [{ "rendererId": "procedural.buddy-marking" }],
+          "equipment": [{ "rendererId": "procedural.buddy-equipment" }],
+          "accessory": [{ "rendererId": "procedural.buddy-accessory" }],
+          "expression": [{ "rendererId": "procedural.buddy-expression" }],
+          "pump": [{ "rendererId": "procedural.buddy-pump" }],
+          "rare-trait": [{ "rendererId": "procedural.buddy-rare" }],
+          "boss-tier": [
+            {
+              "assetKey": "boss.a-rhino.authored.v1.tiers",
+              "optional": true
+            }
+          ]
+        },
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["rail-horn"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "boulder-bison",
+        "rendererMode": "handcrafted",
+        "anatomyFamilyId": "broad-mammal",
+        "baseStrips": {
+          "front": "buddy.boulder-bison.authored.v3.front",
+          "back": "buddy.boulder-bison.authored.v3.back",
+          "left": "buddy.boulder-bison.authored.v3.left",
+          "right": "buddy.boulder-bison.authored.v3.right"
+        },
+        "baseStripCandidates": {
+          "front": ["buddy.boulder-bison.authored.v3.front"],
+          "back": ["buddy.boulder-bison.authored.v3.back"],
+          "left": ["buddy.boulder-bison.authored.v3.left"],
+          "right": ["buddy.boulder-bison.authored.v3.right"]
+        },
+        "layerBindings": {
+          "shadow": [{ "rendererId": "procedural.buddy-shadow" }],
+          "physique-overlay": [{ "rendererId": "batch03.rigid-torso-physique" }],
+          "appendage-variant": [{ "rendererId": "procedural.buddy-appendage" }],
+          "marking": [{ "rendererId": "procedural.buddy-marking" }],
+          "equipment": [{ "rendererId": "batch03.rigid-torso-equipment" }],
+          "accessory": [{ "rendererId": "procedural.buddy-accessory" }],
+          "expression": [{ "rendererId": "procedural.buddy-expression" }],
+          "pump": [{ "rendererId": "batch03.exposed-limb-pump" }],
+          "rare-trait": [{ "rendererId": "procedural.buddy-rare" }]
+        },
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["cairn-hump"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "buff-otter",
+        "rendererMode": "procedural",
+        "anatomyFamilyId": "lean-quadruped",
+        "baseStrips": {},
+        "layerBindings": {},
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["curl-tail"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "titan-gorilla",
+        "rendererMode": "handcrafted",
+        "anatomyFamilyId": "heavy-biped",
+        "baseStrips": {
+          "front": "buddy.titan-gorilla.authored.v1.front",
+          "back": "buddy.titan-gorilla.authored.v1.back",
+          "left": "buddy.titan-gorilla.authored.v1.left",
+          "right": "buddy.titan-gorilla.authored.v1.right"
+        },
+        "baseStripCandidates": {
+          "front": ["buddy.titan-gorilla.authored.v1.front"],
+          "back": ["buddy.titan-gorilla.authored.v1.back"],
+          "left": ["buddy.titan-gorilla.authored.v1.left"],
+          "right": ["buddy.titan-gorilla.authored.v1.right"]
+        },
+        "layerBindings": {
+          "shadow": [{ "rendererId": "procedural.buddy-shadow" }],
+          "physique-overlay": [{ "rendererId": "procedural.buddy-physique" }],
+          "appendage-variant": [{ "rendererId": "procedural.buddy-appendage" }],
+          "marking": [{ "rendererId": "procedural.buddy-marking" }],
+          "equipment": [{ "rendererId": "procedural.buddy-equipment" }],
+          "accessory": [{ "rendererId": "procedural.buddy-accessory" }],
+          "expression": [{ "rendererId": "procedural.buddy-expression" }],
+          "pump": [{ "rendererId": "procedural.buddy-pump" }],
+          "rare-trait": [{ "rendererId": "procedural.buddy-rare" }]
+        },
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": [],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "loopstride",
+        "rendererMode": "procedural",
+        "anatomyFamilyId": "compact-powerhouse",
+        "baseStrips": {},
+        "layerBindings": {},
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["loop-ears"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "mendlume",
+        "rendererMode": "procedural",
+        "anatomyFamilyId": "compact-powerhouse",
+        "baseStrips": {},
+        "layerBindings": {},
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["lantern-crest"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "cadenswoop",
+        "rendererMode": "procedural",
+        "anatomyFamilyId": "avian",
+        "baseStrips": {},
+        "layerBindings": {},
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["cadence-tail"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "spotmole",
+        "rendererMode": "handcrafted",
+        "anatomyFamilyId": "compact-powerhouse",
+        "baseStrips": {
+          "front": "buddy.spotmole.authored.v1.front",
+          "back": "buddy.spotmole.authored.v1.back",
+          "left": "buddy.spotmole.authored.v1.left",
+          "right": "buddy.spotmole.authored.v1.right"
+        },
+        "baseStripCandidates": {
+          "front": ["buddy.spotmole.authored.v1.front"],
+          "back": ["buddy.spotmole.authored.v1.back"],
+          "left": ["buddy.spotmole.authored.v1.left"],
+          "right": ["buddy.spotmole.authored.v1.right"]
+        },
+        "layerBindings": {
+          "shadow": [{ "rendererId": "procedural.buddy-shadow" }],
+          "physique-overlay": [{ "rendererId": "procedural.buddy-physique" }],
+          "appendage-variant": [{ "rendererId": "procedural.buddy-appendage" }],
+          "marking": [{ "rendererId": "procedural.buddy-marking" }],
+          "equipment": [{ "rendererId": "procedural.buddy-equipment" }],
+          "accessory": [{ "rendererId": "procedural.buddy-accessory" }],
+          "expression": [{ "rendererId": "procedural.buddy-expression" }],
+          "pump": [{ "rendererId": "procedural.buddy-pump" }],
+          "rare-trait": [{ "rendererId": "procedural.buddy-rare" }]
+        },
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["shovel-hands"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "prismantle",
+        "rendererMode": "handcrafted",
+        "anatomyFamilyId": "winged-mythic",
+        "baseStrips": {
+          "front": "buddy.prismantle.authored.front",
+          "back": "buddy.prismantle.authored.back",
+          "left": "buddy.prismantle.authored.left",
+          "right": "buddy.prismantle.authored.right"
+        },
+        "baseStripCandidates": {
+          "front": [
+            "buddy.prismantle.authored.v2.front",
+            "buddy.prismantle.authored.front"
+          ],
+          "back": [
+            "buddy.prismantle.authored.v2.back",
+            "buddy.prismantle.authored.back"
+          ],
+          "left": [
+            "buddy.prismantle.authored.v2.left",
+            "buddy.prismantle.authored.left"
+          ],
+          "right": [
+            "buddy.prismantle.authored.v2.right",
+            "buddy.prismantle.authored.right"
+          ]
+        },
+        "layerBindings": {
+          "shadow": [{ "rendererId": "procedural.buddy-shadow" }],
+          "physique-overlay": [{ "rendererId": "procedural.buddy-physique" }],
+          "appendage-variant": [{ "rendererId": "procedural.buddy-appendage" }],
+          "marking": [{ "rendererId": "procedural.buddy-marking" }],
+          "equipment": [{ "rendererId": "procedural.buddy-equipment" }],
+          "accessory": [{ "rendererId": "procedural.buddy-accessory" }],
+          "expression": [{ "rendererId": "procedural.buddy-expression" }],
+          "pump": [{ "rendererId": "procedural.buddy-pump" }],
+          "rare-trait": [{ "rendererId": "procedural.buddy-rare" }]
+        },
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["offset-prism-fins"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "vaultwyrm",
+        "rendererMode": "procedural",
+        "anatomyFamilyId": "serpentine",
+        "baseStrips": {},
+        "layerBindings": {},
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["clasp-tail"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "crownquill",
+        "rendererMode": "procedural",
+        "anatomyFamilyId": "armored-shelled",
+        "baseStrips": {},
+        "layerBindings": {},
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["radial-crown"],
+        "fallbackRenderer": "procedural"
+      },
+      {
+        "speciesId": "manyfold",
+        "rendererMode": "procedural",
+        "anatomyFamilyId": "multi-limbed",
+        "baseStrips": {},
+        "layerBindings": {},
+        "mirrorRightFromLeft": false,
+        "asymmetricFeatureIds": ["offset-limb-rhythm"],
+        "fallbackRenderer": "procedural"
+      }
+    ],
+    "bossOverlays": [
+      {
+        "bossId": "home-watchman",
+        "speciesId": "brawny-bear",
+        "assetKey": "boss.home-watchman.authored.tiers",
+        "assetCandidates": [
+          "boss.home-watchman.authored.v2.tiers",
+          "boss.home-watchman.authored.tiers"
+        ],
+        "tierFrameOrder": [
+          "normal",
+          "pumped",
+          "overload",
+          "final-round",
+          "defeated"
+        ]
+      },
+      {
+        "bossId": "a-rhino",
+        "speciesId": "ripped-rhino",
+        "assetKey": "boss.a-rhino.authored.v1.tiers",
+        "assetCandidates": ["boss.a-rhino.authored.v1.tiers"],
+        "tierFrameOrder": [
+          "normal",
+          "pumped",
+          "overload",
+          "final-round",
+          "defeated"
+        ]
+      },
+      {
+        "bossId": "dome-warden",
+        "speciesId": "titan-tortoise",
+        "assetKey": "boss.dome-warden.authored.v3.tiers",
+        "assetCandidates": ["boss.dome-warden.authored.v3.tiers"],
+        "tierFrameOrder": [
+          "normal",
+          "pumped",
+          "overload",
+          "final-round",
+          "defeated"
+        ]
+      }
+    ],
+    "presentationProfiles": [
+      {
+        "characterId": "brawny-bear",
+        "speciesId": "brawny-bear",
+        "overworldSpriteProfile": {
+          "profileId": "buddy.brawny-bear.overworld.v2",
+          "speciesId": "brawny-bear"
+        },
+        "menuSpriteProfile": {
+          "profileId": "buddy.brawny-bear.menu.v1",
+          "standardId": "buddy-menu-32",
+          "assetCandidates": ["buddy.brawny-bear.presentation.v1.menu"],
+          "frameOrder": ["front", "back", "left", "right"]
+        },
+        "battleSpriteProfile": {
+          "profileId": "buddy.brawny-bear.battle.v1",
+          "standardId": "buddy-battle-48",
+          "assetCandidates": ["buddy.brawny-bear.presentation.v1.battle"],
+          "frameOrder": [
+            "neutral-battle",
+            "attack-preparation",
+            "shoulder-burst",
+            "iron-grind",
+            "snapping-hook",
+            "counter",
+            "stamina-loss",
+            "near-pin",
+            "victory",
+            "capture-success",
+            "escape",
+            "defeat"
+          ]
+        },
+        "showcaseSpriteProfile": {
+          "profileId": "buddy.brawny-bear.showcase.v1",
+          "standardId": "buddy-showcase-64",
+          "assetCandidates": ["buddy.brawny-bear.presentation.v1.showcase"],
+          "frameOrder": [
+            "front-relaxed",
+            "back-relaxed",
+            "front-double-biceps",
+            "back-double-biceps",
+            "side-chest",
+            "side-triceps",
+            "most-muscular",
+            "abs-and-thigh",
+            "victory-pose",
+            "fatigue-pose"
+          ]
+        },
+        "dialoguePortraitProfile": {
+          "profileId": "buddy.brawny-bear.portrait.v1",
+          "standardId": "buddy-dialogue-64",
+          "assetCandidates": ["buddy.brawny-bear.presentation.v1.portrait"],
+          "frameOrder": ["portrait"]
+        }
+      },
+      {
+        "characterId": "iron-wolf",
+        "speciesId": "iron-wolf",
+        "overworldSpriteProfile": {
+          "profileId": "buddy.iron-wolf.overworld.v2",
+          "speciesId": "iron-wolf"
+        },
+        "menuSpriteProfile": {
+          "profileId": "buddy.iron-wolf.menu.v1",
+          "standardId": "buddy-menu-32",
+          "assetCandidates": ["buddy.iron-wolf.presentation.v1.menu"],
+          "frameOrder": ["front", "back", "left", "right"]
+        },
+        "battleSpriteProfile": {
+          "profileId": "buddy.iron-wolf.battle.v1",
+          "standardId": "buddy-battle-48",
+          "assetCandidates": ["buddy.iron-wolf.presentation.v1.battle"],
+          "frameOrder": [
+            "neutral-battle",
+            "attack-preparation",
+            "shoulder-burst",
+            "iron-grind",
+            "snapping-hook",
+            "counter",
+            "stamina-loss",
+            "near-pin",
+            "victory",
+            "capture-success",
+            "escape",
+            "defeat"
+          ]
+        },
+        "showcaseSpriteProfile": {
+          "profileId": "buddy.iron-wolf.showcase.v1",
+          "standardId": "buddy-showcase-64",
+          "assetCandidates": ["buddy.iron-wolf.presentation.v1.showcase"],
+          "frameOrder": [
+            "front-relaxed",
+            "back-relaxed",
+            "front-double-biceps",
+            "back-double-biceps",
+            "side-chest",
+            "side-triceps",
+            "most-muscular",
+            "abs-and-thigh",
+            "victory-pose",
+            "fatigue-pose"
+          ]
+        },
+        "dialoguePortraitProfile": {
+          "profileId": "buddy.iron-wolf.portrait.v1",
+          "standardId": "buddy-dialogue-64",
+          "assetCandidates": ["buddy.iron-wolf.presentation.v1.portrait"],
+          "frameOrder": ["portrait"]
+        }
+      },
+      {
+        "characterId": "prismantle",
+        "speciesId": "prismantle",
+        "overworldSpriteProfile": {
+          "profileId": "buddy.prismantle.overworld.v2",
+          "speciesId": "prismantle"
+        },
+        "menuSpriteProfile": {
+          "profileId": "buddy.prismantle.menu.v1",
+          "standardId": "buddy-menu-32",
+          "assetCandidates": ["buddy.prismantle.presentation.v1.menu"],
+          "frameOrder": ["front", "back", "left", "right"]
+        },
+        "battleSpriteProfile": {
+          "profileId": "buddy.prismantle.battle.v1",
+          "standardId": "buddy-battle-48",
+          "assetCandidates": ["buddy.prismantle.presentation.v1.battle"],
+          "frameOrder": [
+            "neutral-battle",
+            "attack-preparation",
+            "shoulder-burst",
+            "iron-grind",
+            "snapping-hook",
+            "counter",
+            "stamina-loss",
+            "near-pin",
+            "victory",
+            "capture-success",
+            "escape",
+            "defeat"
+          ]
+        },
+        "showcaseSpriteProfile": {
+          "profileId": "buddy.prismantle.showcase.v1",
+          "standardId": "buddy-showcase-64",
+          "assetCandidates": ["buddy.prismantle.presentation.v1.showcase"],
+          "frameOrder": [
+            "front-relaxed",
+            "back-relaxed",
+            "front-double-biceps",
+            "back-double-biceps",
+            "side-chest",
+            "side-triceps",
+            "most-muscular",
+            "abs-and-thigh",
+            "victory-pose",
+            "fatigue-pose"
+          ]
+        },
+        "dialoguePortraitProfile": {
+          "profileId": "buddy.prismantle.portrait.v1",
+          "standardId": "buddy-dialogue-64",
+          "assetCandidates": ["buddy.prismantle.presentation.v1.portrait"],
+          "frameOrder": ["portrait"]
+        }
+      },
+      {
+        "characterId": "home-watchman",
+        "speciesId": "brawny-bear",
+        "bossId": "home-watchman",
+        "overworldSpriteProfile": {
+          "profileId": "boss.home-watchman.overworld.v2",
+          "speciesId": "brawny-bear"
+        },
+        "menuSpriteProfile": {
+          "profileId": "boss.home-watchman.menu.v1",
+          "standardId": "buddy-menu-32",
+          "assetCandidates": ["boss.home-watchman.presentation.v1.menu"],
+          "frameOrder": ["front", "back", "left", "right"]
+        },
+        "battleSpriteProfile": {
+          "profileId": "boss.home-watchman.battle.v1",
+          "standardId": "buddy-boss-battle-64",
+          "assetCandidates": ["boss.home-watchman.presentation.v1.battle"],
+          "frameOrder": [
+            "neutral-battle",
+            "attack-preparation",
+            "shoulder-burst",
+            "iron-grind",
+            "snapping-hook",
+            "counter",
+            "stamina-loss",
+            "near-pin",
+            "victory",
+            "capture-success",
+            "escape",
+            "defeat"
+          ],
+          "tierFrameOrder": [
+            "normal",
+            "pumped",
+            "overload",
+            "final-round",
+            "defeated"
+          ]
+        },
+        "showcaseSpriteProfile": {
+          "profileId": "boss.home-watchman.showcase.v1",
+          "standardId": "buddy-boss-showcase-64",
+          "assetCandidates": ["boss.home-watchman.presentation.v1.showcase"],
+          "frameOrder": [
+            "front-relaxed",
+            "back-relaxed",
+            "front-double-biceps",
+            "back-double-biceps",
+            "side-chest",
+            "side-triceps",
+            "most-muscular",
+            "abs-and-thigh",
+            "victory-pose",
+            "fatigue-pose"
+          ],
+          "tierFrameOrder": [
+            "normal",
+            "pumped",
+            "overload",
+            "final-round",
+            "defeated"
+          ]
+        },
+        "dialoguePortraitProfile": {
+          "profileId": "boss.home-watchman.portrait.v1",
+          "standardId": "buddy-dialogue-64",
+          "assetCandidates": ["boss.home-watchman.presentation.v1.portrait"],
+          "frameOrder": ["portrait"]
+        }
+      },
+      {
+        "characterId": "ripped-rhino",
+        "speciesId": "ripped-rhino",
+        "overworldSpriteProfile": {
+          "profileId": "buddy.ripped-rhino.overworld.v1",
+          "speciesId": "ripped-rhino"
+        },
+        "menuSpriteProfile": {
+          "profileId": "buddy.ripped-rhino.menu.v1",
+          "standardId": "buddy-menu-32",
+          "assetCandidates": [
+            "buddy.ripped-rhino.presentation.v3.menu",
+            "buddy.ripped-rhino.presentation.v1.menu"
+          ],
+          "frameOrder": ["front", "back", "left", "right"]
+        },
+        "battleSpriteProfile": {
+          "profileId": "buddy.ripped-rhino.battle.v1",
+          "standardId": "buddy-battle-48",
+          "assetCandidates": [
+            "buddy.ripped-rhino.presentation.v3.battle",
+            "buddy.ripped-rhino.presentation.v1.battle"
+          ],
+          "frameOrder": [
+            "neutral-battle",
+            "attack-preparation",
+            "shoulder-burst",
+            "iron-grind",
+            "snapping-hook",
+            "counter",
+            "stamina-loss",
+            "near-pin",
+            "victory",
+            "capture-success",
+            "escape",
+            "defeat"
+          ]
+        },
+        "showcaseSpriteProfile": {
+          "profileId": "buddy.ripped-rhino.showcase.v1",
+          "standardId": "buddy-showcase-64",
+          "assetCandidates": [
+            "buddy.ripped-rhino.presentation.v3.showcase",
+            "buddy.ripped-rhino.presentation.v1.showcase"
+          ],
+          "frameOrder": [
+            "front-relaxed",
+            "back-relaxed",
+            "front-double-biceps",
+            "back-double-biceps",
+            "side-chest",
+            "side-triceps",
+            "most-muscular",
+            "abs-and-thigh",
+            "victory-pose",
+            "fatigue-pose"
+          ]
+        },
+        "dialoguePortraitProfile": {
+          "profileId": "buddy.ripped-rhino.portrait.v1",
+          "standardId": "buddy-dialogue-64",
+          "assetCandidates": [
+            "buddy.ripped-rhino.presentation.v3.portrait",
+            "buddy.ripped-rhino.presentation.v1.portrait"
+          ],
+          "frameOrder": ["portrait"]
+        }
+      },
+      {
+        "characterId": "spotmole",
+        "speciesId": "spotmole",
+        "overworldSpriteProfile": {
+          "profileId": "buddy.spotmole.overworld.v1",
+          "speciesId": "spotmole"
+        },
+        "menuSpriteProfile": {
+          "profileId": "buddy.spotmole.menu.v1",
+          "standardId": "buddy-menu-32",
+          "assetCandidates": ["buddy.spotmole.presentation.v1.menu"],
+          "frameOrder": ["front", "back", "left", "right"]
+        },
+        "battleSpriteProfile": {
+          "profileId": "buddy.spotmole.battle.v1",
+          "standardId": "buddy-battle-48",
+          "assetCandidates": ["buddy.spotmole.presentation.v1.battle"],
+          "frameOrder": [
+            "neutral-battle",
+            "attack-preparation",
+            "shoulder-burst",
+            "iron-grind",
+            "snapping-hook",
+            "counter",
+            "stamina-loss",
+            "near-pin",
+            "victory",
+            "capture-success",
+            "escape",
+            "defeat"
+          ]
+        },
+        "showcaseSpriteProfile": {
+          "profileId": "buddy.spotmole.showcase.v1",
+          "standardId": "buddy-showcase-64",
+          "assetCandidates": ["buddy.spotmole.presentation.v1.showcase"],
+          "frameOrder": [
+            "front-relaxed",
+            "back-relaxed",
+            "front-double-biceps",
+            "back-double-biceps",
+            "side-chest",
+            "side-triceps",
+            "most-muscular",
+            "abs-and-thigh",
+            "victory-pose",
+            "fatigue-pose"
+          ]
+        },
+        "dialoguePortraitProfile": {
+          "profileId": "buddy.spotmole.portrait.v1",
+          "standardId": "buddy-dialogue-64",
+          "assetCandidates": ["buddy.spotmole.presentation.v1.portrait"],
+          "frameOrder": ["portrait"]
+        }
+      },
+      {
+        "characterId": "titan-gorilla",
+        "speciesId": "titan-gorilla",
+        "overworldSpriteProfile": {
+          "profileId": "buddy.titan-gorilla.overworld.v1",
+          "speciesId": "titan-gorilla"
+        },
+        "menuSpriteProfile": {
+          "profileId": "buddy.titan-gorilla.menu.v1",
+          "standardId": "buddy-menu-32",
+          "assetCandidates": ["buddy.titan-gorilla.presentation.v1.menu"],
+          "frameOrder": ["front", "back", "left", "right"]
+        },
+        "battleSpriteProfile": {
+          "profileId": "buddy.titan-gorilla.battle.v1",
+          "standardId": "buddy-battle-48",
+          "assetCandidates": ["buddy.titan-gorilla.presentation.v1.battle"],
+          "frameOrder": [
+            "neutral-battle",
+            "attack-preparation",
+            "shoulder-burst",
+            "iron-grind",
+            "snapping-hook",
+            "counter",
+            "stamina-loss",
+            "near-pin",
+            "victory",
+            "capture-success",
+            "escape",
+            "defeat"
+          ]
+        },
+        "showcaseSpriteProfile": {
+          "profileId": "buddy.titan-gorilla.showcase.v1",
+          "standardId": "buddy-showcase-64",
+          "assetCandidates": ["buddy.titan-gorilla.presentation.v1.showcase"],
+          "frameOrder": [
+            "front-relaxed",
+            "back-relaxed",
+            "front-double-biceps",
+            "back-double-biceps",
+            "side-chest",
+            "side-triceps",
+            "most-muscular",
+            "abs-and-thigh",
+            "victory-pose",
+            "fatigue-pose"
+          ]
+        },
+        "dialoguePortraitProfile": {
+          "profileId": "buddy.titan-gorilla.portrait.v1",
+          "standardId": "buddy-dialogue-64",
+          "assetCandidates": ["buddy.titan-gorilla.presentation.v1.portrait"],
+          "frameOrder": ["portrait"]
+        }
+      },
+      {
+        "characterId": "a-rhino",
+        "speciesId": "ripped-rhino",
+        "bossId": "a-rhino",
+        "overworldSpriteProfile": {
+          "profileId": "boss.a-rhino.overworld.v1",
+          "speciesId": "ripped-rhino"
+        },
+        "menuSpriteProfile": {
+          "profileId": "boss.a-rhino.menu.v1",
+          "standardId": "buddy-menu-32",
+          "assetCandidates": ["boss.a-rhino.presentation.v1.menu"],
+          "frameOrder": ["front", "back", "left", "right"]
+        },
+        "battleSpriteProfile": {
+          "profileId": "boss.a-rhino.battle.v1",
+          "standardId": "buddy-boss-battle-64",
+          "assetCandidates": ["boss.a-rhino.presentation.v1.battle"],
+          "frameOrder": [
+            "neutral-battle",
+            "attack-preparation",
+            "shoulder-burst",
+            "iron-grind",
+            "snapping-hook",
+            "counter",
+            "stamina-loss",
+            "near-pin",
+            "victory",
+            "capture-success",
+            "escape",
+            "defeat"
+          ],
+          "tierFrameOrder": [
+            "normal",
+            "pumped",
+            "overload",
+            "final-round",
+            "defeated"
+          ]
+        },
+        "showcaseSpriteProfile": {
+          "profileId": "boss.a-rhino.showcase.v1",
+          "standardId": "buddy-boss-showcase-64",
+          "assetCandidates": ["boss.a-rhino.presentation.v1.showcase"],
+          "frameOrder": [
+            "front-relaxed",
+            "back-relaxed",
+            "front-double-biceps",
+            "back-double-biceps",
+            "side-chest",
+            "side-triceps",
+            "most-muscular",
+            "abs-and-thigh",
+            "victory-pose",
+            "fatigue-pose"
+          ],
+          "tierFrameOrder": [
+            "normal",
+            "pumped",
+            "overload",
+            "final-round",
+            "defeated"
+          ]
+        },
+        "dialoguePortraitProfile": {
+          "profileId": "boss.a-rhino.portrait.v1",
+          "standardId": "buddy-dialogue-64",
+          "assetCandidates": ["boss.a-rhino.presentation.v1.portrait"],
+          "frameOrder": ["portrait"]
+        }
+      },
+      {
+        "characterId": "titan-tortoise",
+        "speciesId": "titan-tortoise",
+        "overworldSpriteProfile": {
+          "profileId": "buddy.titan-tortoise.overworld.v3",
+          "speciesId": "titan-tortoise"
+        },
+        "menuSpriteProfile": {
+          "profileId": "buddy.titan-tortoise.menu.v3",
+          "standardId": "buddy-menu-32",
+          "assetCandidates": ["buddy.titan-tortoise.presentation.v3.menu"],
+          "frameOrder": ["front", "back", "left", "right"]
+        },
+        "battleSpriteProfile": {
+          "profileId": "buddy.titan-tortoise.battle.v3",
+          "standardId": "buddy-battle-48",
+          "assetCandidates": ["buddy.titan-tortoise.presentation.v3.battle"],
+          "frameOrder": [
+            "neutral-battle",
+            "attack-preparation",
+            "shoulder-burst",
+            "iron-grind",
+            "snapping-hook",
+            "counter",
+            "stamina-loss",
+            "near-pin",
+            "victory",
+            "capture-success",
+            "escape",
+            "defeat"
+          ]
+        },
+        "showcaseSpriteProfile": {
+          "profileId": "buddy.titan-tortoise.showcase.v3",
+          "standardId": "buddy-showcase-64",
+          "assetCandidates": ["buddy.titan-tortoise.presentation.v3.showcase"],
+          "frameOrder": [
+            "front-relaxed",
+            "back-relaxed",
+            "front-double-biceps",
+            "back-double-biceps",
+            "side-chest",
+            "side-triceps",
+            "most-muscular",
+            "abs-and-thigh",
+            "victory-pose",
+            "fatigue-pose"
+          ]
+        },
+        "dialoguePortraitProfile": {
+          "profileId": "buddy.titan-tortoise.portrait.v3",
+          "standardId": "buddy-dialogue-64",
+          "assetCandidates": ["buddy.titan-tortoise.presentation.v3.portrait"],
+          "frameOrder": ["portrait"]
+        }
+      },
+      {
+        "characterId": "boulder-bison",
+        "speciesId": "boulder-bison",
+        "overworldSpriteProfile": {
+          "profileId": "buddy.boulder-bison.overworld.v3",
+          "speciesId": "boulder-bison"
+        },
+        "menuSpriteProfile": {
+          "profileId": "buddy.boulder-bison.menu.v3",
+          "standardId": "buddy-menu-32",
+          "assetCandidates": ["buddy.boulder-bison.presentation.v3.menu"],
+          "frameOrder": ["front", "back", "left", "right"]
+        },
+        "battleSpriteProfile": {
+          "profileId": "buddy.boulder-bison.battle.v3",
+          "standardId": "buddy-battle-48",
+          "assetCandidates": ["buddy.boulder-bison.presentation.v3.battle"],
+          "frameOrder": [
+            "neutral-battle",
+            "attack-preparation",
+            "shoulder-burst",
+            "iron-grind",
+            "snapping-hook",
+            "counter",
+            "stamina-loss",
+            "near-pin",
+            "victory",
+            "capture-success",
+            "escape",
+            "defeat"
+          ]
+        },
+        "showcaseSpriteProfile": {
+          "profileId": "buddy.boulder-bison.showcase.v3",
+          "standardId": "buddy-showcase-64",
+          "assetCandidates": ["buddy.boulder-bison.presentation.v3.showcase"],
+          "frameOrder": [
+            "front-relaxed",
+            "back-relaxed",
+            "front-double-biceps",
+            "back-double-biceps",
+            "side-chest",
+            "side-triceps",
+            "most-muscular",
+            "abs-and-thigh",
+            "victory-pose",
+            "fatigue-pose"
+          ]
+        },
+        "dialoguePortraitProfile": {
+          "profileId": "buddy.boulder-bison.portrait.v3",
+          "standardId": "buddy-dialogue-64",
+          "assetCandidates": ["buddy.boulder-bison.presentation.v3.portrait"],
+          "frameOrder": ["portrait"]
+        }
+      },
+      {
+        "characterId": "dome-warden",
+        "speciesId": "titan-tortoise",
+        "bossId": "dome-warden",
+        "overworldSpriteProfile": {
+          "profileId": "boss.dome-warden.overworld.v3",
+          "speciesId": "titan-tortoise"
+        },
+        "menuSpriteProfile": {
+          "profileId": "boss.dome-warden.menu.v3",
+          "standardId": "buddy-menu-32",
+          "assetCandidates": ["boss.dome-warden.presentation.v3.menu"],
+          "frameOrder": ["front", "back", "left", "right"]
+        },
+        "battleSpriteProfile": {
+          "profileId": "boss.dome-warden.battle.v3",
+          "standardId": "buddy-boss-battle-64",
+          "assetCandidates": ["boss.dome-warden.presentation.v3.battle"],
+          "frameOrder": [
+            "neutral-battle",
+            "attack-preparation",
+            "shoulder-burst",
+            "iron-grind",
+            "snapping-hook",
+            "counter",
+            "stamina-loss",
+            "near-pin",
+            "victory",
+            "capture-success",
+            "escape",
+            "defeat"
+          ],
+          "tierFrameOrder": [
+            "normal",
+            "pumped",
+            "overload",
+            "final-round",
+            "defeated"
+          ]
+        },
+        "showcaseSpriteProfile": {
+          "profileId": "boss.dome-warden.showcase.v3",
+          "standardId": "buddy-boss-showcase-64",
+          "assetCandidates": ["boss.dome-warden.presentation.v3.showcase"],
+          "frameOrder": [
+            "front-relaxed",
+            "back-relaxed",
+            "front-double-biceps",
+            "back-double-biceps",
+            "side-chest",
+            "side-triceps",
+            "most-muscular",
+            "abs-and-thigh",
+            "victory-pose",
+            "fatigue-pose"
+          ],
+          "tierFrameOrder": [
+            "normal",
+            "pumped",
+            "overload",
+            "final-round",
+            "defeated"
+          ]
+        },
+        "dialoguePortraitProfile": {
+          "profileId": "boss.dome-warden.portrait.v3",
+          "standardId": "buddy-dialogue-64",
+          "assetCandidates": ["boss.dome-warden.presentation.v3.portrait"],
+          "frameOrder": ["portrait"]
+        }
+      }
+    ]
+  }
 }

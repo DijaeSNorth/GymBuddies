@@ -11,18 +11,26 @@ import {
   createTrainerPaletteMap,
   type TrainerPaletteSwap,
 } from '../../game/assets/paletteSwap';
-import { ASSET_CATEGORIES, type AssetCategory } from '../../game/assets/types';
+import {
+  ASSET_CATEGORIES,
+  BUDDY_BATTLE_POSES,
+  BUDDY_SHOWCASE_POSES,
+  type AssetCategory,
+} from '../../game/assets/types';
 import { validateAssetManifest } from '../../game/assets/validation';
 import {
   DEFAULT_TRAINER_APPEARANCE,
+  TRAINER_BUILD_ATTRIBUTES,
   TRAINER_BOTTOMS,
   TRAINER_PHYSIQUE_PRESETS,
+  TRAINER_SKIN_TONES,
   TRAINER_TOPS,
   cloneTrainerAppearance,
 } from '../../game/content/trainerAppearance';
+import { TRAINER_POSE_DEFINITIONS } from '../../game/content/bodybuilding';
 import { BUDDY_SPECIES } from '../../game/content/buddies';
 import {
-  BUDDY_BODY_SIZE_OPTIONS,
+  BUDDY_POSE_OPTIONS,
   getBuddyCharacterDesign,
 } from '../../game/content/buddyCharacters';
 import {
@@ -40,7 +48,11 @@ import {
   createNpcCharacterDesign,
   trainerAppearanceFromCharacterDesign,
 } from '../../game/systems/characterDesign';
-import type { TrainerPose } from '../../game/types';
+import type {
+  BuddyPose,
+  TrainerAppearance,
+  TrainerBuildAttributeId,
+} from '../../game/types';
 import { BuddySprite } from '../buddies/BuddySprite';
 import { TrainerPixelSprite } from '../trainer/TrainerPixelSprite';
 import './assetPreview.css';
@@ -87,16 +99,24 @@ const PALETTE_PRESETS: Array<{ id: string; name: string; palette: TrainerPalette
   },
 ];
 
-const CHARACTER_GALLERY_POSES: TrainerPose[] = [
-  'idle',
-  'walking',
-  'running',
-  'training',
-  'victory',
-  'fatigue',
-  'capture',
-  'boss-introduction',
-];
+const MULTI_RESOLUTION_PILOTS = [
+  { label: 'Bramblift', speciesId: 'brawny-bear' },
+  { label: 'Rivetjack', speciesId: 'iron-wolf' },
+  { label: 'Prismantle', speciesId: 'prismantle' },
+  {
+    bossId: 'home-watchman',
+    label: 'Mat Watchman',
+    speciesId: 'brawny-bear',
+  },
+  { label: 'Railhorn', speciesId: 'ripped-rhino' },
+  { label: 'Spotmole', speciesId: 'spotmole' },
+  { label: 'Knuckledge', speciesId: 'titan-gorilla' },
+  {
+    bossId: 'a-rhino',
+    label: 'A-Rhino',
+    speciesId: 'ripped-rhino',
+  },
+] as const;
 
 const CHARACTER_GALLERY_DIRECTIONS = [
   'front',
@@ -104,6 +124,39 @@ const CHARACTER_GALLERY_DIRECTIONS = [
   'left',
   'right',
 ] as const;
+
+const GALLERY_TOP_COLOR_IDS = [
+  'ocean',
+  'coral',
+  'amber',
+  'teal',
+  'plum',
+  'moss',
+  'brick',
+  'violet',
+] as const;
+
+const BODY_RANGE_PREVIEWS = [
+  { id: 'minimum', label: 'Minimum · Athletic', value: 0, skinToneId: TRAINER_SKIN_TONES[0]!.id },
+  { id: 'middle', label: 'Middle · Developed', value: 5, skinToneId: TRAINER_SKIN_TONES[5]!.id },
+  { id: 'maximum', label: 'Maximum · Showcase', value: 10, skinToneId: TRAINER_SKIN_TONES[9]!.id },
+] as const;
+
+function trainerAppearanceAtBuild(
+  value: number,
+  skinToneId = DEFAULT_TRAINER_APPEARANCE.colors.skinToneId,
+): TrainerAppearance {
+  const appearance = cloneTrainerAppearance(DEFAULT_TRAINER_APPEARANCE);
+  TRAINER_BUILD_ATTRIBUTES.forEach(({ key }) => {
+    appearance.build[key] = value;
+  });
+  appearance.colors.skinToneId = skinToneId;
+  return appearance;
+}
+
+function muscleLabel(id: TrainerBuildAttributeId) {
+  return TRAINER_BUILD_ATTRIBUTES.find((attribute) => attribute.id === id)?.label ?? id;
+}
 
 function PaletteCanvas({
   palette,
@@ -312,7 +365,7 @@ export function AssetPreviewScreen() {
             <h2 id="trainer-gallery-title">Trainer silhouette gallery</h2>
           </div>
           <p>
-            Eight modular physique presets share one bottom-center anchor across
+            Fourteen modular physique presets share one bottom-center anchor across
             front, back, left, and right directions.
           </p>
         </div>
@@ -322,16 +375,8 @@ export function AssetPreviewScreen() {
               DEFAULT_TRAINER_APPEARANCE,
             );
             appearance.build = { ...preset.build };
-            appearance.colors.topPrimaryId = [
-              'ocean',
-              'coral',
-              'amber',
-              'teal',
-              'plum',
-              'moss',
-              'brick',
-              'violet',
-            ][presetIndex]!;
+            appearance.colors.topPrimaryId =
+              GALLERY_TOP_COLOR_IDS[presetIndex % GALLERY_TOP_COLOR_IDS.length]!;
             return (
               <article key={preset.id}>
                 <h3>{preset.label}</h3>
@@ -360,6 +405,142 @@ export function AssetPreviewScreen() {
 
       <section
         className="asset-debug-section"
+        aria-labelledby="multires-pilot-gallery-title"
+      >
+        <div className="asset-debug-section-heading">
+          <div>
+            <p className="asset-debug-kicker">Native context sheets</p>
+            <h2 id="multires-pilot-gallery-title">
+              Multi-resolution review gallery
+            </h2>
+          </div>
+          <p>
+            Approved pilot references and the armored/heavy review batch use
+            authored native frames. The 24×24 overworld standard remains
+            unchanged.
+          </p>
+        </div>
+        <div className="multires-pilot-gallery">
+          {MULTI_RESOLUTION_PILOTS.map((pilot) => {
+            const species = BUDDY_SPECIES.find(
+              (entry) => entry.id === pilot.speciesId,
+            )!;
+            const design = getBuddyCharacterDesign(species.id);
+            const bossId = 'bossId' in pilot ? pilot.bossId : undefined;
+            return (
+              <article key={pilot.label}>
+                <h3>{pilot.label}</h3>
+                <div className="multires-menu-row">
+                  {CHARACTER_GALLERY_DIRECTIONS.map((direction) => (
+                    <figure key={direction}>
+                      <BuddySprite
+                        bossId={bossId}
+                        cosmetics={design.defaultCosmetics}
+                        creature={species}
+                        direction={direction}
+                        label={`${pilot.label} ${direction} menu`}
+                        presentationContext="menu"
+                        reducedMotion
+                        scale={1}
+                      />
+                      <figcaption>{direction} · 32</figcaption>
+                    </figure>
+                  ))}
+                </div>
+                <div className="multires-pose-row">
+                  {BUDDY_BATTLE_POSES.map((battlePose) => (
+                    <figure key={battlePose}>
+                      <BuddySprite
+                        battlePose={battlePose}
+                        bossId={bossId}
+                        bossTier={bossId ? 'final-round' : undefined}
+                        cosmetics={design.defaultCosmetics}
+                        creature={species}
+                        label={`${pilot.label} ${battlePose}`}
+                        presentationContext="battle"
+                        reducedMotion
+                        scale={1}
+                      />
+                      <figcaption>{battlePose}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+                <div className="multires-pose-row">
+                  {BUDDY_SHOWCASE_POSES.map((showcasePose) => (
+                    <figure key={showcasePose}>
+                      <BuddySprite
+                        bossId={bossId}
+                        bossTier={bossId ? 'final-round' : undefined}
+                        cosmetics={design.defaultCosmetics}
+                        creature={species}
+                        label={`${pilot.label} ${showcasePose}`}
+                        presentationContext="showcase"
+                        reducedMotion
+                        scale={1}
+                        showcasePose={showcasePose}
+                      />
+                      <figcaption>{showcasePose}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section
+        className="asset-debug-section"
+        aria-labelledby="body-range-gallery-title"
+      >
+        <div className="asset-debug-section-heading">
+          <div>
+            <p className="asset-debug-kicker">Silhouette boundary validation</p>
+            <h2 id="body-range-gallery-title">Minimum, middle, and maximum builds</h2>
+          </div>
+          <p>
+            Every cosmetic body control is set together at its lowest, middle,
+            and highest value. The minimum remains athletic; the maximum retains
+            negative space and readable limb separation.
+          </p>
+        </div>
+        <div className="body-range-gallery">
+          {BODY_RANGE_PREVIEWS.map((preview) => {
+            const appearance = trainerAppearanceAtBuild(
+              preview.value,
+              preview.skinToneId,
+            );
+            return (
+              <article key={preview.id} data-build-range={preview.id}>
+                <h3>{preview.label}</h3>
+                <div>
+                  {CHARACTER_GALLERY_DIRECTIONS.map((direction) => (
+                    <figure key={direction}>
+                      <TrainerPixelSprite
+                        animated={false}
+                        appearance={appearance}
+                        direction={direction}
+                        label={`${preview.label} ${direction}`}
+                        pose={
+                          direction === 'back'
+                            ? 'back-relaxed'
+                            : 'front-relaxed'
+                        }
+                        reducedMotion
+                        scale={2}
+                      />
+                      <figcaption>{direction}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section
+        className="asset-debug-section"
         aria-labelledby="archetype-gallery-title"
       >
         <div className="asset-debug-section-heading">
@@ -368,7 +549,7 @@ export function AssetPreviewScreen() {
             <h2 id="archetype-gallery-title">Every body archetype</h2>
           </div>
           <p>
-            Ten powerful silhouettes use posture and proportion—not only
+            Sixteen powerful silhouettes use posture and proportion—not only
             scale—to communicate different kinds of strength.
           </p>
         </div>
@@ -417,54 +598,140 @@ export function AssetPreviewScreen() {
       >
         <div className="asset-debug-section-heading">
           <div>
-            <p className="asset-debug-kicker">Pose and outfit coverage</p>
-            <h2 id="animation-gallery-title">Animations and outfit modules</h2>
+            <p className="asset-debug-kicker">Pose vocabulary coverage</p>
+            <h2 id="animation-gallery-title">Bodybuilding pose library</h2>
           </div>
           <p>
-            Every supported pose and clothing module keeps the same
-            bottom-center anchor and crisp nearest-neighbor pixels.
+            Every supported movement, gameplay, and bodybuilding pose keeps the
+            same bottom-center anchor and crisp nearest-neighbor pixels.
           </p>
         </div>
-        <div className="character-animation-gallery">
-          {CHARACTER_GALLERY_POSES.map((pose) => (
-            <figure key={pose}>
+        <div className="character-animation-gallery" data-gallery="pose-matrix">
+          {TRAINER_POSE_DEFINITIONS.map((pose) => (
+            <figure key={pose.id} data-pose-category={pose.category}>
               <TrainerPixelSprite
                 animated={false}
                 appearance={trainerAppearanceFromCharacterDesign(
                   RIVAL_CHARACTER_DESIGNS[1]!,
                 )}
-                label={`${pose} pose`}
-                pose={pose}
+                direction={pose.defaultDirection}
+                label={`${pose.label} pose`}
+                pose={pose.id}
                 reducedMotion
                 scale={2}
               />
-              <figcaption>{pose}</figcaption>
+              <figcaption>
+                {pose.label}
+                <small>{pose.silhouetteCue}</small>
+              </figcaption>
             </figure>
           ))}
+        </div>
+      </section>
+
+      <section
+        className="asset-debug-section"
+        aria-labelledby="clothing-stress-gallery-title"
+      >
+        <div className="asset-debug-section-heading">
+          <div>
+            <p className="asset-debug-kicker">Modular attachment validation</p>
+            <h2 id="clothing-stress-gallery-title">Clothing stress tests</h2>
+          </div>
+          <p>
+            Every top module is paired with a bottoms module on both minimum
+            and maximum builds, alternating light and dark skin tones.
+          </p>
+        </div>
+        <div className="clothing-stress-gallery" data-gallery="clothing-stress">
           {TRAINER_TOPS.map((top, index) => {
-            const appearance = cloneTrainerAppearance(
-              trainerAppearanceFromCharacterDesign(
-                GYM_LEADER_CHARACTER_DESIGNS[index % GYM_LEADER_CHARACTER_DESIGNS.length]!,
-              ),
-            );
-            appearance.outfit.topId = top.id;
-            appearance.outfit.bottomsId =
-              TRAINER_BOTTOMS[index % TRAINER_BOTTOMS.length]!.id;
+            const bottoms = TRAINER_BOTTOMS[index % TRAINER_BOTTOMS.length]!;
             return (
-              <figure key={top.id}>
-                <TrainerPixelSprite
-                  animated={false}
-                  appearance={appearance}
-                  label={`${top.label} outfit`}
-                  reducedMotion
-                  scale={2}
-                />
-                <figcaption>
-                  {top.label} · {TRAINER_BOTTOMS[index % TRAINER_BOTTOMS.length]!.label}
-                </figcaption>
-              </figure>
+              <article key={top.id}>
+                <h3>
+                  {top.label} · {bottoms.label}
+                </h3>
+                <div>
+                  {BODY_RANGE_PREVIEWS.filter(
+                    (preview) => preview.id !== 'middle',
+                  ).map((preview, previewIndex) => {
+                    const appearance = trainerAppearanceAtBuild(
+                      preview.value,
+                      previewIndex === 0
+                        ? TRAINER_SKIN_TONES[1]!.id
+                        : TRAINER_SKIN_TONES[9]!.id,
+                    );
+                    appearance.outfit.topId = top.id;
+                    appearance.outfit.bottomsId = bottoms.id;
+                    appearance.outfit.wristWrapsId = 'double';
+                    appearance.outfit.kneeSleevesId = 'reinforced';
+                    appearance.accessories.beltId = 'lifting-wide';
+                    return (
+                      <figure key={preview.id}>
+                        <TrainerPixelSprite
+                          animated={false}
+                          appearance={appearance}
+                          direction={index % 2 === 0 ? 'front' : 'back'}
+                          label={`${top.label} ${preview.label}`}
+                          pose={
+                            index % 2 === 0
+                              ? 'front-double-biceps'
+                              : 'back-double-biceps'
+                          }
+                          reducedMotion
+                          scale={2}
+                        />
+                        <figcaption>{preview.label}</figcaption>
+                      </figure>
+                    );
+                  })}
+                </div>
+              </article>
             );
           })}
+        </div>
+      </section>
+
+      <section
+        className="asset-debug-section"
+        aria-labelledby="mobile-character-preview-title"
+      >
+        <div className="asset-debug-section-heading">
+          <div>
+            <p className="asset-debug-kicker">Handheld readability</p>
+            <h2 id="mobile-character-preview-title">
+              240×160 mobile-scale preview
+            </h2>
+          </div>
+          <p>
+            Native-scale sprites are staged inside the logical playfield to
+            verify that mass, taper, limb separation, and posing survive on phones.
+          </p>
+        </div>
+        <div className="mobile-character-preview" data-gallery="mobile-scale">
+          {BODY_RANGE_PREVIEWS.map((preview, index) => (
+            <figure key={preview.id}>
+              <TrainerPixelSprite
+                animated={false}
+                appearance={trainerAppearanceAtBuild(
+                  preview.value,
+                  preview.skinToneId,
+                )}
+                direction={index === 2 ? 'back' : 'front'}
+                label={`${preview.label} native scale`}
+                pose={
+                  index === 0
+                    ? 'front-relaxed'
+                    : index === 1
+                      ? 'side-chest'
+                      : 'back-double-biceps'
+                }
+                reducedMotion
+                scale={1}
+              />
+              <figcaption>{preview.label}</figcaption>
+            </figure>
+          ))}
         </div>
       </section>
 
@@ -491,23 +758,49 @@ export function AssetPreviewScreen() {
             ...NPC_CHARACTER_SEEDS.map(createNpcCharacterDesign),
           ].map((character) => (
             <article key={character.id}>
-              <TrainerPixelSprite
-                animated={false}
-                appearance={trainerAppearanceFromCharacterDesign(character)}
-                label={character.name}
-                pose={character.signaturePose}
-                reducedMotion
-                scale={2.25}
-              />
+              <div className="major-character-outfit-pair">
+                <TrainerPixelSprite
+                  animated={false}
+                  appearance={trainerAppearanceFromCharacterDesign(character)}
+                  label={`${character.name} signature outfit`}
+                  pose={character.signaturePose}
+                  reducedMotion
+                  scale={2.25}
+                />
+                <TrainerPixelSprite
+                  animated={false}
+                  appearance={trainerAppearanceFromCharacterDesign(
+                    character,
+                    'late-game',
+                  )}
+                  label={`${character.name} late-game outfit`}
+                  pose={character.victoryPose}
+                  reducedMotion
+                  scale={2.25}
+                />
+              </div>
               <div>
                 <h3>{character.name}</h3>
                 <span>
                   {character.kind} · {character.discipline}
                 </span>
+                <p className="character-physique-line">
+                  {MUSCULAR_BODY_ARCHETYPES.find(
+                    (archetype) =>
+                      archetype.id === character.appearance.archetypeId,
+                  )?.label ?? character.appearance.archetypeId}
+                  {' · '}
+                  {muscleLabel(character.primaryMuscleEmphasis)}
+                  {' emphasis'}
+                </p>
                 <p>{character.trainingPhilosophy}</p>
                 <small>
                   {character.signatureClothing} ·{' '}
                   {character.signatureEquipment}
+                </small>
+                <small>
+                  {character.sponsorPatch.label} ·{' '}
+                  {character.alternateLateGameOutfit.label}
                 </small>
               </div>
             </article>
@@ -542,43 +835,111 @@ export function AssetPreviewScreen() {
                   <code>{design.silhouetteModuleId}</code>
                 </div>
                 <div className="buddy-debug-variations">
-                  {BUDDY_BODY_SIZE_OPTIONS.map((size, sizeIndex) => (
-                    <figure key={size.id}>
+                  {design.physiquePresets.map((preset, presetIndex) => (
+                    <figure
+                      data-buddy-preset={preset.id}
+                      key={preset.id}
+                    >
                       <BuddySprite
                         compact
                         cosmetics={{
                           ...design.defaultCosmetics,
-                          bodySizeId:
-                            size.id as typeof design.defaultCosmetics.bodySizeId,
+                          physiquePresetId: preset.id,
+                          physique: preset.physique,
+                          bodySizeId: preset.bodySizeId,
+                          muscleDefinitionId: preset.muscleDefinitionId,
                           patternId:
                             design.patternOptions[
-                              (speciesIndex + sizeIndex) %
+                              (speciesIndex + presetIndex) %
                                 design.patternOptions.length
                             ]!.id,
                           appendageVariantId:
                             design.appendageOptions[
-                              sizeIndex % design.appendageOptions.length
+                              presetIndex % design.appendageOptions.length
                             ]!.id,
                           expressionId:
                             design.expressionOptions[
-                              (speciesIndex + sizeIndex) %
+                              (speciesIndex + presetIndex) %
                                 design.expressionOptions.length
                             ]!.id as typeof design.defaultCosmetics.expressionId,
                         }}
                         creature={species}
                         direction={
                           CHARACTER_GALLERY_DIRECTIONS[
-                            sizeIndex % CHARACTER_GALLERY_DIRECTIONS.length
+                            presetIndex % CHARACTER_GALLERY_DIRECTIONS.length
                           ]
                         }
-                        label={`${species.name} ${size.label}`}
-                        pose={sizeIndex === 2 ? 'victory' : 'idle'}
+                        label={`${species.name} ${preset.label}`}
+                        pose={presetIndex === 3 ? 'front-flex' : 'idle'}
                         reducedMotion
                         scale={2}
                       />
-                      <figcaption>{size.label}</figcaption>
+                      <figcaption>{preset.label}</figcaption>
                     </figure>
                   ))}
+                </div>
+                <div
+                  className="buddy-pose-gallery"
+                  data-gallery={`buddy-poses-${species.id}`}
+                >
+                  {BUDDY_POSE_OPTIONS.map((pose, poseIndex) => (
+                    <figure data-buddy-pose={pose.id} key={pose.id}>
+                      <BuddySprite
+                        compact
+                        cosmetics={design.defaultCosmetics}
+                        creature={species}
+                        direction={
+                          CHARACTER_GALLERY_DIRECTIONS[
+                            poseIndex % CHARACTER_GALLERY_DIRECTIONS.length
+                          ]
+                        }
+                        label={`${species.name} ${pose.label}`}
+                        pose={pose.id as BuddyPose}
+                        reducedMotion
+                        scale={1.4}
+                      />
+                      <figcaption>{pose.label}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+                <div className="buddy-background-checks">
+                  {(['light', 'dark'] as const).map((background) => (
+                    <figure
+                      className={`buddy-background-${background}`}
+                      key={background}
+                    >
+                      <BuddySprite
+                        compact
+                        cosmetics={{
+                          ...design.defaultCosmetics,
+                          physiquePresetId:
+                            design.physiquePresets.at(-1)!.id,
+                          physique: design.physiquePresets.at(-1)!.physique,
+                          bodySizeId:
+                            design.physiquePresets.at(-1)!.bodySizeId,
+                        }}
+                        creature={species}
+                        label={`${species.name} silhouette on ${background}`}
+                        pose="front-flex"
+                        reducedMotion
+                        scale={1.2}
+                        silhouetteOnly
+                      />
+                      <figcaption>{background}</figcaption>
+                    </figure>
+                  ))}
+                  <figure className="buddy-mobile-check">
+                    <BuddySprite
+                      compact
+                      cosmetics={design.defaultCosmetics}
+                      creature={species}
+                      label={`${species.name} mobile size`}
+                      pose="idle"
+                      reducedMotion
+                      scale={1}
+                    />
+                    <figcaption>mobile</figcaption>
+                  </figure>
                 </div>
                 <small>{design.trainingSpecialization}</small>
               </article>
@@ -609,21 +970,46 @@ export function AssetPreviewScreen() {
             )!;
             return (
               <article key={design.id}>
-                <BuddySprite
-                  animationCueId={design.entranceAnimationId}
-                  animated={false}
-                  cosmetics={bossBuddyCosmetics(design)}
-                  creature={species}
-                  label={boss.name}
-                  pose="entrance"
-                  reducedMotion
-                  scale={2.4}
-                />
+                <div className="boss-tier-gallery">
+                  {design.presentationTiers.map((tier) => (
+                    <figure data-boss-tier={tier.tier} key={tier.id}>
+                      <BuddySprite
+                        animationCueId={design.entranceAnimationId}
+                        animated={false}
+                        bossId={boss.id}
+                        bossTier={tier.tier}
+                        cosmetics={bossBuddyCosmetics(design, tier.tier)}
+                        creature={species}
+                        label={`${boss.name} ${tier.label}`}
+                        pose={tier.poseId}
+                        presentationContext="showcase"
+                        reducedMotion
+                        scale={1}
+                        showcasePose={
+                          tier.tier === 'defeated'
+                            ? 'fatigue-pose'
+                            : tier.tier === 'final-round'
+                              ? 'most-muscular'
+                              : 'front-relaxed'
+                        }
+                      />
+                      <figcaption>{tier.label}</figcaption>
+                    </figure>
+                  ))}
+                </div>
                 <div>
                   <h3>{boss.name}</h3>
                   <span>{design.buildLabel}</span>
+                  <p className="character-physique-line">
+                    {design.primaryMuscleEmphasis} emphasis
+                  </p>
                   <p>{design.trainingPhilosophy}</p>
                   <small>{design.battleStance}</small>
+                  <small>
+                    {design.presentationTiers
+                      .map((tier) => tier.equipmentCue)
+                      .join(' · ')}
+                  </small>
                 </div>
               </article>
             );

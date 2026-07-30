@@ -76,10 +76,47 @@ export type BuddyPose =
   | 'victory'
   | 'fatigue'
   | 'capture'
-  | 'entrance';
+  | 'entrance'
+  | 'front-flex'
+  | 'back-flex'
+  | 'side-pose'
+  | 'boss-entrance'
+  | 'rare-entrance';
+
+export type BuddyPhysiqueRegion =
+  | 'shoulders'
+  | 'chest'
+  | 'back'
+  | 'arms'
+  | 'core'
+  | 'legs';
+
+export type BuddyEmphasisLevelId =
+  | 'restrained'
+  | 'balanced'
+  | 'pronounced';
+export type BuddyMassId = 'compact-density' | 'balanced-mass' | 'heavy-mass';
+export type BuddySymmetryId = 'natural' | 'balanced' | 'stage';
+export type BuddyStanceId = 'narrow' | 'athletic' | 'planted' | 'wide';
+export type BuddyPostureId = 'coiled' | 'neutral' | 'proud' | 'towering';
+export type BuddyPumpEffectId = 'none' | 'warm' | 'full';
+
+export type BuddyPhysiqueSettings = {
+  shoulderEmphasisId: BuddyEmphasisLevelId;
+  chestEmphasisId: BuddyEmphasisLevelId;
+  backEmphasisId: BuddyEmphasisLevelId;
+  armEmphasisId: BuddyEmphasisLevelId;
+  coreEmphasisId: BuddyEmphasisLevelId;
+  legEmphasisId: BuddyEmphasisLevelId;
+  overallMassId: BuddyMassId;
+  symmetryId: BuddySymmetryId;
+  stanceId: BuddyStanceId;
+  postureId: BuddyPostureId;
+  pumpEffectId: BuddyPumpEffectId;
+};
 
 export type BuddyCosmetics = {
-  version: 1;
+  version: 2;
   primaryPaletteId: string;
   secondaryPaletteId: string;
   accentPaletteId: string;
@@ -92,12 +129,25 @@ export type BuddyCosmetics = {
   expressionId: BuddyExpressionId;
   victoryPoseId: string;
   entranceAnimationId: string;
+  physiquePresetId: string;
+  physique: BuddyPhysiqueSettings;
 };
 
 export type BuddyVisualOption = {
   id: string;
   label: string;
+  description?: string;
+  slot?: BuddyAccessorySlot;
 };
+
+export type BuddyAccessorySlot =
+  | 'hands'
+  | 'elbows'
+  | 'knees'
+  | 'waist'
+  | 'neck'
+  | 'head'
+  | 'victory';
 
 export type BuddyMusclePlacement =
   | 'shoulders'
@@ -107,6 +157,32 @@ export type BuddyMusclePlacement =
   | 'forearms'
   | 'legs';
 
+export type BuddyAnatomyRenderFamily =
+  | 'quadruped'
+  | 'shell'
+  | 'primate'
+  | 'runner'
+  | 'winged'
+  | 'serpentine'
+  | 'armored'
+  | 'many-limbed';
+
+export type BuddyAnatomyProfile = {
+  id: string;
+  renderFamily: BuddyAnatomyRenderFamily;
+  regionLabels: Record<BuddyPhysiqueRegion, string>;
+  protectedFeatures: string[];
+};
+
+export type BuddyPhysiquePreset = {
+  id: string;
+  label: string;
+  description: string;
+  bodySizeId: BuddyBodySizeId;
+  muscleDefinitionId: BuddyMuscleDefinitionId;
+  physique: BuddyPhysiqueSettings;
+};
+
 export type BuddyCharacterDesign = {
   id: string;
   speciesId: string;
@@ -114,6 +190,8 @@ export type BuddyCharacterDesign = {
   trainingSpecialization: string;
   silhouetteModuleId: string;
   musclePlacement: BuddyMusclePlacement;
+  anatomyProfile: BuddyAnatomyProfile;
+  physiquePresets: BuddyPhysiquePreset[];
   bodyVariations: BuddyVisualOption[];
   patternOptions: BuddyVisualOption[];
   appendageOptions: BuddyVisualOption[];

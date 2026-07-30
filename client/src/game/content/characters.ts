@@ -3,6 +3,7 @@ import type {
   MuscularBodyArchetype,
   NpcAppearanceTemplate,
   NpcCharacterSeed,
+  NpcOutfitCombination,
   WorldCharacterDesign,
 } from '../types';
 
@@ -14,6 +15,38 @@ export const MUSCULAR_BODY_ARCHETYPES: MuscularBodyArchetype[] = [
     silhouette: 'Tapered waist, round shoulders, balanced limbs.',
     strengthLanguage: 'Symmetry and deliberate posing communicate control.',
     posture: 'open',
+  },
+  {
+    id: 'open-bodybuilder',
+    label: 'Open-Mass Builder',
+    physiquePresetId: 'open-bodybuilder',
+    silhouette: 'High overall mass with rounded delts, thick limbs, and a controlled waist.',
+    strengthLanguage: 'Stillness and compact posing make dense development readable without extra height.',
+    posture: 'open',
+  },
+  {
+    id: 'taper-performer',
+    label: 'Taper Performer',
+    physiquePresetId: 'taper-performer',
+    silhouette: 'Long shoulder line and wide back over a compact waist.',
+    strengthLanguage: 'Relaxed open posture keeps the taper visible during movement.',
+    posture: 'open',
+  },
+  {
+    id: 'sculpted-physique',
+    label: 'Sculpted Physique',
+    physiquePresetId: 'sculpted-physique',
+    silhouette: 'Dense balanced limbs, rounded shoulders, and crisp torso separation.',
+    strengthLanguage: 'Deliberate flex transitions communicate symmetry and control.',
+    posture: 'upright',
+  },
+  {
+    id: 'figure-balance',
+    label: 'Figure Balance',
+    physiquePresetId: 'figure-balance',
+    silhouette: 'Round delts, a clear back taper, and developed legs.',
+    strengthLanguage: 'Poised quarter turns and balanced stance communicate complete development.',
+    posture: 'upright',
   },
   {
     id: 'heavy-powerlifter',
@@ -32,6 +65,14 @@ export const MUSCULAR_BODY_ARCHETYPES: MuscularBodyArchetype[] = [
     posture: 'forward',
   },
   {
+    id: 'platform-lifter',
+    label: 'Platform Lifter',
+    physiquePresetId: 'platform-lifter',
+    silhouette: 'Pronounced traps, braced back, powerful hips, and explosive legs.',
+    strengthLanguage: 'A fast upright set position suggests precise whole-body force.',
+    posture: 'grounded',
+  },
+  {
     id: 'balanced-athlete',
     label: 'Balanced Athlete',
     physiquePresetId: 'balanced-athlete',
@@ -46,6 +87,14 @@ export const MUSCULAR_BODY_ARCHETYPES: MuscularBodyArchetype[] = [
     silhouette: 'Long limbs, narrow waist, defined shoulders.',
     strengthLanguage: 'A coiled stance and quick guard communicate speed.',
     posture: 'coiled',
+  },
+  {
+    id: 'lean-athlete',
+    label: 'Lean Athletic',
+    physiquePresetId: 'lean-athlete',
+    silhouette: 'Long limbs, visible separation, and even athletic development.',
+    strengthLanguage: 'Economical movement and a confident stride communicate usable strength.',
+    posture: 'upright',
   },
   {
     id: 'compact-powerhouse',
@@ -95,6 +144,10 @@ const DEFAULT_RECIPE: CharacterAppearanceRecipe = {
   skinToneId: 'honey-warm',
   faceShapeId: 'oval-athletic',
   eyesId: 'focused-round',
+  eyebrowsId: 'straight-bold',
+  noseId: 'compact',
+  mouthId: 'steady',
+  facialHairId: 'none',
   hairStyleId: 'close-crop',
   hairLengthId: 'short',
   hairColorId: 'ink',
@@ -116,10 +169,67 @@ function appearance(
   return { ...DEFAULT_RECIPE, ...value };
 }
 
+type DerivedCharacterField =
+  | 'handcrafted'
+  | 'regionalMuscleEmphasis'
+  | 'warmupAnimationId'
+  | 'victoryPose'
+  | 'lossReactionId'
+  | 'signatureOutfitId'
+  | 'alternateLateGameOutfit'
+  | 'gymAccessoryId'
+  | 'sponsorPatch';
+
 function character(
-  value: Omit<WorldCharacterDesign, 'handcrafted'>,
+  value: Omit<WorldCharacterDesign, DerivedCharacterField>,
 ): WorldCharacterDesign {
-  return { ...value, handcrafted: true };
+  const secondaryEmphasis = {
+    power: 'shoulderWidth',
+    technique: 'coreDefinition',
+    endurance: 'quadSize',
+    mobility: 'calfSize',
+    recovery: 'upperBackWidth',
+  } as const;
+  const patchSymbol = {
+    power: 'spark',
+    technique: 'knot',
+    endurance: 'anchor',
+    mobility: 'arc',
+    recovery: 'summit',
+  } as const;
+  return {
+    ...value,
+    regionalMuscleEmphasis: [
+      value.primaryMuscleEmphasis,
+      secondaryEmphasis[value.discipline],
+    ],
+    warmupAnimationId: `${value.id}-signature-warmup`,
+    victoryPose: value.signaturePose,
+    lossReactionId: `${value.id}-composed-reset`,
+    signatureOutfitId: `${value.id}-signature-outfit`,
+    alternateLateGameOutfit: {
+      id: `${value.id}-late-game-outfit`,
+      label: `${value.name} summit kit`,
+      topId:
+        value.appearance.topId.includes('hoodie')
+          ? 'tank-racer'
+          : 'hoodie-sleeveless',
+      bottomsId:
+        value.appearance.bottomsId === 'joggers-taper'
+          ? 'shorts-training'
+          : 'joggers-taper',
+      primaryColorId: value.appearance.accentColorId,
+      secondaryColorId: value.appearance.secondaryColorId,
+      accentColorId: value.appearance.primaryColorId,
+    },
+    gymAccessoryId: `${value.id}-${value.discipline}-gym-token`,
+    sponsorPatch: {
+      id: `${value.id}-patch`,
+      label: `${value.name} ${value.discipline} mark`,
+      symbol: patchSymbol[value.discipline],
+    },
+    handcrafted: true,
+  };
 }
 
 export const GYM_LEADER_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
@@ -129,7 +239,7 @@ export const GYM_LEADER_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
     kind: 'gym-leader',
     discipline: 'recovery',
     appearance: appearance({
-      archetypeId: 'heavyweight-anchor',
+      archetypeId: 'figure-balance',
       skinToneId: 'mahogany-neutral',
       faceShapeId: 'broad-soft',
       eyesId: 'calm-wide',
@@ -144,14 +254,16 @@ export const GYM_LEADER_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
       secondaryColorId: 'chalk',
       accentColorId: 'gold',
     }),
-    idlePose: 'idle',
+    idlePose: 'front-relaxed',
     expressionId: 'warm',
+    primaryMuscleEmphasis: 'upperBackWidth',
     trainingPhilosophy: 'Recovery is an active part of every strong set.',
-    signaturePose: 'training',
+    signaturePose: 'back-double-biceps',
     signatureClothing: 'Moss sleeveless coaching hoodie',
     signatureEquipment: 'Twin pacing wraps',
     battleStance: 'Open palms and a planted recovery stance',
     entranceAnimationId: 'leader-mara-calm-step',
+    idleAnimationId: 'leader-mara-lat-breath',
     victoryAnimationId: 'leader-mara-wrap-salute',
   }),
   character({
@@ -175,14 +287,16 @@ export const GYM_LEADER_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
       secondaryColorId: 'navy',
       accentColorId: 'chalk',
     }),
-    idlePose: 'training',
+    idlePose: 'most-muscular',
     expressionId: 'bold',
+    primaryMuscleEmphasis: 'forearmSize',
     trainingPhilosophy: 'Clean alignment turns a short effort into useful power.',
-    signaturePose: 'capture',
+    signaturePose: 'side-triceps',
     signatureClothing: 'Coral compression top with navy side panels',
     signatureEquipment: 'Oversized white grip gloves',
     battleStance: 'Low elbows and square wrists',
     entranceAnimationId: 'leader-dex-knuckle-set',
+    idleAnimationId: 'leader-dex-forearm-roll',
     victoryAnimationId: 'leader-dex-double-flex',
   }),
   character({
@@ -191,7 +305,7 @@ export const GYM_LEADER_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
     kind: 'gym-leader',
     discipline: 'technique',
     appearance: appearance({
-      archetypeId: 'classic-bodybuilder',
+      archetypeId: 'sculpted-physique',
       skinToneId: 'copper-rich',
       faceShapeId: 'diamond-defined',
       eyesId: 'sharp-upturn',
@@ -206,14 +320,16 @@ export const GYM_LEADER_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
       secondaryColorId: 'sky',
       accentColorId: 'amber',
     }),
-    idlePose: 'training',
+    idlePose: 'front-relaxed',
     expressionId: 'focused',
+    primaryMuscleEmphasis: 'shoulderWidth',
     trainingPhilosophy: 'Repeatable technique is strength you can trust.',
-    signaturePose: 'boss-introduction',
+    signaturePose: 'front-double-biceps',
     signatureClothing: 'Ocean racer tank and paneled leggings',
     signatureEquipment: 'Amber line-marking hand tape',
     battleStance: 'High chest, angled feet, still centerline',
     entranceAnimationId: 'leader-nia-centerline-turn',
+    idleAnimationId: 'leader-nia-delt-set',
     victoryAnimationId: 'leader-nia-measured-bow',
   }),
   character({
@@ -238,14 +354,16 @@ export const GYM_LEADER_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
       secondaryColorId: 'ink',
       accentColorId: 'copper',
     }),
-    idlePose: 'fatigue',
+    idlePose: 'front-relaxed',
     expressionId: 'measured',
+    primaryMuscleEmphasis: 'lowerBackThickness',
     trainingPhilosophy: 'Restraint keeps hard work available for the final round.',
-    signaturePose: 'training',
+    signaturePose: 'most-muscular',
     signatureClothing: 'Rust sleeveless hood and reinforced boots',
     signatureEquipment: 'Weathered carry belt',
     battleStance: 'Forward lean behind a quiet guard',
     entranceAnimationId: 'leader-sol-gate-carry',
+    idleAnimationId: 'leader-sol-braced-breath',
     victoryAnimationId: 'leader-sol-belt-release',
   }),
   character({
@@ -254,7 +372,7 @@ export const GYM_LEADER_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
     kind: 'gym-leader',
     discipline: 'mobility',
     appearance: appearance({
-      archetypeId: 'mobility-specialist',
+      archetypeId: 'taper-performer',
       heightShift: 1,
       skinToneId: 'sand-gold',
       faceShapeId: 'long-angular',
@@ -270,14 +388,16 @@ export const GYM_LEADER_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
       secondaryColorId: 'orchid',
       accentColorId: 'mint',
     }),
-    idlePose: 'capture',
+    idlePose: 'confident-walk',
     expressionId: 'reserved',
+    primaryMuscleEmphasis: 'upperBackWidth',
     trainingPhilosophy: 'Position creates safe power before the opponent reacts.',
-    signaturePose: 'boss-introduction',
+    signaturePose: 'side-chest',
     signatureClothing: 'Violet split-panel compression suit',
     signatureEquipment: 'Mint motion-reading wrist band',
     battleStance: 'Offset feet with a relaxed leading shoulder',
     entranceAnimationId: 'leader-vale-pivot-read',
+    idleAnimationId: 'leader-vale-taper-turn',
     victoryAnimationId: 'leader-vale-quiet-point',
   }),
   character({
@@ -286,7 +406,7 @@ export const GYM_LEADER_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
     kind: 'gym-leader',
     discipline: 'recovery',
     appearance: appearance({
-      archetypeId: 'balanced-athlete',
+      archetypeId: 'open-bodybuilder',
       skinToneId: 'deep-ebony',
       faceShapeId: 'square-strong',
       eyesId: 'bright-arc',
@@ -301,14 +421,16 @@ export const GYM_LEADER_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
       secondaryColorId: 'chalk',
       accentColorId: 'teal',
     }),
-    idlePose: 'victory',
+    idlePose: 'front-relaxed',
     expressionId: 'warm',
+    primaryMuscleEmphasis: 'chestSize',
     trainingPhilosophy: 'A complete team carries every discipline to the summit.',
-    signaturePose: 'victory',
+    signaturePose: 'victory-flex',
     signatureClothing: 'Gold panel shirt and balanced champion sash',
     signatureEquipment: 'Five-band summit clasp',
     battleStance: 'Upright stance with five-point hand signal',
     entranceAnimationId: 'leader-ori-five-band-open',
+    idleAnimationId: 'leader-ori-chest-rise',
     victoryAnimationId: 'leader-ori-summit-salute',
   }),
 ];
@@ -335,14 +457,16 @@ export const RIVAL_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
       secondaryColorId: 'ink',
       accentColorId: 'amber',
     }),
-    idlePose: 'training',
+    idlePose: 'most-muscular',
     expressionId: 'fierce',
+    primaryMuscleEmphasis: 'gluteSize',
     trainingPhilosophy: 'Commit to the opening, then own the recovery.',
-    signaturePose: 'capture',
+    signaturePose: 'side-chest',
     signatureClothing: 'Brick lifting singlet over a short compression top',
     signatureEquipment: 'Square bronze lifting buckle',
     battleStance: 'Deep brace with elbows pulled close',
     entranceAnimationId: 'rival-joa-floor-stomp',
+    idleAnimationId: 'rival-joa-brace-cycle',
     victoryAnimationId: 'rival-joa-buckle-tap',
   }),
   character({
@@ -351,7 +475,7 @@ export const RIVAL_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
     kind: 'rival',
     discipline: 'technique',
     appearance: appearance({
-      archetypeId: 'lean-fighter',
+      archetypeId: 'lean-athlete',
       skinToneId: 'rose-brown',
       faceShapeId: 'oval-athletic',
       eyesId: 'sharp-upturn',
@@ -366,14 +490,16 @@ export const RIVAL_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
       secondaryColorId: 'navy',
       accentColorId: 'coral',
     }),
-    idlePose: 'capture',
+    idlePose: 'pre-workout-warmup',
     expressionId: 'playful',
+    primaryMuscleEmphasis: 'coreDefinition',
     trainingPhilosophy: 'A readable rhythm can still hide a clever counter.',
-    signaturePose: 'boss-introduction',
+    signaturePose: 'abs-and-thigh',
     signatureClothing: 'Teal split tank and coral tempo band',
     signatureEquipment: 'Three-count wrist clicker',
     battleStance: 'Loose guard with a bouncing lead heel',
     entranceAnimationId: 'rival-suri-three-count',
+    idleAnimationId: 'rival-suri-shoulder-sweep',
     victoryAnimationId: 'rival-suri-spin-flex',
   }),
   character({
@@ -382,7 +508,7 @@ export const RIVAL_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
     kind: 'rival',
     discipline: 'recovery',
     appearance: appearance({
-      archetypeId: 'compact-powerhouse',
+      archetypeId: 'platform-lifter',
       skinToneId: 'ivory-neutral',
       faceShapeId: 'broad-soft',
       eyesId: 'calm-wide',
@@ -397,23 +523,76 @@ export const RIVAL_CHARACTER_DESIGNS: WorldCharacterDesign[] = [
       secondaryColorId: 'chalk',
       accentColorId: 'mint',
     }),
-    idlePose: 'idle',
+    idlePose: 'back-relaxed',
     expressionId: 'steady',
+    primaryMuscleEmphasis: 'trapeziusSize',
     trainingPhilosophy: 'Patience turns the longest journey into repeatable work.',
-    signaturePose: 'victory',
+    signaturePose: 'back-double-biceps',
     signatureClothing: 'Plum training hoodie with mint lantern seam',
     signatureEquipment: 'Soft-light recovery timer',
     battleStance: 'Centered feet and low relaxed shoulders',
     entranceAnimationId: 'rival-ren-lantern-rise',
+    idleAnimationId: 'rival-ren-trap-breath',
     victoryAnimationId: 'rival-ren-cooldown-wave',
   }),
+];
+
+export const NPC_OUTFIT_COMBINATIONS: NpcOutfitCombination[] = [
+  {
+    id: 'route-outfit-forge-carry',
+    regionId: 'forge',
+    topId: 'hoodie-sleeveless',
+    bottomsId: 'joggers-taper',
+    shoesId: 'lifting-flat',
+    accessoryId: 'lifting-wide',
+  },
+  {
+    id: 'route-outfit-forge-press',
+    regionId: 'forge',
+    topId: 'compression-short',
+    bottomsId: 'shorts-training',
+    shoesId: 'lifting-flat',
+    accessoryId: 'double',
+  },
+  {
+    id: 'route-outfit-ridge-tempo',
+    regionId: 'ridge',
+    topId: 'tank-racer',
+    bottomsId: 'shorts-split',
+    shoesId: 'runner-light',
+    accessoryId: 'headband',
+  },
+  {
+    id: 'route-outfit-ridge-control',
+    regionId: 'ridge',
+    topId: 'compression-long',
+    bottomsId: 'leggings-panel',
+    shoesId: 'wrap-shoes',
+    accessoryId: 'single',
+  },
+  {
+    id: 'route-outfit-summit-anchor',
+    regionId: 'summit',
+    topId: 'hoodie-training',
+    bottomsId: 'joggers-taper',
+    shoesId: 'trainer-high',
+    accessoryId: 'beanie',
+  },
+  {
+    id: 'route-outfit-summit-stride',
+    regionId: 'summit',
+    topId: 'tee-panel',
+    bottomsId: 'leggings-panel',
+    shoesId: 'runner-light',
+    accessoryId: 'wide-headband',
+  },
 ];
 
 export const NPC_APPEARANCE_TEMPLATES: NpcAppearanceTemplate[] = [
   {
     id: 'npc-template-route-power',
     label: 'Route Power Trainer',
-    archetypeIds: ['compact-powerhouse', 'heavy-powerlifter', 'strongman'],
+    archetypeIds: ['compact-powerhouse', 'heavy-powerlifter', 'strongman', 'open-bodybuilder'],
     disciplineIds: ['power', 'endurance'],
     skinToneIds: ['sand-gold', 'copper-rich', 'deep-ebony', 'olive-gold'],
     faceShapeIds: ['square-strong', 'round-power', 'broad-soft'],
@@ -421,13 +600,18 @@ export const NPC_APPEARANCE_TEMPLATES: NpcAppearanceTemplate[] = [
     topIds: ['tank-racer', 'hoodie-sleeveless', 'compression-short'],
     bottomIds: ['shorts-training', 'joggers-taper'],
     accessoryIds: ['lifting-wide', 'headband', 'wide-headband'],
+    facialHairIds: ['none', 'stubble', 'short-boxed'],
+    eyebrowIds: ['straight-bold', 'angled-focus', 'soft-arc'],
+    regionalOutfitIds: ['route-outfit-forge-carry', 'route-outfit-forge-press'],
+    trainingSpecialtyIds: ['loaded-carry', 'press-control', 'ground-brace'],
+    posePreferenceIds: ['most-muscular', 'side-chest', 'front-relaxed'],
     expressionIds: ['bold', 'focused', 'warm'],
-    idlePoseIds: ['idle', 'training'],
+    idlePoseIds: ['front-relaxed', 'most-muscular', 'post-set-pump'],
   },
   {
     id: 'npc-template-route-technique',
     label: 'Route Technique Trainer',
-    archetypeIds: ['classic-bodybuilder', 'balanced-athlete', 'lean-fighter'],
+    archetypeIds: ['classic-bodybuilder', 'sculpted-physique', 'taper-performer', 'lean-athlete'],
     disciplineIds: ['technique', 'mobility'],
     skinToneIds: ['porcelain-warm', 'honey-warm', 'umber-warm', 'rose-brown'],
     faceShapeIds: ['oval-athletic', 'diamond-defined', 'long-angular'],
@@ -435,13 +619,18 @@ export const NPC_APPEARANCE_TEMPLATES: NpcAppearanceTemplate[] = [
     topIds: ['tee-panel', 'tank-racer', 'compression-long'],
     bottomIds: ['shorts-split', 'leggings-panel'],
     accessoryIds: ['headband', 'single', 'none'],
+    facialHairIds: ['none', 'stubble', 'mustache'],
+    eyebrowIds: ['soft-arc', 'angled-focus', 'straight-bold'],
+    regionalOutfitIds: ['route-outfit-ridge-tempo', 'route-outfit-ridge-control'],
+    trainingSpecialtyIds: ['tempo-control', 'grip-switch', 'range-work'],
+    posePreferenceIds: ['side-triceps', 'side-chest', 'front-double-biceps'],
     expressionIds: ['steady', 'playful', 'measured'],
-    idlePoseIds: ['idle', 'capture'],
+    idlePoseIds: ['front-relaxed', 'side-chest', 'pre-workout-warmup'],
   },
   {
     id: 'npc-template-route-endurance',
     label: 'Route Endurance Trainer',
-    archetypeIds: ['lower-body-specialist', 'balanced-athlete', 'heavyweight-anchor'],
+    archetypeIds: ['lower-body-specialist', 'figure-balance', 'platform-lifter', 'heavyweight-anchor'],
     disciplineIds: ['endurance', 'recovery'],
     skinToneIds: ['ivory-neutral', 'amber-neutral', 'mahogany-neutral', 'espresso-cool'],
     faceShapeIds: ['broad-soft', 'oval-athletic', 'round-power'],
@@ -449,8 +638,13 @@ export const NPC_APPEARANCE_TEMPLATES: NpcAppearanceTemplate[] = [
     topIds: ['hoodie-training', 'tee-panel', 'compression-short'],
     bottomIds: ['joggers-taper', 'leggings-panel'],
     accessoryIds: ['beanie', 'double', 'none'],
+    facialHairIds: ['none', 'full-beard', 'stubble'],
+    eyebrowIds: ['straight-bold', 'soft-arc', 'angled-focus'],
+    regionalOutfitIds: ['route-outfit-summit-anchor', 'route-outfit-summit-stride'],
+    trainingSpecialtyIds: ['route-pacing', 'recovery-carry', 'long-set'],
+    posePreferenceIds: ['abs-and-thigh', 'back-double-biceps', 'back-relaxed'],
     expressionIds: ['warm', 'reserved', 'steady'],
-    idlePoseIds: ['idle', 'fatigue'],
+    idlePoseIds: ['back-relaxed', 'abs-and-thigh', 'fatigued-stance'],
   },
 ];
 
@@ -503,6 +697,10 @@ export const MUSCULAR_BODY_ARCHETYPE_BY_ID = new Map(
 
 export const NPC_APPEARANCE_TEMPLATE_BY_ID = new Map(
   NPC_APPEARANCE_TEMPLATES.map((entry) => [entry.id, entry]),
+);
+
+export const NPC_OUTFIT_COMBINATION_BY_ID = new Map(
+  NPC_OUTFIT_COMBINATIONS.map((entry) => [entry.id, entry]),
 );
 
 export const HANDCRAFTED_CHARACTER_BY_ID = new Map(

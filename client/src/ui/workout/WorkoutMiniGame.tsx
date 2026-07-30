@@ -4,6 +4,7 @@ import {
   WORKOUT_LOAD_BY_ID,
   WORKOUT_LOAD_ORDER,
 } from '../../game/content/workoutLoads';
+import { TRAINER_MUSCLES } from '../../game/content/trainer';
 import {
   gamepadActions,
   keyboardEventToAction,
@@ -19,7 +20,11 @@ import type {
   WorkoutLoadTier,
   WorkoutPreview,
   WorkoutSession,
+  TrainerAppearance,
+  TrainerMuscleId,
+  TrainerPose,
 } from '../../game/types';
+import { TrainerPixelSprite } from '../trainer/TrainerPixelSprite';
 
 const FEEDBACK_COPY: Record<WorkoutFeedbackCode, string> = {
   'readiness-strong': 'Readiness supports clean repetitions.',
@@ -51,10 +56,14 @@ interface WorkoutMiniGameProps {
   canStart: boolean;
   frame: number;
   keyboardBindings: KeyboardBindingMap;
+  machineName: string;
   paused: boolean;
   preview: WorkoutPreview;
+  primaryMuscleGroups: readonly TrainerMuscleId[];
+  reducedMotion: boolean;
   selectedLoad: WorkoutLoadTier;
   session: WorkoutSession | null;
+  trainerAppearance: TrainerAppearance;
   onAction: () => void;
   onSelectLoad: (load: WorkoutLoadTier) => void;
   onStart: () => void;
@@ -64,10 +73,14 @@ export function WorkoutMiniGame({
   canStart,
   frame,
   keyboardBindings,
+  machineName,
   paused,
   preview,
+  primaryMuscleGroups,
+  reducedMotion,
   selectedLoad,
   session,
+  trainerAppearance,
   onAction,
   onSelectLoad,
   onStart,
@@ -117,7 +130,21 @@ export function WorkoutMiniGame({
   const machineTone =
     session?.phase === 'resolved'
       ? session.outcome ?? 'preview'
-      : latestRep?.grade ?? session?.phase ?? 'preview';
+          : latestRep?.grade ?? session?.phase ?? 'preview';
+  const trainerPose: TrainerPose = !session
+    ? 'pre-workout-warmup'
+    : session.phase === 'resolved'
+      ? session.outcome === 'success'
+        ? 'post-set-pump'
+        : 'fatigued-stance'
+      : session.phase === 'spot'
+        ? 'most-muscular'
+        : 'training';
+  const muscleLabels = primaryMuscleGroups.map(
+    (muscleId) =>
+      TRAINER_MUSCLES.find((muscle) => muscle.id === muscleId)?.label ??
+      muscleId,
+  );
 
   function selectAdjacentLoad(delta: -1 | 1) {
     if (paused || session) return;
@@ -193,7 +220,7 @@ export function WorkoutMiniGame({
     >
       <div className="workout-heading">
         <div>
-          <strong>Technique Set</strong>
+          <strong>{machineName} Technique Set</strong>
           <small>
             {session
               ? session.phase === 'rep'
@@ -212,6 +239,9 @@ export function WorkoutMiniGame({
           {(session?.loadTier ?? preview.selectedLoad).toUpperCase()}
         </span>
       </div>
+      <small className="workout-muscle-callout">
+        Physique focus: {muscleLabels.join(' · ')}
+      </small>
 
       <div
         key={`${session?.id ?? 'preview'}-${session?.repResults.length ?? 0}-${session?.phase ?? 'preview'}`}
@@ -221,6 +251,17 @@ export function WorkoutMiniGame({
           '--workout-machine-cycle-ms': `${session?.repDurationMs ?? preview.repTimingMs}ms`,
         } as CSSProperties}
       >
+        <div className="workout-trainer-pose">
+          <TrainerPixelSprite
+            animated={false}
+            appearance={trainerAppearance}
+            direction="front"
+            label={`${machineName} trainer`}
+            pose={trainerPose}
+            reducedMotion={reducedMotion}
+            scale={2}
+          />
+        </div>
         <span className="workout-machine-upright workout-machine-upright-left" />
         <span className="workout-machine-upright workout-machine-upright-right" />
         <span className="workout-machine-cable" />

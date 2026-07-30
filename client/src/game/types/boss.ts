@@ -2,8 +2,31 @@ import type { CaptureMoveId } from './capture';
 import type {
   BuddyBodySizeId,
   BuddyExpressionId,
+  BuddyMusclePlacement,
   BuddyMuscleDefinitionId,
 } from './buddy';
+
+export type BossPresentationTier =
+  | 'normal'
+  | 'pumped'
+  | 'overload'
+  | 'final-round'
+  | 'defeated';
+
+export type BossPresentationTierDesign = {
+  id: string;
+  tier: BossPresentationTier;
+  label: string;
+  poseId:
+    | 'boss-entrance'
+    | 'front-flex'
+    | 'back-flex'
+    | 'side-pose'
+    | 'fatigue';
+  equipmentCue: string;
+  arenaLightingClass: string;
+  motionCue: string;
+};
 
 export type BossSchedule = {
   readyAtGameplayMs: number;
@@ -82,7 +105,9 @@ export type GymBossRoster = {
 export type BossCharacterDesign = {
   id: string;
   bossId: string;
+  speciesId: string;
   buildLabel: string;
+  primaryMuscleEmphasis: BuddyMusclePlacement;
   trainingPhilosophy: string;
   signaturePoseId: string;
   signatureClothing: string;
@@ -100,4 +125,5 @@ export type BossCharacterDesign = {
   battleStance: string;
   entranceAnimationId: string;
   victoryAnimationId: string;
+  presentationTiers: BossPresentationTierDesign[];
 };

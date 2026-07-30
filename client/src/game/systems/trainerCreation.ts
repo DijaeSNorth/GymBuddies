@@ -2,6 +2,7 @@ import { MAX_MUSCLE_LEVEL } from '../content/trainer';
 import {
   DEFAULT_TRAINER_APPEARANCE,
   MAX_SAVED_APPEARANCE_PRESETS,
+  TRAINER_BUILD_ATTRIBUTES,
   cloneTrainerAppearance,
   trainerAppearanceLegacyPalette,
 } from '../content/trainerAppearance';
@@ -109,13 +110,24 @@ export function resetTrainerAppearanceCategory(
   draft: TrainerCreationDraft,
   category: TrainerAppearanceCategory,
 ): TrainerCreationDraft {
-  if (category === 'preview') return draft;
-  if (category === 'build') {
+  if (category === 'poses' || category === 'saved-looks') return draft;
+  if (
+    category === 'build' ||
+    category === 'upper-body' ||
+    category === 'core' ||
+    category === 'lower-body'
+  ) {
+    const build = { ...draft.appearance.build };
+    for (const attribute of TRAINER_BUILD_ATTRIBUTES) {
+      if (attribute.region === category) {
+        build[attribute.id] = DEFAULT_TRAINER_APPEARANCE.build[attribute.id];
+      }
+    }
     return {
       ...draft,
       appearance: {
         ...draft.appearance,
-        build: { ...DEFAULT_TRAINER_APPEARANCE.build },
+        build,
       },
       physiquePresetId: null,
     };

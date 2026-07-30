@@ -1,0 +1,334 @@
+.physique-review-backdrop {
+  align-items: flex-start;
+  background: rgba(3, 14, 18, 0.86);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  overflow: auto;
+  padding: clamp(0.5rem, 2vw, 1.5rem);
+  position: fixed;
+  z-index: 110;
+}
+
+.physique-review-panel {
+  background:
+    linear-gradient(135deg, rgba(104, 211, 155, 0.08), transparent 35%),
+    #0c2429;
+  border: 3px solid #68d39b;
+  box-shadow: 0 0 0 3px #061519, 0 18px 54px rgba(0, 0, 0, 0.55);
+  color: #eef2d0;
+  max-width: 960px;
+  min-width: 0;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  width: 100%;
+}
+
+.physique-review-header,
+.physique-review-grid,
+.physique-review-actions,
+.physique-review-status-row,
+.physique-challenge-grid {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.physique-review-header {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.physique-review-header h2,
+.physique-review-section h3,
+.physique-review-settings-card h3 {
+  margin-top: 0;
+}
+
+.physique-review-panel button {
+  min-height: 44px;
+}
+
+.physique-review-header p {
+  margin: 0.25rem 0;
+}
+
+.physique-review-kicker {
+  color: #f2c14e;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+}
+
+.physique-review-grid {
+  align-items: stretch;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.physique-review-preview-card {
+  background: #102f34;
+  border: 2px solid #285057;
+  flex: 2 1 390px;
+  padding: 0.75rem;
+}
+
+.physique-review-settings-card {
+  background: #102f34;
+  border: 2px solid #285057;
+  flex: 1 1 245px;
+  padding: 0.75rem;
+}
+
+.physique-review-compare {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.physique-review-buddy {
+  margin: 12px 0 0;
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(104, 211, 155, 0.34);
+  background:
+    radial-gradient(circle at 50% 64%, rgba(104, 211, 155, 0.13), transparent 46%),
+    #061519;
+}
+
+.physique-review-buddy figcaption {
+  color: #b9d8c4;
+  font-size: 10px;
+}
+
+.physique-review-compare figure {
+  align-items: center;
+  background: #061519;
+  border: 2px solid #285057;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  min-height: 180px;
+  overflow: hidden;
+  padding: 0.5rem;
+}
+
+.physique-review-compare figcaption {
+  color: #b9d8c4;
+  font-size: 0.8rem;
+  margin-top: 0.35rem;
+}
+
+.physique-review-pumped {
+  box-shadow: inset 0 0 20px rgba(242, 193, 78, 0.2);
+}
+
+.physique-review-field {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+}
+
+.physique-review-field select,
+.physique-review-field input {
+  min-height: 44px;
+  width: 100%;
+}
+
+.physique-review-toggle {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+  margin: 0.7rem 0;
+  min-height: 44px;
+}
+
+.physique-review-toggle input {
+  height: 22px;
+  width: 22px;
+}
+
+.physique-review-actions,
+.physique-review-status-row {
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.65rem;
+}
+
+.physique-review-status-row span {
+  background: #061519;
+  border: 1px solid #285057;
+  padding: 0.3rem 0.45rem;
+  text-transform: capitalize;
+}
+
+.physique-review-success {
+  color: #68d39b;
+}
+
+.physique-review-section {
+  background: rgba(6, 21, 25, 0.68);
+  border: 2px solid #285057;
+  margin-top: 0.85rem;
+  padding: 0.75rem;
+}
+
+.physique-development-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.physique-development-row {
+  align-items: center;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(88px, 0.8fr) minmax(120px, 3fr) 32px;
+}
+
+.physique-development-track {
+  background: #061519;
+  border: 1px solid #285057;
+  height: 14px;
+  overflow: hidden;
+  position: relative;
+}
+
+.physique-development-fill,
+.physique-pump-fill {
+  bottom: 0;
+  left: 0;
+  position: absolute;
+}
+
+.physique-development-fill {
+  background: #68d39b;
+  height: 100%;
+}
+
+.physique-pump-fill {
+  background: #f2c14e;
+  height: 4px;
+}
+
+.physique-ratings-grid {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+}
+
+.physique-ratings-grid div {
+  background: #102f34;
+  border: 1px solid #285057;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.55rem;
+  text-transform: capitalize;
+}
+
+.physique-ratings-grid strong {
+  color: #f2c14e;
+}
+
+.physique-history-list,
+.physique-compact-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.physique-history-list li {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0.45rem 0;
+}
+
+.physique-history-list span,
+.physique-compact-list {
+  color: #b9d8c4;
+  font-size: 0.8rem;
+}
+
+.physique-challenge-grid {
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.physique-challenge-grid > * {
+  flex: 1 1 175px;
+}
+
+.physique-challenge-result {
+  background: #2c2521;
+  border-left: 4px solid #ef6a5b;
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.7rem;
+  padding: 0.6rem;
+}
+
+.physique-challenge-result.success {
+  background: #102f29;
+  border-left-color: #68d39b;
+}
+
+.physique-debug-controls > div {
+  align-items: center;
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: minmax(85px, 1fr) repeat(4, auto);
+  margin: 0.35rem 0;
+}
+
+.physique-debug-controls button {
+  min-height: 38px;
+}
+
+@media (max-width: 520px) {
+  .physique-review-backdrop {
+    padding: 0;
+  }
+
+  .physique-review-panel {
+    border-width: 0 0 3px;
+    min-height: 100%;
+  }
+
+  .physique-review-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .physique-review-compare figure {
+    min-height: 156px;
+  }
+
+  .physique-review-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .physique-review-actions button {
+    width: 100%;
+  }
+
+  .physique-development-row {
+    grid-template-columns: 82px minmax(95px, 1fr) 28px;
+  }
+
+  .physique-debug-controls > div {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .physique-debug-controls > div span {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .physique-review-panel *,
+  .physique-review-panel *::before,
+  .physique-review-panel *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -23,6 +23,7 @@ import { cloneTrainerAppearancePresets } from '../systems/trainerAppearance';
 import { createBossSchedule } from '../systems/bossScheduling';
 import { createSeedBuddy } from '../systems/buddyProgression';
 import { createRandomState } from '../systems/random';
+import { createDefaultVisualProgressionState } from '../systems/visualProgression';
 import type {
   BossSchedule,
   SaveAudioSettings,
@@ -83,6 +84,9 @@ export function createDefaultSaveData(options?: {
       repeatedUses: 0,
       masteryByMachineId: {},
     },
+    visualProgression: createDefaultVisualProgressionState(
+      preset.appearance,
+    ),
     hasStarterSet: false,
     unlockedZoneIds: [...FALLBACK_UNLOCKED_ZONES],
     visitedZoneIds: ['home'],

@@ -1,0 +1,325 @@
+.batch03-review-shell {
+  --batch03-accent: #f2c14e;
+  --batch03-bg: #061519;
+  --batch03-ink: #eef2d0;
+  --batch03-line: #2d5960;
+  --batch03-muted: #b9d8c4;
+  --batch03-panel: #102b30;
+  background: var(--batch03-bg);
+  color: var(--batch03-ink);
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.batch03-review-shell > nav {
+  display: flex;
+  gap: 16px;
+  margin: 0 auto 20px;
+  max-width: 1600px;
+}
+
+.batch03-review-shell a {
+  color: var(--batch03-accent);
+}
+
+.batch03-deliverable,
+.batch03-contact-sheet {
+  background: #0c2227;
+  border: 2px solid var(--batch03-line);
+  margin: 0 auto 32px;
+  max-width: 1600px;
+  padding: 20px;
+}
+
+.batch03-deliverable > header,
+.batch03-contact-sheet > header {
+  border-bottom: 2px solid var(--batch03-accent);
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+}
+
+.batch03-deliverable h1,
+.batch03-deliverable h2,
+.batch03-deliverable h3,
+.batch03-deliverable p,
+.batch03-contact-sheet h1,
+.batch03-contact-sheet h2,
+.batch03-contact-sheet h3,
+.batch03-contact-sheet p {
+  margin-top: 0;
+}
+
+.batch03-deliverable h1,
+.batch03-contact-sheet h1 {
+  font-size: 30px;
+  margin-bottom: 4px;
+}
+
+.batch03-deliverable h2,
+.batch03-contact-sheet h2 {
+  color: var(--batch03-accent);
+  font-size: 18px;
+}
+
+.batch03-deliverable h3,
+.batch03-contact-sheet h3 {
+  font-size: 13px;
+}
+
+.batch03-deliverable > header p,
+.batch03-contact-sheet > header p {
+  color: var(--batch03-accent);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.batch03-contact-sheet > section {
+  background: var(--batch03-panel);
+  border: 1px solid var(--batch03-line);
+  margin-top: 16px;
+  padding: 14px;
+}
+
+.batch03-grid {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+}
+
+.batch03-cross-row,
+.batch03-silhouette-row {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 150px repeat(8, minmax(120px, 1fr));
+  margin-top: 14px;
+}
+
+.batch03-cross-row > h3,
+.batch03-silhouette-row > h2 {
+  align-self: center;
+  color: var(--batch03-accent);
+}
+
+.batch03-preset-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
+}
+
+.batch03-preset-grid > div,
+.batch03-tier-grid > div {
+  background: #0a1d21;
+  border: 1px solid var(--batch03-line);
+  padding: 9px;
+}
+
+.batch03-directions {
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+}
+
+.batch03-state-grid {
+  grid-template-columns: repeat(3, minmax(150px, 260px));
+}
+
+.batch03-action-grid {
+  grid-template-columns: repeat(6, minmax(130px, 1fr));
+}
+
+.batch03-background-grid {
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+}
+
+.batch03-layer-grid {
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
+}
+
+.batch03-anchor-grid {
+  grid-template-columns: repeat(4, minmax(250px, 1fr));
+}
+
+.batch03-mobile-grid {
+  grid-template-columns: repeat(4, minmax(240px, 1fr));
+}
+
+.batch03-tier-grid {
+  grid-template-columns: repeat(5, minmax(210px, 1fr));
+}
+
+.batch03-review-shell figure {
+  margin: 0;
+}
+
+.batch03-sprite-stage {
+  align-items: center;
+  background: #18343a;
+  display: flex;
+  justify-content: center;
+  min-height: 112px;
+  overflow: hidden;
+  padding: 8px;
+  position: relative;
+}
+
+.batch03-review-shell figcaption {
+  color: var(--batch03-muted);
+  font-size: 11px;
+  padding-top: 4px;
+  text-align: center;
+}
+
+.batch03-background {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 118px;
+  width: 100%;
+}
+
+.batch03-background.is-light {
+  background: #eef2d0;
+}
+
+.batch03-background.is-dark {
+  background: #061519;
+}
+
+.batch03-background.is-gym {
+  background:
+    linear-gradient(#285057 0 58%, #18343a 58% 62%, #704f73 62%);
+}
+
+.batch03-background.is-route {
+  background:
+    repeating-linear-gradient(90deg, #507b5b 0 10px, #456a4e 10px 20px);
+}
+
+.batch03-background.is-battle {
+  background:
+    radial-gradient(circle at 50% 70%, #704f73 0 30%, #18343a 31% 100%);
+}
+
+.batch03-mobile-card {
+  align-items: center;
+  background: #18343a;
+  border: 1px solid #68d39b;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  min-height: 210px;
+  padding: 14px;
+}
+
+.batch03-mobile-card span {
+  color: var(--batch03-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.batch03-inspect-frame .batch03-sprite-stage {
+  box-shadow: inset 0 0 0 1px #ef6a5b;
+}
+
+.batch03-inspect-frame .batch03-sprite-stage::before,
+.batch03-inspect-frame .batch03-sprite-stage::after {
+  background: var(--batch03-accent);
+  content: '';
+  opacity: 0.85;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.batch03-inspect-frame .batch03-sprite-stage::before {
+  bottom: 8px;
+  height: 1px;
+  left: 8px;
+  right: 8px;
+}
+
+.batch03-inspect-frame .batch03-sprite-stage::after {
+  bottom: 8px;
+  height: 10px;
+  left: 50%;
+  width: 1px;
+}
+
+.batch03-layer-canvas,
+.batch03-anchor-diagram canvas {
+  image-rendering: pixelated;
+  width: 96px;
+}
+
+.batch03-anchor-diagram {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 96px 192px 1fr;
+}
+
+.batch03-anchor-diagram svg {
+  background: #18343a;
+  image-rendering: pixelated;
+  width: 192px;
+}
+
+.batch03-anchor-diagram ol {
+  color: var(--batch03-muted);
+  font-size: 10px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.batch03-tier-grid dl {
+  font-size: 11px;
+  margin: 8px 0 0;
+}
+
+.batch03-tier-grid dl > div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.batch03-tier-grid dd {
+  color: var(--batch03-accent);
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .batch03-review-shell {
+    padding: 8px;
+  }
+
+  .batch03-deliverable,
+  .batch03-contact-sheet {
+    padding: 10px;
+  }
+
+  .batch03-cross-row,
+  .batch03-silhouette-row,
+  .batch03-preset-grid,
+  .batch03-background-grid,
+  .batch03-anchor-grid,
+  .batch03-mobile-grid,
+  .batch03-tier-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .batch03-action-grid,
+  .batch03-layer-grid {
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+  }
+
+  .batch03-anchor-diagram {
+    grid-template-columns: 72px 144px 1fr;
+  }
+
+  .batch03-anchor-diagram canvas {
+    width: 72px;
+  }
+
+  .batch03-anchor-diagram svg {
+    width: 144px;
+  }
+}

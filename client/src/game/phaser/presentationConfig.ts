@@ -4,6 +4,7 @@ import type {
   OverworldLocationId,
   TrainerAppearance,
   TrainerEmote,
+  TrainerRecoveryPresentation,
 } from '../types';
 import type { PresentationEffectCue } from './presentationEffects';
 
@@ -66,6 +67,9 @@ export interface GamePresentationSnapshot {
     skin: string;
   };
   trainerAppearance: TrainerAppearance;
+  trainerIdleSequence: number;
+  trainerPumpIntensity: number;
+  trainerRecovery: TrainerRecoveryPresentation;
   visitedZoneIds: readonly GymZoneId[];
   motion: PresentationMotionSettings;
 }

@@ -1,0 +1,166 @@
+import type { TrainerPoseDefinition } from '../types';
+
+export const TRAINER_POSE_DEFINITIONS: TrainerPoseDefinition[] = [
+  {
+    id: 'idle',
+    label: 'Athletic Idle',
+    category: 'movement',
+    defaultDirection: 'front',
+    silhouetteCue: 'Relaxed readiness with visible shoulder and leg development.',
+  },
+  {
+    id: 'walking',
+    label: 'Walk',
+    category: 'movement',
+    defaultDirection: 'front',
+    silhouetteCue: 'Compact travel stride with anchored shoulders.',
+  },
+  {
+    id: 'running',
+    label: 'Run',
+    category: 'movement',
+    defaultDirection: 'front',
+    silhouetteCue: 'Longer opposing arm and leg drive.',
+  },
+  {
+    id: 'confident-walk',
+    label: 'Confident Walk',
+    category: 'movement',
+    defaultDirection: 'front',
+    silhouetteCue: 'Open chest, deliberate stride, and relaxed lat width.',
+  },
+  {
+    id: 'training',
+    label: 'Training Rep',
+    category: 'gameplay',
+    defaultDirection: 'front',
+    silhouetteCue: 'Braced torso and loaded curling arms.',
+  },
+  {
+    id: 'capture',
+    label: 'Capture Brace',
+    category: 'gameplay',
+    defaultDirection: 'left',
+    silhouetteCue: 'One reaching arm with a grounded counter-side stance.',
+  },
+  {
+    id: 'victory',
+    label: 'Victory',
+    category: 'gameplay',
+    defaultDirection: 'front',
+    silhouetteCue: 'Raised double-arm celebration.',
+  },
+  {
+    id: 'fatigue',
+    label: 'Fatigue',
+    category: 'gameplay',
+    defaultDirection: 'front',
+    silhouetteCue: 'Lowered shoulders and a controlled recovery stance.',
+  },
+  {
+    id: 'boss-introduction',
+    label: 'Boss Introduction',
+    category: 'gameplay',
+    defaultDirection: 'front',
+    silhouetteCue: 'Asymmetric flex and planted challenge stance.',
+  },
+  {
+    id: 'front-relaxed',
+    label: 'Front Relaxed',
+    category: 'bodybuilding',
+    defaultDirection: 'front',
+    silhouetteCue: 'Open delts, visible taper, balanced quads, and calm posture.',
+  },
+  {
+    id: 'back-relaxed',
+    label: 'Back Relaxed',
+    category: 'bodybuilding',
+    defaultDirection: 'back',
+    silhouetteCue: 'Lat width, trapezius rise, lower-back thickness, and calves.',
+  },
+  {
+    id: 'front-double-biceps',
+    label: 'Front Double Biceps',
+    category: 'bodybuilding',
+    defaultDirection: 'front',
+    silhouetteCue: 'Bent arms frame the taper while quads remain planted.',
+  },
+  {
+    id: 'back-double-biceps',
+    label: 'Back Double Biceps',
+    category: 'bodybuilding',
+    defaultDirection: 'back',
+    silhouetteCue: 'Bent arms frame back width and rear-leg development.',
+  },
+  {
+    id: 'side-chest',
+    label: 'Side Chest',
+    category: 'bodybuilding',
+    defaultDirection: 'left',
+    silhouetteCue: 'Compressed arms frame chest depth, hamstrings, and calves.',
+  },
+  {
+    id: 'side-triceps',
+    label: 'Side Triceps',
+    category: 'bodybuilding',
+    defaultDirection: 'right',
+    silhouetteCue: 'Straight rear arm exposes triceps and torso depth.',
+  },
+  {
+    id: 'most-muscular',
+    label: 'Most Muscular',
+    category: 'bodybuilding',
+    defaultDirection: 'front',
+    silhouetteCue: 'Arms close inward around chest, traps, and forearms.',
+  },
+  {
+    id: 'abs-and-thigh',
+    label: 'Abs and Thigh',
+    category: 'bodybuilding',
+    defaultDirection: 'front',
+    silhouetteCue: 'One raised arm reveals core definition over a flexed quad.',
+  },
+  {
+    id: 'victory-flex',
+    label: 'Victory Flex',
+    category: 'bodybuilding',
+    defaultDirection: 'front',
+    silhouetteCue: 'Celebratory double-arm flex with an upright taper.',
+  },
+  {
+    id: 'pre-workout-warmup',
+    label: 'Pre-Workout Warmup',
+    category: 'bodybuilding',
+    defaultDirection: 'front',
+    silhouetteCue: 'Wide arm sweep and mobile shoulder preparation.',
+  },
+  {
+    id: 'post-set-pump',
+    label: 'Post-Set Pump',
+    category: 'bodybuilding',
+    defaultDirection: 'front',
+    silhouetteCue: 'Compact curl stance emphasizing arms, chest, and forearms.',
+  },
+  {
+    id: 'fatigued-stance',
+    label: 'Fatigued Stance',
+    category: 'bodybuilding',
+    defaultDirection: 'front',
+    silhouetteCue: 'Hands low with controlled breathing and retained posture.',
+  },
+  {
+    id: 'boss-entrance-pose',
+    label: 'Boss Entrance Pose',
+    category: 'bodybuilding',
+    defaultDirection: 'front',
+    silhouetteCue: 'One high flex, one braced hand, and a wide planted base.',
+  },
+];
+
+export const TRAINER_BODYBUILDING_POSES = TRAINER_POSE_DEFINITIONS.filter(
+  (pose) => pose.category === 'bodybuilding',
+);
+
+export const TRAINER_POSE_BY_ID = new Map(
+  TRAINER_POSE_DEFINITIONS.map((pose) => [pose.id, pose]),
+);

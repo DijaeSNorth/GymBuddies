@@ -844,11 +844,29 @@ export class OverworldScene extends Phaser.Scene {
         : this.snapshot.facing === 'down'
           ? 'front'
           : this.snapshot.facing;
+    const idlePose =
+      this.snapshot.trainerRecovery.stance === 'fatigued'
+        ? 'fatigued-stance'
+        : this.snapshot.trainerPumpIntensity >= 0.34
+          ? 'post-set-pump'
+          : 'idle';
+    const pose =
+      walkFrame === 0
+        ? idlePose
+        : this.snapshot.trainerPumpIntensity >= 0.24
+          ? 'confident-walk'
+          : 'walking';
+    const animationFrame =
+      walkFrame === 0 &&
+      idlePose === 'fatigued-stance' &&
+      !this.snapshot.motion.reducedMotion
+        ? this.snapshot.trainerIdleSequence % 2
+        : walkFrame;
     const frame = renderTrainerPixelFrame(
       this.snapshot.trainerAppearance,
       direction,
-      walkFrame === 0 ? 'idle' : 'walking',
-      walkFrame,
+      pose,
+      animationFrame,
     );
     const worldPixelScale = 0.5;
     for (const rect of frame.rects) {

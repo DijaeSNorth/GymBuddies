@@ -79,6 +79,14 @@
 .trainer-rotation-controls button,
 .trainer-compare-toggle,
 .trainer-history-toolbar button,
+.trainer-forge-mode button,
+.trainer-preview-tool-strip button,
+.trainer-preview-secondary-tools button,
+.trainer-region-highlights button,
+.trainer-pose-cycle button,
+.trainer-auto-rotate,
+.trainer-appearance-transfer button,
+.trainer-saved-look-actions button,
 .trainer-custom-tabs button,
 .trainer-pose-grid button,
 .trainer-save-preset button,
@@ -98,6 +106,22 @@
 .trainer-compare-toggle:focus-visible,
 .trainer-history-toolbar button:hover,
 .trainer-history-toolbar button:focus-visible,
+.trainer-forge-mode button:hover,
+.trainer-forge-mode button:focus-visible,
+.trainer-preview-tool-strip button:hover,
+.trainer-preview-tool-strip button:focus-visible,
+.trainer-preview-secondary-tools button:hover,
+.trainer-preview-secondary-tools button:focus-visible,
+.trainer-region-highlights button:hover,
+.trainer-region-highlights button:focus-visible,
+.trainer-pose-cycle button:hover,
+.trainer-pose-cycle button:focus-visible,
+.trainer-auto-rotate:hover,
+.trainer-auto-rotate:focus-visible,
+.trainer-appearance-transfer button:hover,
+.trainer-appearance-transfer button:focus-visible,
+.trainer-saved-look-actions button:hover,
+.trainer-saved-look-actions button:focus-visible,
 .trainer-custom-tabs button:hover,
 .trainer-custom-tabs button:focus-visible,
 .trainer-pose-grid button:hover,
@@ -125,11 +149,9 @@
 
 .trainer-custom-tabs {
   display: grid;
-  grid-template-columns: repeat(7, minmax(72px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
   gap: 4px;
-  overflow-x: auto;
   padding: 2px 2px 7px;
-  scrollbar-color: var(--trainer-forge-mint) var(--trainer-forge-ink);
 }
 
 .trainer-custom-tabs button {
@@ -145,7 +167,7 @@
 
 .trainer-history-toolbar {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(150px, 1.25fr) repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin: 6px 0 10px;
 }
@@ -179,6 +201,154 @@
   border: 1px solid rgba(185, 216, 196, 0.24);
   padding: 10px;
   background: rgba(16, 47, 52, 0.82);
+}
+
+.trainer-control-group > summary {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  color: var(--trainer-forge-amber);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.trainer-control-group > summary:focus-visible {
+  outline: 2px solid var(--trainer-forge-mint);
+  outline-offset: 3px;
+}
+
+.trainer-forge-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 7px 0;
+}
+
+.trainer-forge-mode button {
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  text-align: left;
+}
+
+.trainer-forge-mode button.active,
+.trainer-preview-tool-strip button.active,
+.trainer-preview-secondary-tools button.active,
+.trainer-region-highlights button.active {
+  border-color: var(--trainer-forge-mint);
+  color: var(--trainer-forge-ink);
+  background: var(--trainer-forge-mint);
+}
+
+.trainer-forge-mode small {
+  color: var(--trainer-forge-copy);
+  font-size: 7px;
+  line-height: 1.35;
+}
+
+.trainer-forge-mode button.active small {
+  color: var(--trainer-forge-deep);
+}
+
+.trainer-preview-tool-strip,
+.trainer-region-highlights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 7px;
+}
+
+.trainer-preview-tool-strip button,
+.trainer-region-highlights button,
+.trainer-preview-secondary-tools button {
+  min-height: 38px;
+}
+
+.trainer-preview-secondary-tools {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 7px;
+}
+
+.trainer-preview-secondary-tools > div {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+}
+
+.trainer-pose-cycle {
+  display: grid;
+  grid-template-columns: 1fr minmax(88px, 1fr) 1fr;
+  gap: 4px;
+  align-items: center;
+}
+
+.trainer-pose-cycle strong {
+  color: var(--trainer-forge-amber);
+  font-size: 7px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.trainer-auto-rotate {
+  width: 100%;
+  margin-top: 5px;
+}
+
+.trainer-auto-rotate:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.trainer-lighting-neutral {
+  background:
+    linear-gradient(#b8c7b8, #739094 64%, #19373b) !important;
+}
+
+.trainer-lighting-stage {
+  background:
+    radial-gradient(circle at 50% 7%, rgba(242, 193, 78, 0.75), transparent 38%),
+    linear-gradient(135deg, #31183b, #07171c 68%) !important;
+}
+
+.trainer-lighting-gym {
+  background:
+    linear-gradient(90deg, rgba(104, 211, 155, 0.08) 1px, transparent 1px),
+    linear-gradient(#285057, #0a2025) !important;
+  background-size: 14px 100% !important;
+}
+
+.trainer-preview-size-small {
+  min-height: 145px !important;
+}
+
+.trainer-mirrored-canvas {
+  transform: scaleX(-1);
+}
+
+.trainer-silhouette-canvas {
+  filter: brightness(0) saturate(100%);
+}
+
+.trainer-random-filter {
+  display: grid;
+  gap: 4px;
+  color: var(--trainer-forge-copy);
+  font-size: 7px;
+}
+
+.trainer-random-filter select,
+.trainer-look-compare-selects select,
+.trainer-saved-presets input {
+  min-width: 0;
+  min-height: 44px;
+  border: 2px solid var(--trainer-forge-line);
+  padding: 7px;
+  color: var(--trainer-forge-light);
+  background: var(--trainer-forge-ink);
+  font: inherit;
+  font-size: 8px;
 }
 
 .trainer-custom-copy {
@@ -462,6 +632,48 @@
   background: var(--trainer-forge-ink);
 }
 
+.trainer-saved-look-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.trainer-appearance-transfer,
+.trainer-look-compare-selects {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.trainer-look-compare-selects label {
+  display: grid;
+  gap: 5px;
+  color: var(--trainer-forge-copy);
+  font-size: 8px;
+}
+
+.trainer-look-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.trainer-look-comparison figure {
+  display: grid;
+  place-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 7px;
+  background: var(--trainer-forge-ink);
+}
+
+.trainer-look-comparison figcaption,
+.trainer-transfer-status {
+  color: var(--trainer-forge-copy);
+  font-size: 7px;
+  line-height: 1.5;
+}
+
 .trainer-saved-presets .trainer-pixel-canvas {
   grid-row: span 3;
 }
@@ -539,6 +751,10 @@ html[data-gb-reduced-motion='true'] .trainer-pixel-canvas {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .trainer-random-filter {
+    grid-column: 1 / -1;
+  }
+
   .trainer-physique-presets,
   .trainer-gameplay-presets,
   .trainer-option-grid,
@@ -570,6 +786,14 @@ html[data-gb-reduced-motion='true'] .trainer-pixel-canvas {
   .trainer-saved-presets {
     grid-template-columns: 1fr;
   }
+
+  .trainer-preview-tool-strip {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    padding-block: 4px;
+    background: var(--trainer-forge-ink);
+  }
 }
 
 @media (max-width: 390px) {
@@ -588,6 +812,27 @@ html[data-gb-reduced-motion='true'] .trainer-pixel-canvas {
   .trainer-preview-comparison .trainer-pixel-canvas {
     max-width: 100px;
     height: auto;
+  }
+
+  .trainer-region-highlights,
+  .trainer-forge-mode,
+  .trainer-appearance-transfer,
+  .trainer-look-compare-selects {
+    grid-template-columns: 1fr;
+  }
+
+  .trainer-preview-tool-strip {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trainer-pose-cycle {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .trainer-pose-cycle strong {
+    grid-column: 1 / -1;
+    grid-row: 1;
   }
 
   .trainer-curated-swatches {

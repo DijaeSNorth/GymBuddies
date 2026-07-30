@@ -1,5 +1,5 @@
-export const CURRENT_SAVE_SCHEMA_VERSION = 16 as const;
-export const SAVE_VERSION = 'v16' as const;
+export const CURRENT_SAVE_SCHEMA_VERSION = 19 as const;
+export const SAVE_VERSION = 'v19' as const;
 export const SAVE_KEY = 'gym-buddies.save.current';
 export const SAVE_BACKUP_KEY = 'gym-buddies.save.previous';
 export const LEGACY_SAVE_KEYS = ['gymbuddies-save-v12'] as const;

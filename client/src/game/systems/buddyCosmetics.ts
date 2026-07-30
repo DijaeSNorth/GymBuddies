@@ -2,7 +2,13 @@ import {
   BUDDY_BODY_SIZE_OPTIONS,
   BUDDY_CHARACTER_DESIGN_BY_SPECIES_ID,
   BUDDY_DEFINITION_OPTIONS,
+  BUDDY_EMPHASIS_OPTIONS,
+  BUDDY_MASS_OPTIONS,
   BUDDY_PALETTE_COLORS,
+  BUDDY_POSTURE_OPTIONS,
+  BUDDY_PUMP_OPTIONS,
+  BUDDY_STANCE_OPTIONS,
+  BUDDY_SYMMETRY_OPTIONS,
   getBuddyCharacterDesign,
 } from '../content/buddyCharacters';
 import type {
@@ -37,14 +43,22 @@ function validAccessoryIds(
 ) {
   if (!Array.isArray(value)) return [...design.defaultCosmetics.accessoryIds];
   const available = new Set(design.accessoryOptions.map((entry) => entry.id));
-  const normalized = [
+  const candidates = [
     ...new Set(
       value.filter(
         (entry): entry is string =>
           typeof entry === 'string' && available.has(entry),
       ),
     ),
-  ].slice(0, 2);
+  ];
+  const usedSlots = new Set<string>();
+  const normalized = candidates.filter((id) => {
+    if (id === 'accessory-none') return candidates.length === 1;
+    const slot = design.accessoryOptions.find((entry) => entry.id === id)?.slot;
+    if (!slot || usedSlots.has(slot)) return false;
+    usedSlots.add(slot);
+    return true;
+  }).slice(0, 4);
   return normalized.length > 0
     ? normalized
     : [...design.defaultCosmetics.accessoryIds];
@@ -56,6 +70,7 @@ export function cloneBuddyCosmetics(
   return {
     ...cosmetics,
     accessoryIds: [...cosmetics.accessoryIds],
+    physique: { ...cosmetics.physique },
   };
 }
 
@@ -65,8 +80,21 @@ export function normalizeBuddyCosmetics(
 ): BuddyCosmetics {
   const design = getBuddyCharacterDesign(speciesId);
   const defaults = design.defaultCosmetics;
+  const preset = design.physiquePresets.find(
+    (entry) => entry.id === value?.physiquePresetId,
+  ) ?? design.physiquePresets.find(
+    (entry) => entry.id === defaults.physiquePresetId,
+  )!;
+  const sourcePhysique = value?.physique;
+  const normalizePhysiqueOption = <
+    T extends string
+  >(
+    options: readonly BuddyVisualOption[],
+    valueId: unknown,
+    fallback: T,
+  ) => hasOption(options, valueId) ? valueId as T : fallback;
   return {
-    version: 1,
+    version: 2,
     primaryPaletteId: validPaletteId(value?.primaryPaletteId)
       ? value.primaryPaletteId
       : defaults.primaryPaletteId,
@@ -113,6 +141,64 @@ export function normalizeBuddyCosmetics(
     )
       ? value.entranceAnimationId
       : defaults.entranceAnimationId,
+    physiquePresetId: preset.id,
+    physique: {
+      shoulderEmphasisId: normalizePhysiqueOption(
+        BUDDY_EMPHASIS_OPTIONS,
+        sourcePhysique?.shoulderEmphasisId,
+        preset.physique.shoulderEmphasisId,
+      ),
+      chestEmphasisId: normalizePhysiqueOption(
+        BUDDY_EMPHASIS_OPTIONS,
+        sourcePhysique?.chestEmphasisId,
+        preset.physique.chestEmphasisId,
+      ),
+      backEmphasisId: normalizePhysiqueOption(
+        BUDDY_EMPHASIS_OPTIONS,
+        sourcePhysique?.backEmphasisId,
+        preset.physique.backEmphasisId,
+      ),
+      armEmphasisId: normalizePhysiqueOption(
+        BUDDY_EMPHASIS_OPTIONS,
+        sourcePhysique?.armEmphasisId,
+        preset.physique.armEmphasisId,
+      ),
+      coreEmphasisId: normalizePhysiqueOption(
+        BUDDY_EMPHASIS_OPTIONS,
+        sourcePhysique?.coreEmphasisId,
+        preset.physique.coreEmphasisId,
+      ),
+      legEmphasisId: normalizePhysiqueOption(
+        BUDDY_EMPHASIS_OPTIONS,
+        sourcePhysique?.legEmphasisId,
+        preset.physique.legEmphasisId,
+      ),
+      overallMassId: normalizePhysiqueOption(
+        BUDDY_MASS_OPTIONS,
+        sourcePhysique?.overallMassId,
+        preset.physique.overallMassId,
+      ),
+      symmetryId: normalizePhysiqueOption(
+        BUDDY_SYMMETRY_OPTIONS,
+        sourcePhysique?.symmetryId,
+        preset.physique.symmetryId,
+      ),
+      stanceId: normalizePhysiqueOption(
+        BUDDY_STANCE_OPTIONS,
+        sourcePhysique?.stanceId,
+        preset.physique.stanceId,
+      ),
+      postureId: normalizePhysiqueOption(
+        BUDDY_POSTURE_OPTIONS,
+        sourcePhysique?.postureId,
+        preset.physique.postureId,
+      ),
+      pumpEffectId: normalizePhysiqueOption(
+        BUDDY_PUMP_OPTIONS,
+        sourcePhysique?.pumpEffectId,
+        preset.physique.pumpEffectId,
+      ),
+    },
   };
 }
 
@@ -144,12 +230,8 @@ export function randomizeBuddyCosmetics(
   const secondary = choosePalette(primary.randomState);
   const accent = choosePalette(secondary.randomState);
   const pattern = chooseOption(accent.randomState, design.patternOptions);
-  const definition = chooseOption(
-    pattern.randomState,
-    BUDDY_DEFINITION_OPTIONS,
-  );
-  const size = chooseOption(definition.randomState, BUDDY_BODY_SIZE_OPTIONS);
-  const appendage = chooseOption(size.randomState, design.appendageOptions);
+  const preset = chooseOption(pattern.randomState, design.physiquePresets);
+  const appendage = chooseOption(preset.randomState, design.appendageOptions);
   const accessory = chooseOption(
     appendage.randomState,
     design.accessoryOptions,
@@ -177,15 +259,22 @@ export function randomizeBuddyCosmetics(
       secondaryPaletteId: secondary.id,
       accentPaletteId: accent.id,
       patternId: pattern.id,
-      muscleDefinitionId:
-        definition.id as BuddyCosmetics['muscleDefinitionId'],
-      bodySizeId: size.id as BuddyCosmetics['bodySizeId'],
+      muscleDefinitionId: design.physiquePresets.find(
+        (entry) => entry.id === preset.id,
+      )!.muscleDefinitionId,
+      bodySizeId: design.physiquePresets.find(
+        (entry) => entry.id === preset.id,
+      )!.bodySizeId,
       appendageVariantId: appendage.id,
       accessoryIds: [accessory.id],
       rareTraitId: rare.id,
       expressionId: expression.id as BuddyCosmetics['expressionId'],
       victoryPoseId: victory.id,
       entranceAnimationId: entrance.id,
+      physiquePresetId: preset.id,
+      physique: design.physiquePresets.find(
+        (entry) => entry.id === preset.id,
+      )!.physique,
     }),
     randomState: rare.randomState,
   };

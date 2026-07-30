@@ -130,8 +130,20 @@ test('deployment smoke: release shell, manifests, and every asset load from the 
   expect(serviceWorkerResponse.headers()['cache-control']).toContain(
     'no-cache',
   );
-  expect(await serviceWorkerResponse.text()).toMatch(
+  const serviceWorkerSource = await serviceWorkerResponse.text();
+  expect(serviceWorkerSource).toMatch(
     /gym-buddies-core-[a-f0-9]{16}/,
+  );
+  const precacheSource =
+    serviceWorkerSource.match(
+      /const PRECACHE_URLS = ([\s\S]*?);\nconst DEFERRED_URLS/,
+    )?.[1] ?? '';
+  expect(precacheSource).not.toContain('/battle-48.png');
+  expect(precacheSource).not.toContain('/battle-64.png');
+  expect(precacheSource).not.toContain('/showcase-64.png');
+  expect(precacheSource).not.toContain('/portrait-64.png');
+  expect(serviceWorkerSource).toContain(
+    '/presentation/v1/brawny-bear/battle-48.png',
   );
 
   const reloadedResponse = await page.reload();

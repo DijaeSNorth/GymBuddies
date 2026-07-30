@@ -3,39 +3,101 @@ import type {
   TrainerAppearanceOption,
   TrainerBuildAttribute,
   TrainerBuildAttributeId,
+  TrainerBuildRegion,
   TrainerColorOption,
   TrainerCosmeticBuild,
   TrainerPhysiquePreset,
+  TrainerRandomizationFilter,
 } from '../types/trainer';
 
 export const TRAINER_BUILD_MIN = 0;
 export const TRAINER_BUILD_MAX = 10;
-export const TRAINER_APPEARANCE_VERSION = 2 as const;
-export const MAX_SAVED_APPEARANCE_PRESETS = 8;
+export const TRAINER_APPEARANCE_VERSION = 3 as const;
+export const MAX_SAVED_APPEARANCE_PRESETS = 12;
+
+function attribute(
+  id: TrainerBuildAttributeId,
+  label: string,
+  detail: string,
+  minimumLabel: string,
+  maximumLabel: string,
+  region: TrainerBuildRegion,
+  quick = false,
+): TrainerBuildAttribute {
+  return {
+    id,
+    key: id,
+    label,
+    detail,
+    minimumLabel,
+    maximumLabel,
+    region,
+    quick,
+  };
+}
 
 export const TRAINER_BUILD_ATTRIBUTES: TrainerBuildAttribute[] = [
-  { id: 'height', key: 'height', label: 'Height', detail: 'Changes the cosmetic vertical silhouette only.', minimumLabel: 'Compact', maximumLabel: 'Towering' },
-  { id: 'bodyScale', key: 'bodyScale', label: 'Overall Scale', detail: 'Changes the overall frame while preserving a powerful silhouette.', minimumLabel: 'Trim frame', maximumLabel: 'Broad frame' },
-  { id: 'headSize', key: 'headSize', label: 'Head Size', detail: 'Adjusts head proportions without changing gameplay.', minimumLabel: 'Small', maximumLabel: 'Large' },
-  { id: 'neckThickness', key: 'neckThickness', label: 'Neck', detail: 'Sets the visual neck thickness beneath the head.', minimumLabel: 'Defined', maximumLabel: 'Thick' },
-  { id: 'shoulderWidth', key: 'shoulderWidth', label: 'Shoulders', detail: 'Shapes the upper-body width in every facing direction.', minimumLabel: 'Athletic', maximumLabel: 'Extra wide' },
-  { id: 'trapeziusSize', key: 'trapeziusSize', label: 'Trapezius', detail: 'Raises and thickens the upper-back silhouette.', minimumLabel: 'Defined', maximumLabel: 'High-set' },
-  { id: 'chestSize', key: 'chestSize', label: 'Chest', detail: 'Changes torso depth and front-facing chest shape.', minimumLabel: 'Athletic', maximumLabel: 'Full' },
-  { id: 'upperBackWidth', key: 'upperBackWidth', label: 'Upper Back', detail: 'Changes the back-facing taper and lat width.', minimumLabel: 'Tapered', maximumLabel: 'Wide' },
-  { id: 'lowerBackThickness', key: 'lowerBackThickness', label: 'Lower Back', detail: 'Changes the visual thickness above the waist.', minimumLabel: 'Lean', maximumLabel: 'Solid' },
-  { id: 'bicepsSize', key: 'bicepsSize', label: 'Biceps', detail: 'Changes the upper-arm curve in front and side views.', minimumLabel: 'Defined', maximumLabel: 'Massive' },
-  { id: 'tricepsSize', key: 'tricepsSize', label: 'Triceps', detail: 'Changes the rear upper-arm shape.', minimumLabel: 'Defined', maximumLabel: 'Massive' },
-  { id: 'forearmSize', key: 'forearmSize', label: 'Forearms', detail: 'Changes the lower-arm width and grip silhouette.', minimumLabel: 'Lean', maximumLabel: 'Thick' },
-  { id: 'handSize', key: 'handSize', label: 'Hands', detail: 'Changes hand and glove proportions.', minimumLabel: 'Compact', maximumLabel: 'Large' },
-  { id: 'coreDefinition', key: 'coreDefinition', label: 'Core Definition', detail: 'Adds cosmetic torso definition marks only.', minimumLabel: 'Smooth', maximumLabel: 'Etched' },
-  { id: 'waistWidth', key: 'waistWidth', label: 'Waist', detail: 'Changes midsection width while keeping clothing aligned.', minimumLabel: 'Narrow', maximumLabel: 'Wide' },
-  { id: 'gluteSize', key: 'gluteSize', label: 'Glutes', detail: 'Changes the rear and side hip silhouette.', minimumLabel: 'Athletic', maximumLabel: 'Powerful' },
-  { id: 'quadSize', key: 'quadSize', label: 'Quads', detail: 'Changes front thigh width and stance.', minimumLabel: 'Defined', maximumLabel: 'Powerful' },
-  { id: 'hamstringSize', key: 'hamstringSize', label: 'Hamstrings', detail: 'Changes rear and side thigh depth.', minimumLabel: 'Defined', maximumLabel: 'Powerful' },
-  { id: 'calfSize', key: 'calfSize', label: 'Calves', detail: 'Changes lower-leg width above shoes.', minimumLabel: 'Defined', maximumLabel: 'Full' },
-  { id: 'footSize', key: 'footSize', label: 'Feet', detail: 'Changes shoe length and stance width.', minimumLabel: 'Compact', maximumLabel: 'Large' },
-  { id: 'muscleDefinition', key: 'muscleDefinition', label: 'Muscle Definition', detail: 'Controls cosmetic highlight and shadow marks.', minimumLabel: 'Soft shading', maximumLabel: 'Sharp shading' },
-  { id: 'bodyMass', key: 'bodyMass', label: 'Body Mass', detail: 'Adds overall visual mass without changing trainer power.', minimumLabel: 'Lean muscular', maximumLabel: 'Heavyweight' },
+  attribute('height', 'Height', 'Changes the cosmetic vertical silhouette only.', 'Compact', 'Towering', 'build'),
+  attribute('bodyScale', 'Overall Scale', 'Changes the overall frame while preserving a powerful silhouette.', 'Trim frame', 'Broad frame', 'build', true),
+  attribute('headSize', 'Head Size', 'Adjusts head proportions without changing gameplay.', 'Small', 'Large', 'build'),
+  attribute('neckThickness', 'Neck', 'Sets the visual neck thickness beneath the head.', 'Defined', 'Thick', 'upper-body'),
+  attribute('shoulderWidth', 'Shoulders', 'Shapes the upper-body width in every facing direction.', 'Athletic', 'Extra wide', 'upper-body', true),
+  attribute('trapeziusSize', 'Trapezius', 'Raises and thickens the upper-back silhouette.', 'Defined', 'High-set', 'upper-body'),
+  attribute('chestSize', 'Chest', 'Changes torso depth and front-facing chest shape.', 'Athletic', 'Full', 'upper-body', true),
+  attribute('upperBackWidth', 'Upper Back', 'Changes the back-facing taper and lat width.', 'Tapered', 'Wide', 'upper-body', true),
+  attribute('lowerBackThickness', 'Lower Back', 'Changes the visual thickness above the waist.', 'Lean', 'Solid', 'core'),
+  attribute('bicepsSize', 'Biceps', 'Changes the upper-arm curve in front and side views.', 'Defined', 'Massive', 'upper-body', true),
+  attribute('tricepsSize', 'Triceps', 'Changes the rear upper-arm shape.', 'Defined', 'Massive', 'upper-body'),
+  attribute('forearmSize', 'Forearms', 'Changes the lower-arm width and grip silhouette.', 'Lean', 'Thick', 'upper-body'),
+  attribute('handSize', 'Hands', 'Changes hand and glove proportions.', 'Compact', 'Large', 'build'),
+  attribute('coreDefinition', 'Core Definition', 'Adds cosmetic torso definition marks only.', 'Smooth', 'Etched', 'core', true),
+  attribute('waistWidth', 'Waist', 'Changes midsection width while keeping clothing aligned.', 'Narrow', 'Wide', 'core', true),
+  attribute('gluteSize', 'Glutes', 'Changes the rear and side hip silhouette.', 'Athletic', 'Powerful', 'lower-body'),
+  attribute('quadSize', 'Quads', 'Changes front thigh width and stance.', 'Defined', 'Powerful', 'lower-body', true),
+  attribute('hamstringSize', 'Hamstrings', 'Changes rear and side thigh depth.', 'Defined', 'Powerful', 'lower-body'),
+  attribute('calfSize', 'Calves', 'Changes lower-leg width above shoes.', 'Defined', 'Full', 'lower-body'),
+  attribute('footSize', 'Feet', 'Changes shoe length and stance width.', 'Compact', 'Large', 'build'),
+  attribute('muscleDefinition', 'Muscle Definition', 'Controls fictional cosmetic highlight and shadow marks.', 'Soft shading', 'Sharp shading', 'build', true),
+  attribute('bodyMass', 'Body Mass', 'Adds overall visual mass without changing trainer power.', 'Lean muscular', 'Heavyweight', 'build', true),
+  attribute('clavicleWidth', 'Clavicle Width', 'Sets the shoulder-frame span beneath the delts.', 'Compact frame', 'Wide frame', 'upper-body'),
+  attribute('shoulderRoundness', 'Shoulder Roundness', 'Changes the curve of the shoulder caps.', 'Angular', 'Rounded', 'upper-body'),
+  attribute('frontDeltSize', 'Front-Delt Size', 'Changes the front-facing shoulder cap.', 'Defined', 'Full', 'upper-body'),
+  attribute('sideDeltSize', 'Side-Delt Size', 'Changes outer shoulder width and roundness.', 'Defined', 'Capped', 'upper-body', true),
+  attribute('rearDeltSize', 'Rear-Delt Size', 'Changes the back-facing shoulder cap.', 'Defined', 'Full', 'upper-body'),
+  attribute('upperChestFullness', 'Upper-Chest Fullness', 'Changes upper torso fullness below the clavicles.', 'Athletic', 'Shelf-like', 'upper-body', true),
+  attribute('lowerChestFullness', 'Lower-Chest Fullness', 'Changes lower chest depth and contour.', 'Athletic', 'Full', 'upper-body'),
+  attribute('latWidth', 'Lat Width', 'Changes the broad back silhouette.', 'Tapered', 'Wide', 'upper-body', true),
+  attribute('latFlare', 'Lat Flare', 'Changes how strongly the back tapers toward the waist.', 'Relaxed', 'Flared', 'upper-body'),
+  attribute('midBackThickness', 'Mid-Back Thickness', 'Changes central back depth in back and side views.', 'Lean', 'Dense', 'upper-body'),
+  attribute('trapeziusHeight', 'Trapezius Height', 'Raises the trap silhouette toward the neck.', 'Low-set', 'High-set', 'upper-body'),
+  attribute('trapeziusWidth', 'Trapezius Width', 'Widens the trap shelf across the upper back.', 'Compact', 'Wide', 'upper-body'),
+  attribute('bicepsPeak', 'Biceps Peak', 'Changes the height of the flexed biceps silhouette.', 'Long curve', 'High peak', 'upper-body'),
+  attribute('bicepsThickness', 'Biceps Thickness', 'Changes upper-arm depth without affecting gameplay power.', 'Defined', 'Dense', 'upper-body'),
+  attribute('tricepsHorseshoeDefinition', 'Triceps Horseshoe', 'Adds a fictional rear-arm separation mark.', 'Smooth', 'Etched', 'upper-body'),
+  attribute('forearmThickness', 'Forearm Thickness', 'Changes the lower-arm silhouette around wraps and gloves.', 'Lean', 'Thick', 'upper-body'),
+  attribute('forearmVascularDefinition', 'Forearm Vascular Detail', 'Adds stylized, fictional forearm detail marks.', 'Clean', 'Detailed', 'upper-body'),
+  attribute('ribcageWidth', 'Ribcage Width', 'Changes upper-midsection width beneath the chest.', 'Compact', 'Broad', 'core'),
+  attribute('waistTaper', 'Waist Taper', 'Changes the visual transition from ribs to waist.', 'Straight', 'Dramatic', 'core', true),
+  attribute('abdominalDefinition', 'Abdominal Definition', 'Changes stylized abdominal panel lines.', 'Smooth', 'Etched', 'core'),
+  attribute('obliqueDefinition', 'Oblique Definition', 'Adds side-core definition marks.', 'Smooth', 'Etched', 'core'),
+  attribute('serratusDefinition', 'Serratus Definition', 'Adds stylized upper-side core notches.', 'Smooth', 'Detailed', 'core'),
+  attribute('midsectionThickness', 'Midsection Thickness', 'Changes the side and front depth of the torso.', 'Compact', 'Thick', 'core'),
+  attribute('hipWidth', 'Hip Width', 'Changes the pelvis and upper-leg anchor span.', 'Compact', 'Wide', 'lower-body'),
+  attribute('gluteFullness', 'Glute Fullness', 'Changes rear and side glute projection.', 'Athletic', 'Full', 'lower-body'),
+  attribute('quadSweep', 'Quad Sweep', 'Changes outer-thigh curvature in front poses.', 'Straight', 'Sweeping', 'lower-body', true),
+  attribute('innerThighThickness', 'Inner-Thigh Thickness', 'Changes space and mass between the thighs.', 'Separated', 'Dense', 'lower-body'),
+  attribute('hamstringDrop', 'Hamstring Drop', 'Changes rear-thigh length and lower contour.', 'High', 'Low', 'lower-body'),
+  attribute('calfWidth', 'Calf Width', 'Changes lower-leg width independently.', 'Defined', 'Wide', 'lower-body'),
+  attribute('calfHeight', 'Calf Height', 'Changes where the calf muscle sits on the lower leg.', 'Low', 'High', 'lower-body'),
+  attribute('ankleThickness', 'Ankle Thickness', 'Changes the transition between calves and shoes.', 'Narrow', 'Thick', 'lower-body'),
+  attribute('bodyFatPresentation', 'Body-Fat Presentation', 'Controls fictional visual softness only; it is not a health assessment.', 'Crisp', 'Soft', 'build'),
+  attribute('muscleFullness', 'Muscle Fullness', 'Changes stylized muscle roundness without changing statistics.', 'Firm', 'Full', 'build', true),
+  attribute('muscleSeparation', 'Muscle Separation', 'Changes contrast between fictional muscle groups.', 'Subtle', 'Deep', 'build', true),
+  attribute('vascularity', 'Vascularity', 'Adds restrained fictional stage-detail pixels.', 'None', 'Pronounced', 'build'),
+  attribute('pumpLevel', 'Pump Level', 'Changes temporary-looking cosmetic fullness only.', 'Rested', 'Stage pump', 'build', true),
+  attribute('posture', 'Posture', 'Changes torso lift and shoulder carriage.', 'Relaxed', 'Stage tall', 'build', true),
+  attribute('stanceWidth', 'Stance Width', 'Changes cosmetic foot and leg spacing.', 'Narrow', 'Wide', 'build', true),
+  attribute('symmetryPreference', 'Symmetry Preference', 'Balances or intentionally offsets the left and right silhouette.', 'Expressive', 'Mirrored', 'build'),
 ];
 
 const BALANCED_BUILD: TrainerCosmeticBuild = {
@@ -61,6 +123,45 @@ const BALANCED_BUILD: TrainerCosmeticBuild = {
   footSize: 5,
   muscleDefinition: 6,
   bodyMass: 7,
+  clavicleWidth: 7,
+  shoulderRoundness: 7,
+  frontDeltSize: 7,
+  sideDeltSize: 7,
+  rearDeltSize: 7,
+  upperChestFullness: 7,
+  lowerChestFullness: 7,
+  latWidth: 7,
+  latFlare: 6,
+  midBackThickness: 6,
+  trapeziusHeight: 6,
+  trapeziusWidth: 6,
+  bicepsPeak: 6,
+  bicepsThickness: 7,
+  tricepsHorseshoeDefinition: 6,
+  forearmThickness: 6,
+  forearmVascularDefinition: 4,
+  ribcageWidth: 6,
+  waistTaper: 6,
+  abdominalDefinition: 6,
+  obliqueDefinition: 5,
+  serratusDefinition: 5,
+  midsectionThickness: 6,
+  hipWidth: 5,
+  gluteFullness: 6,
+  quadSweep: 7,
+  innerThighThickness: 6,
+  hamstringDrop: 6,
+  calfWidth: 6,
+  calfHeight: 5,
+  ankleThickness: 5,
+  bodyFatPresentation: 4,
+  muscleFullness: 7,
+  muscleSeparation: 6,
+  vascularity: 3,
+  pumpLevel: 5,
+  posture: 6,
+  stanceWidth: 5,
+  symmetryPreference: 8,
 };
 
 function buildWith(
@@ -83,6 +184,30 @@ export const TRAINER_PHYSIQUE_PRESETS: TrainerPhysiquePreset[] = [
     build: buildWith({ shoulderWidth: 9, chestSize: 9, upperBackWidth: 9, waistWidth: 3, bicepsSize: 9, tricepsSize: 9, coreDefinition: 9, muscleDefinition: 9 }),
   },
   {
+    id: 'open-bodybuilder',
+    label: 'Open-Mass Builder',
+    description: 'Maximum roundness through the delts, chest, back, arms, and legs with a deliberate stage stance.',
+    build: buildWith({ bodyScale: 9, neckThickness: 8, shoulderWidth: 10, trapeziusSize: 9, chestSize: 10, upperBackWidth: 10, lowerBackThickness: 8, bicepsSize: 10, tricepsSize: 10, forearmSize: 8, waistWidth: 6, gluteSize: 9, quadSize: 10, hamstringSize: 10, calfSize: 9, muscleDefinition: 9, bodyMass: 10 }),
+  },
+  {
+    id: 'taper-performer',
+    label: 'Taper Performer',
+    description: 'Capped shoulders and a broad back frame a narrow waist with long, confident posing lines.',
+    build: buildWith({ height: 7, bodyScale: 5, neckThickness: 5, shoulderWidth: 10, trapeziusSize: 6, chestSize: 8, upperBackWidth: 10, lowerBackThickness: 5, bicepsSize: 7, tricepsSize: 7, forearmSize: 5, waistWidth: 2, gluteSize: 6, quadSize: 6, hamstringSize: 6, calfSize: 6, coreDefinition: 8, muscleDefinition: 8, bodyMass: 5 }),
+  },
+  {
+    id: 'sculpted-physique',
+    label: 'Sculpted Physique',
+    description: 'Dense shoulders, arms, back, and legs balanced around a controlled waist and crisp definition.',
+    build: buildWith({ bodyScale: 7, neckThickness: 6, shoulderWidth: 9, trapeziusSize: 7, chestSize: 8, upperBackWidth: 9, lowerBackThickness: 7, bicepsSize: 9, tricepsSize: 9, forearmSize: 7, waistWidth: 4, gluteSize: 8, quadSize: 9, hamstringSize: 9, calfSize: 8, coreDefinition: 9, muscleDefinition: 10, bodyMass: 7 }),
+  },
+  {
+    id: 'figure-balance',
+    label: 'Figure Balance',
+    description: 'Round delts, a clear back taper, and developed legs create a poised symmetrical silhouette.',
+    build: buildWith({ height: 6, bodyScale: 6, neckThickness: 5, shoulderWidth: 9, trapeziusSize: 6, chestSize: 7, upperBackWidth: 9, lowerBackThickness: 5, bicepsSize: 6, tricepsSize: 7, forearmSize: 5, waistWidth: 3, gluteSize: 8, quadSize: 9, hamstringSize: 8, calfSize: 8, coreDefinition: 8, muscleDefinition: 9, bodyMass: 6 }),
+  },
+  {
     id: 'heavy-powerlifter',
     label: 'Heavy Powerlifter',
     description: 'A dense, grounded frame with a thick torso and powerful legs.',
@@ -95,10 +220,22 @@ export const TRAINER_PHYSIQUE_PRESETS: TrainerPhysiquePreset[] = [
     build: buildWith({ height: 9, bodyScale: 9, neckThickness: 9, trapeziusSize: 10, chestSize: 9, upperBackWidth: 10, handSize: 9, bodyMass: 10 }),
   },
   {
+    id: 'platform-lifter',
+    label: 'Platform Lifter',
+    description: 'Explosive traps, back, hips, and legs support a fast upright lifting posture.',
+    build: buildWith({ height: 5, bodyScale: 6, neckThickness: 8, shoulderWidth: 7, trapeziusSize: 10, chestSize: 7, upperBackWidth: 9, lowerBackThickness: 8, bicepsSize: 6, tricepsSize: 7, forearmSize: 8, waistWidth: 5, gluteSize: 10, quadSize: 10, hamstringSize: 9, calfSize: 8, coreDefinition: 7, muscleDefinition: 8, bodyMass: 7 }),
+  },
+  {
     id: 'lean-fighter',
     label: 'Lean Fighter',
     description: 'Long, mobile proportions with crisp definition and compact mass.',
     build: buildWith({ height: 7, bodyScale: 3, shoulderWidth: 6, waistWidth: 3, quadSize: 6, calfSize: 7, coreDefinition: 10, muscleDefinition: 10, bodyMass: 3 }),
+  },
+  {
+    id: 'lean-athlete',
+    label: 'Lean Athletic',
+    description: 'Long limbs, visible muscle separation, and balanced development support an efficient athletic stance.',
+    build: buildWith({ height: 8, bodyScale: 4, neckThickness: 5, shoulderWidth: 7, trapeziusSize: 5, chestSize: 6, upperBackWidth: 7, lowerBackThickness: 5, bicepsSize: 6, tricepsSize: 6, forearmSize: 6, waistWidth: 3, gluteSize: 6, quadSize: 7, hamstringSize: 7, calfSize: 8, coreDefinition: 10, muscleDefinition: 10, bodyMass: 4 }),
   },
   {
     id: 'compact-powerhouse',
@@ -118,9 +255,152 @@ export const TRAINER_PHYSIQUE_PRESETS: TrainerPhysiquePreset[] = [
     description: 'A dramatic upper-body taper with substantial arms and back width.',
     build: buildWith({ shoulderWidth: 10, trapeziusSize: 9, chestSize: 10, upperBackWidth: 10, bicepsSize: 10, tricepsSize: 10, forearmSize: 8, waistWidth: 3 }),
   },
+  {
+    id: 'classic-aesthetic',
+    label: 'Classic Aesthetic',
+    description: 'Long posing lines, a strong taper, full chest, sweeping quads, and balanced stage detail.',
+    build: buildWith({ height: 7, clavicleWidth: 9, shoulderRoundness: 8, upperChestFullness: 8, latWidth: 9, latFlare: 9, waistWidth: 3, waistTaper: 10, bicepsPeak: 9, quadSweep: 9, calfWidth: 7, muscleSeparation: 9, posture: 9 }),
+  },
+  {
+    id: 'mass-monster',
+    label: 'Mass Monster',
+    description: 'Maximum fictional muscle fullness across a thick torso, dense arms, and heavyweight legs.',
+    build: buildWith({ bodyScale: 10, bodyMass: 10, muscleFullness: 10, pumpLevel: 9, clavicleWidth: 10, sideDeltSize: 10, upperChestFullness: 10, lowerChestFullness: 10, latWidth: 10, midBackThickness: 10, bicepsThickness: 10, forearmThickness: 9, midsectionThickness: 9, gluteFullness: 10, innerThighThickness: 10, calfWidth: 10 }),
+  },
+  {
+    id: 'wide-back-specialist',
+    label: 'Wide-Back Specialist',
+    description: 'A broad clavicle frame with flared lats, rear delts, and layered back thickness.',
+    build: buildWith({ clavicleWidth: 10, shoulderWidth: 10, rearDeltSize: 10, upperBackWidth: 10, latWidth: 10, latFlare: 10, midBackThickness: 9, trapeziusWidth: 9, waistTaper: 9, bicepsSize: 7, quadSize: 6 }),
+  },
+  {
+    id: 'arm-specialist',
+    label: 'Arm Specialist',
+    description: 'High biceps peaks, dense triceps, thick forearms, and rounded delts frame a balanced torso.',
+    build: buildWith({ bicepsSize: 10, bicepsPeak: 10, bicepsThickness: 10, tricepsSize: 10, tricepsHorseshoeDefinition: 10, forearmSize: 10, forearmThickness: 10, forearmVascularDefinition: 9, shoulderRoundness: 9, sideDeltSize: 9, pumpLevel: 9 }),
+  },
+  {
+    id: 'chest-specialist',
+    label: 'Chest Specialist',
+    description: 'A full upper and lower chest sits over a controlled waist and sturdy upper-back base.',
+    build: buildWith({ chestSize: 10, upperChestFullness: 10, lowerChestFullness: 10, clavicleWidth: 9, frontDeltSize: 9, ribcageWidth: 8, waistTaper: 8, tricepsSize: 8, posture: 9 }),
+  },
+  {
+    id: 'shoulder-specialist',
+    label: 'Shoulder Specialist',
+    description: 'Distinct front, side, and rear delts create a wide capped silhouette without excessive torso mass.',
+    build: buildWith({ clavicleWidth: 9, shoulderWidth: 10, shoulderRoundness: 10, frontDeltSize: 10, sideDeltSize: 10, rearDeltSize: 10, trapeziusHeight: 7, trapeziusWidth: 8, waistWidth: 3, waistTaper: 9 }),
+  },
+  {
+    id: 'leg-specialist',
+    label: 'Leg Specialist',
+    description: 'Wide hips, full glutes, sweeping quads, dense inner thighs, dropped hamstrings, and full calves.',
+    build: buildWith({ hipWidth: 8, gluteSize: 10, gluteFullness: 10, quadSize: 10, quadSweep: 10, innerThighThickness: 10, hamstringSize: 10, hamstringDrop: 10, calfSize: 10, calfWidth: 10, stanceWidth: 8, upperBackWidth: 5 }),
+  },
+  {
+    id: 'posterior-chain-specialist',
+    label: 'Posterior-Chain Specialist',
+    description: 'Rear delts, traps, back thickness, glutes, hamstrings, and calves dominate the back view.',
+    build: buildWith({ rearDeltSize: 10, trapeziusSize: 9, trapeziusHeight: 9, trapeziusWidth: 9, upperBackWidth: 9, midBackThickness: 10, lowerBackThickness: 10, gluteFullness: 10, hamstringDrop: 10, calfWidth: 9 }),
+  },
+  {
+    id: 'balanced-stage-physique',
+    label: 'Balanced Stage Physique',
+    description: 'Symmetrical development, poised posture, complete limbs, and polished fictional stage presentation.',
+    build: buildWith({ shoulderRoundness: 8, upperChestFullness: 8, latFlare: 8, bicepsPeak: 8, tricepsHorseshoeDefinition: 8, waistTaper: 8, abdominalDefinition: 8, quadSweep: 8, hamstringDrop: 8, calfWidth: 8, muscleSeparation: 8, symmetryPreference: 10, posture: 9 }),
+  },
+  {
+    id: 'compact-heavyweight',
+    label: 'Compact Heavyweight',
+    description: 'A short, dense frame with a thick torso, powerful limbs, and a wide planted stance.',
+    build: buildWith({ height: 1, bodyScale: 9, bodyMass: 10, neckThickness: 9, clavicleWidth: 8, midBackThickness: 9, bicepsThickness: 9, forearmThickness: 9, midsectionThickness: 9, hipWidth: 8, innerThighThickness: 9, ankleThickness: 8, stanceWidth: 8 }),
+  },
+  {
+    id: 'lean-shredded',
+    label: 'Lean Shredded',
+    description: 'A lean muscular frame with high fictional separation, etched core detail, and restrained fullness.',
+    build: buildWith({ height: 8, bodyScale: 3, bodyMass: 3, bodyFatPresentation: 0, muscleFullness: 5, muscleDefinition: 10, muscleSeparation: 10, vascularity: 8, forearmVascularDefinition: 9, abdominalDefinition: 10, obliqueDefinition: 10, serratusDefinition: 10, waistTaper: 9, posture: 9 }),
+  },
+  {
+    id: 'off-season-power-build',
+    label: 'Off-Season Power Build',
+    description: 'A full, recovery-ready strength silhouette with dense legs, torso thickness, and lower visual separation.',
+    build: buildWith({ bodyScale: 8, bodyMass: 9, bodyFatPresentation: 8, muscleFullness: 9, muscleSeparation: 3, vascularity: 1, ribcageWidth: 8, midsectionThickness: 9, lowerBackThickness: 9, hipWidth: 8, gluteFullness: 9, innerThighThickness: 9, ankleThickness: 7, posture: 6 }),
+  },
 ];
 
 export const DEFAULT_TRAINER_PHYSIQUE_PRESET_ID = 'balanced-athlete';
+
+export const TRAINER_RANDOMIZATION_FILTERS: Array<{
+  id: TrainerRandomizationFilter;
+  label: string;
+}> = [
+  { id: 'any-physique', label: 'Any Physique' },
+  { id: 'heavy-builds', label: 'Heavy Builds Only' },
+  { id: 'lean-builds', label: 'Lean Builds Only' },
+  { id: 'upper-body-dominant', label: 'Upper-Body Dominant' },
+  { id: 'lower-body-dominant', label: 'Lower-Body Dominant' },
+  { id: 'balanced', label: 'Balanced' },
+  { id: 'fantasy-gym-champion', label: 'Fantasy Gym Champion' },
+  { id: 'realistic-athletic', label: 'Realistic Athletic' },
+  { id: 'wild-colors', label: 'Wild Colors' },
+  { id: 'neutral-colors', label: 'Neutral Colors' },
+];
+
+export const TRAINER_RANDOMIZATION_PRESET_IDS: Record<
+  TrainerRandomizationFilter,
+  readonly string[]
+> = {
+  'any-physique': TRAINER_PHYSIQUE_PRESETS.map(({ id }) => id),
+  'heavy-builds': [
+    'mass-monster',
+    'open-bodybuilder',
+    'heavy-powerlifter',
+    'strongman',
+    'compact-heavyweight',
+    'off-season-power-build',
+  ],
+  'lean-builds': [
+    'classic-aesthetic',
+    'taper-performer',
+    'lean-fighter',
+    'lean-athlete',
+    'lean-shredded',
+  ],
+  'upper-body-dominant': [
+    'wide-back-specialist',
+    'arm-specialist',
+    'chest-specialist',
+    'shoulder-specialist',
+    'upper-body-specialist',
+  ],
+  'lower-body-dominant': [
+    'leg-specialist',
+    'posterior-chain-specialist',
+    'lower-body-specialist',
+    'platform-lifter',
+  ],
+  balanced: [
+    'balanced-athlete',
+    'balanced-stage-physique',
+    'sculpted-physique',
+    'figure-balance',
+  ],
+  'fantasy-gym-champion': [
+    'mass-monster',
+    'open-bodybuilder',
+    'strongman',
+    'balanced-stage-physique',
+  ],
+  'realistic-athletic': [
+    'balanced-athlete',
+    'classic-aesthetic',
+    'lean-athlete',
+    'figure-balance',
+  ],
+  'wild-colors': TRAINER_PHYSIQUE_PRESETS.map(({ id }) => id),
+  'neutral-colors': TRAINER_PHYSIQUE_PRESETS.map(({ id }) => id),
+};
 
 function options(entries: Array<[string, string, string?]>): TrainerAppearanceOption[] {
   return entries.map(([id, label, description]) => ({ id, label, description }));
@@ -234,15 +514,19 @@ export const TRAINER_HAIR_LENGTHS = options([
 
 export const TRAINER_TOPS = options([
   ['tee-panel', 'Panel Shirt'],
-  ['tank-racer', 'Racer Tank'],
+  ['tank-racer', 'Racerback Tank'],
+  ['tank-stringer', 'Stringer Tank'],
+  ['pump-cover-oversized', 'Oversized Pump Cover'],
   ['hoodie-sleeveless', 'Sleeveless Hoodie'],
   ['hoodie-training', 'Training Hoodie'],
   ['compression-short', 'Compression Top'],
   ['compression-long', 'Long Compression Top'],
+  ['posing-top', 'Competition Posing Top'],
 ]);
 export const TRAINER_BOTTOMS = options([
   ['shorts-split', 'Split Shorts'],
   ['shorts-training', 'Training Shorts'],
+  ['shorts-posing', 'Competition Posing Shorts'],
   ['joggers-taper', 'Tapered Joggers'],
   ['leggings-panel', 'Panel Leggings'],
 ]);
@@ -250,6 +534,7 @@ export const TRAINER_SHOES = options([
   ['trainer-low', 'Low Trainers'],
   ['trainer-high', 'High Trainers'],
   ['lifting-flat', 'Flat Lifters'],
+  ['lifting-raised', 'Raised Lifting Shoes'],
   ['runner-light', 'Light Runners'],
   ['boot-strong', 'Strong Boots'],
   ['wrap-shoes', 'Wrap Shoes'],
@@ -283,6 +568,19 @@ export const TRAINER_KNEE_SLEEVES = options([
   ['short', 'Short Sleeve'],
   ['reinforced', 'Reinforced'],
 ]);
+export const TRAINER_LOGO_SHAPES = options([
+  ['none', 'No Logo'],
+  ['forge-diamond', 'Forge Diamond'],
+  ['pulse-plate', 'Pulse Plate'],
+  ['split-anvil', 'Split Anvil'],
+  ['summit-bars', 'Summit Bars'],
+]);
+export const TRAINER_CHALK_MARKS = options([
+  ['none', 'No Chalk'],
+  ['palms', 'Palm Chalk'],
+  ['wrap-dust', 'Wrap Dust'],
+  ['shoulder-smudge', 'Shoulder Smudge'],
+]);
 export const TRAINER_HEADWEAR = options([
   ['none', 'None'],
   ['headband', 'Headband'],
@@ -315,6 +613,12 @@ export const TRAINER_FANTASY_ACCESSORIES = options([
   ['cape-banner', 'Banner Cape'],
   ['aura-ribbon', 'Aura Ribbon'],
   ['shoulder-mantle', 'Champion Mantle'],
+]);
+export const TRAINER_TOWELS = options([
+  ['none', 'No Towel'],
+  ['shoulder-small', 'Shoulder Towel'],
+  ['belt-loop', 'Belt-Loop Towel'],
+  ['gym-stripe', 'Striped Gym Towel'],
 ]);
 
 export const TRAINER_SKIN_TONES: TrainerColorOption[] = [
@@ -375,11 +679,14 @@ export const TRAINER_APPEARANCE_OPTION_GROUPS = {
   wristWraps: TRAINER_WRIST_WRAPS,
   elbowSleeves: TRAINER_ELBOW_SLEEVES,
   kneeSleeves: TRAINER_KNEE_SLEEVES,
+  logoShapes: TRAINER_LOGO_SHAPES,
+  chalkMarks: TRAINER_CHALK_MARKS,
   headwear: TRAINER_HEADWEAR,
   belts: TRAINER_BELTS,
   gymBags: TRAINER_GYM_BAGS,
   jewelry: TRAINER_JEWELRY,
   fantasy: TRAINER_FANTASY_ACCESSORIES,
+  towels: TRAINER_TOWELS,
 } as const;
 
 export const DEFAULT_TRAINER_APPEARANCE: TrainerAppearance = {
@@ -413,6 +720,8 @@ export const DEFAULT_TRAINER_APPEARANCE: TrainerAppearance = {
     wristWrapsId: 'single',
     elbowSleevesId: 'none',
     kneeSleevesId: 'none',
+    logoShapeId: 'forge-diamond',
+    chalkMarksId: 'none',
   },
   colors: {
     skinToneId: 'honey-warm',
@@ -425,6 +734,8 @@ export const DEFAULT_TRAINER_APPEARANCE: TrainerAppearance = {
     shoeAccentId: 'coral',
     accessoryPrimaryId: 'amber',
     accessoryAccentId: 'mint',
+    trimColorId: 'amber',
+    logoColorId: 'chalk',
   },
   accessories: {
     headwearId: 'none',
@@ -432,6 +743,7 @@ export const DEFAULT_TRAINER_APPEARANCE: TrainerAppearance = {
     gymBagId: 'none',
     jewelryId: 'none',
     fantasyId: 'none',
+    towelId: 'none',
   },
 };
 

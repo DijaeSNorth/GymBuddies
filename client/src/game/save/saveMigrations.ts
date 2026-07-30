@@ -11,7 +11,15 @@ import type { SaveAccessibilitySettings } from '../types';
 
 type UnknownRecord = Record<string, unknown>;
 
-export type SupportedSaveSchemaVersion = 12 | 13 | 14 | 15 | 16;
+export type SupportedSaveSchemaVersion =
+  | 12
+  | 13
+  | 14
+  | 15
+  | 16
+  | 17
+  | 18
+  | 19;
 
 export type SaveMigrationResult =
   | {
@@ -58,6 +66,9 @@ export function detectSaveSchemaVersion(
   if (payload.version === 'v14') return 14;
   if (payload.version === 'v15') return 15;
   if (payload.version === 'v16') return 16;
+  if (payload.version === 'v17') return 17;
+  if (payload.version === 'v18') return 18;
+  if (payload.version === 'v19') return 19;
   if (payload.version === 'v12') return 12;
   if (
     'trainer' in payload ||
@@ -165,6 +176,57 @@ function migrateV15ToV16(raw: UnknownRecord) {
     : raw.team;
   return {
     ...raw,
+    schemaVersion: 16,
+    version: 'v16',
+    team,
+  };
+}
+
+function migrateV16ToV17(raw: UnknownRecord) {
+  return {
+    ...raw,
+    schemaVersion: 17,
+    version: 'v17',
+  };
+}
+
+function migrateV17ToV18(raw: UnknownRecord) {
+  return {
+    ...raw,
+    schemaVersion: 18,
+    version: 'v18',
+    visualProgression: isRecord(raw.visualProgression)
+      ? raw.visualProgression
+      : null,
+  };
+}
+
+function migrateV18ToV19(raw: UnknownRecord) {
+  const team = Array.isArray(raw.team)
+    ? raw.team.map((entry) => {
+        if (!isRecord(entry)) return entry;
+        const creature = isRecord(entry.creature) ? entry.creature : null;
+        const speciesId =
+          typeof entry.speciesId === 'string'
+            ? entry.speciesId
+            : creature && typeof creature.id === 'string'
+              ? creature.id
+              : null;
+        if (
+          !speciesId ||
+          !BUDDY_CHARACTER_DESIGN_BY_SPECIES_ID.has(speciesId)
+        ) return entry;
+        return {
+          ...entry,
+          cosmetics: normalizeBuddyCosmetics(
+            speciesId,
+            isRecord(entry.cosmetics) ? entry.cosmetics : undefined,
+          ),
+        };
+      })
+    : raw.team;
+  return {
+    ...raw,
     schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
     version: SAVE_VERSION,
     team,
@@ -239,6 +301,18 @@ export function migrateSaveToCurrent(
   if (detectedVersion <= 15) {
     current = migrateV15ToV16(current);
     appliedMigrations.push('v15-to-v16');
+  }
+  if (detectedVersion <= 16) {
+    current = migrateV16ToV17(current);
+    appliedMigrations.push('v16-to-v17');
+  }
+  if (detectedVersion <= 17) {
+    current = migrateV17ToV18(current);
+    appliedMigrations.push('v17-to-v18');
+  }
+  if (detectedVersion <= 18) {
+    current = migrateV18ToV19(current);
+    appliedMigrations.push('v18-to-v19');
   }
   return {
     ok: true,

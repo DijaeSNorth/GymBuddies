@@ -7,17 +7,21 @@ import {
   TRAINER_BUILD_MAX,
   TRAINER_BUILD_MIN,
   TRAINER_COLOR_OPTIONS,
+  TRAINER_PHYSIQUE_PRESETS,
+  TRAINER_RANDOMIZATION_PRESET_IDS,
   TRAINER_SKIN_TONES,
   cloneTrainerAppearance,
 } from '../content/trainerAppearance';
 import type {
   TrainerAppearance,
+  TrainerAppearanceExportEnvelope,
   TrainerAppearancePreset,
   TrainerBuildAttributeId,
   TrainerColorAppearance,
   TrainerFaceAppearance,
   TrainerHairAppearance,
   TrainerOutfitAppearance,
+  TrainerRandomizationFilter,
   TrainerAccessoryAppearance,
 } from '../types';
 import { clamp } from './math';
@@ -145,6 +149,8 @@ export function normalizeTrainerAppearance(
       wristWrapsId: TRAINER_APPEARANCE_OPTION_GROUPS.wristWraps,
       elbowSleevesId: TRAINER_APPEARANCE_OPTION_GROUPS.elbowSleeves,
       kneeSleevesId: TRAINER_APPEARANCE_OPTION_GROUPS.kneeSleeves,
+      logoShapeId: TRAINER_APPEARANCE_OPTION_GROUPS.logoShapes,
+      chalkMarksId: TRAINER_APPEARANCE_OPTION_GROUPS.chalkMarks,
     },
     issues,
     'Outfit',
@@ -163,6 +169,8 @@ export function normalizeTrainerAppearance(
       shoeAccentId: TRAINER_COLOR_OPTIONS,
       accessoryPrimaryId: TRAINER_COLOR_OPTIONS,
       accessoryAccentId: TRAINER_COLOR_OPTIONS,
+      trimColorId: TRAINER_COLOR_OPTIONS,
+      logoColorId: TRAINER_COLOR_OPTIONS,
     },
     issues,
     'Color',
@@ -176,6 +184,7 @@ export function normalizeTrainerAppearance(
       gymBagId: TRAINER_APPEARANCE_OPTION_GROUPS.gymBags,
       jewelryId: TRAINER_APPEARANCE_OPTION_GROUPS.jewelry,
       fantasyId: TRAINER_APPEARANCE_OPTION_GROUPS.fantasy,
+      towelId: TRAINER_APPEARANCE_OPTION_GROUPS.towels,
     },
     issues,
     'Accessory',
@@ -260,21 +269,96 @@ function pick<T>(values: readonly T[], state: { seed: number }) {
 
 export function randomizeTrainerAppearance(
   seed: number,
+  filter: TrainerRandomizationFilter = 'any-physique',
 ): TrainerAppearance {
   const state = { seed: seed >>> 0 || 0x47594d42 };
+  const presetIds = TRAINER_RANDOMIZATION_PRESET_IDS[filter];
+  const presetId = pick(presetIds, state);
+  const preset =
+    TRAINER_PHYSIQUE_PRESETS.find((entry) => entry.id === presetId) ??
+    TRAINER_PHYSIQUE_PRESETS[0]!;
   const build = Object.fromEntries(
     TRAINER_BUILD_ATTRIBUTES.map((attribute) => [
       attribute.id,
-      2 + Math.floor(pick([0, 1, 2, 3, 4, 5, 6, 7, 8], state)),
+      clamp(
+        preset.build[attribute.id] + pick([-1, 0, 0, 0, 1], state),
+        TRAINER_BUILD_MIN,
+        TRAINER_BUILD_MAX,
+      ),
     ]),
   ) as TrainerAppearance['build'];
   // Every randomized result remains intentionally athletic and muscular.
   build.shoulderWidth = Math.max(5, build.shoulderWidth);
+  build.clavicleWidth = Math.max(5, build.clavicleWidth);
+  build.shoulderRoundness = Math.max(5, build.shoulderRoundness);
   build.chestSize = Math.max(5, build.chestSize);
   build.bicepsSize = Math.max(5, build.bicepsSize);
   build.tricepsSize = Math.max(5, build.tricepsSize);
   build.quadSize = Math.max(5, build.quadSize);
   build.bodyMass = Math.max(3, build.bodyMass);
+  build.muscleFullness = Math.max(5, build.muscleFullness);
+  if (filter === 'heavy-builds') {
+    build.bodyMass = Math.max(8, build.bodyMass);
+    build.muscleFullness = Math.max(8, build.muscleFullness);
+    build.midsectionThickness = Math.max(7, build.midsectionThickness);
+  }
+  if (filter === 'lean-builds') {
+    build.bodyMass = Math.min(5, build.bodyMass);
+    build.bodyFatPresentation = Math.min(3, build.bodyFatPresentation);
+    build.muscleSeparation = Math.max(8, build.muscleSeparation);
+  }
+  if (filter === 'upper-body-dominant') {
+    build.shoulderWidth = Math.max(8, build.shoulderWidth);
+    build.latWidth = Math.max(8, build.latWidth);
+    build.bicepsThickness = Math.max(8, build.bicepsThickness);
+    build.quadSweep = Math.min(7, build.quadSweep);
+  }
+  if (filter === 'lower-body-dominant') {
+    build.gluteFullness = Math.max(8, build.gluteFullness);
+    build.quadSweep = Math.max(8, build.quadSweep);
+    build.hamstringDrop = Math.max(8, build.hamstringDrop);
+    build.shoulderWidth = Math.min(8, build.shoulderWidth);
+  }
+  if (filter === 'balanced' || filter === 'realistic-athletic') {
+    build.symmetryPreference = Math.max(8, build.symmetryPreference);
+  }
+
+  const neutralColorIds = new Set([
+    'ink',
+    'chalk',
+    'navy',
+    'moss',
+    'silver',
+    'copper',
+  ]);
+  const wildColorIds = new Set([
+    'amber',
+    'coral',
+    'mint',
+    'ocean',
+    'plum',
+    'teal',
+  ]);
+  const colorPool =
+    filter === 'neutral-colors' || filter === 'realistic-athletic'
+      ? TRAINER_COLOR_OPTIONS.filter((option) =>
+          neutralColorIds.has(option.id),
+        )
+      : filter === 'wild-colors'
+        ? TRAINER_COLOR_OPTIONS.filter((option) =>
+            wildColorIds.has(option.id),
+          )
+      : TRAINER_COLOR_OPTIONS;
+  const hairColorPool =
+    filter === 'neutral-colors' || filter === 'realistic-athletic'
+      ? TRAINER_COLOR_OPTIONS.filter((option) =>
+          neutralColorIds.has(option.id),
+        )
+      : colorPool;
+  const fantasyAccessories =
+    TRAINER_APPEARANCE_OPTION_GROUPS.fantasy.filter(
+      (option) => option.id !== 'none',
+    );
 
   const appearance: TrainerAppearance = {
     version: TRAINER_APPEARANCE_VERSION,
@@ -295,8 +379,8 @@ export function randomizeTrainerAppearance(
     hair: {
       styleId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.hairStyles, state).id,
       lengthId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.hairLengths, state).id,
-      colorId: pick(TRAINER_COLOR_OPTIONS, state).id,
-      highlightColorId: pick(TRAINER_COLOR_OPTIONS, state).id,
+      colorId: pick(hairColorPool, state).id,
+      highlightColorId: pick(hairColorPool, state).id,
     },
     outfit: {
       topId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.tops, state).id,
@@ -307,29 +391,102 @@ export function randomizeTrainerAppearance(
       wristWrapsId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.wristWraps, state).id,
       elbowSleevesId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.elbowSleeves, state).id,
       kneeSleevesId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.kneeSleeves, state).id,
+      logoShapeId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.logoShapes, state).id,
+      chalkMarksId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.chalkMarks, state).id,
     },
     colors: {
       skinToneId: pick(TRAINER_SKIN_TONES, state).id,
-      topPrimaryId: pick(TRAINER_COLOR_OPTIONS, state).id,
-      topSecondaryId: pick(TRAINER_COLOR_OPTIONS, state).id,
-      topAccentId: pick(TRAINER_COLOR_OPTIONS, state).id,
-      bottomPrimaryId: pick(TRAINER_COLOR_OPTIONS, state).id,
-      bottomSecondaryId: pick(TRAINER_COLOR_OPTIONS, state).id,
-      shoePrimaryId: pick(TRAINER_COLOR_OPTIONS, state).id,
-      shoeAccentId: pick(TRAINER_COLOR_OPTIONS, state).id,
-      accessoryPrimaryId: pick(TRAINER_COLOR_OPTIONS, state).id,
-      accessoryAccentId: pick(TRAINER_COLOR_OPTIONS, state).id,
+      topPrimaryId: pick(colorPool, state).id,
+      topSecondaryId: pick(colorPool, state).id,
+      topAccentId: pick(colorPool, state).id,
+      bottomPrimaryId: pick(colorPool, state).id,
+      bottomSecondaryId: pick(colorPool, state).id,
+      shoePrimaryId: pick(colorPool, state).id,
+      shoeAccentId: pick(colorPool, state).id,
+      accessoryPrimaryId: pick(colorPool, state).id,
+      accessoryAccentId: pick(colorPool, state).id,
+      trimColorId: pick(colorPool, state).id,
+      logoColorId: pick(colorPool, state).id,
     },
     accessories: {
       headwearId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.headwear, state).id,
       beltId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.belts, state).id,
       gymBagId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.gymBags, state).id,
       jewelryId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.jewelry, state).id,
-      fantasyId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.fantasy, state).id,
+      fantasyId:
+        filter === 'fantasy-gym-champion'
+          ? pick(fantasyAccessories, state).id
+          : filter === 'realistic-athletic'
+            ? 'none'
+            : pick(TRAINER_APPEARANCE_OPTION_GROUPS.fantasy, state).id,
+      towelId: pick(TRAINER_APPEARANCE_OPTION_GROUPS.towels, state).id,
     },
   };
   if (appearance.hair.styleId === 'bald') appearance.hair.lengthId = 'none';
   return appearance;
+}
+
+export const TRAINER_APPEARANCE_IMPORT_MAX_BYTES = 65_536;
+
+export function exportTrainerAppearanceJson(
+  appearance: TrainerAppearance,
+  exportedAt = new Date().toISOString(),
+) {
+  const envelope: TrainerAppearanceExportEnvelope = {
+    format: 'gym-buddies-appearance',
+    version: TRAINER_APPEARANCE_VERSION,
+    exportedAt,
+    appearance: cloneTrainerAppearance(appearance),
+  };
+  return JSON.stringify(envelope, null, 2);
+}
+
+export function importTrainerAppearanceJson(
+  json: string,
+):
+  | {
+      ok: true;
+      appearance: TrainerAppearance;
+      issues: string[];
+    }
+  | {
+      ok: false;
+      message: string;
+    } {
+  if (new TextEncoder().encode(json).byteLength > TRAINER_APPEARANCE_IMPORT_MAX_BYTES) {
+    return {
+      ok: false,
+      message: 'Appearance JSON is larger than the 64 KB safety limit.',
+    };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return { ok: false, message: 'Appearance JSON could not be parsed.' };
+  }
+  if (!isRecord(parsed) || parsed.format !== 'gym-buddies-appearance') {
+    return {
+      ok: false,
+      message: 'This file is not a Gym Buddies appearance export.',
+    };
+  }
+  if (
+    typeof parsed.version !== 'number' ||
+    parsed.version < 2 ||
+    parsed.version > TRAINER_APPEARANCE_VERSION
+  ) {
+    return {
+      ok: false,
+      message: 'This appearance version is not supported.',
+    };
+  }
+  const normalized = normalizeTrainerAppearance(parsed.appearance);
+  return {
+    ok: true,
+    appearance: normalized.appearance,
+    issues: normalized.issues,
+  };
 }
 
 export function updateTrainerBuildValue(

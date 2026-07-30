@@ -1971,6 +1971,13 @@ html[data-gb-high-contrast='true'] :focus-visible {
   border: 1px solid #315b6e;
 }
 
+.buddy-customizer-help {
+  margin: 4px 0 8px;
+  color: #8fb5bf;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
 .buddy-accessory-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2282,14 +2289,40 @@ html[data-gb-high-contrast='true'] :focus-visible {
   line-height: 1.45;
 }
 
+.workout-muscle-callout {
+  display: block;
+  margin: -2px 0 5px;
+  color: #f2c14e;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  line-height: 1.45;
+  text-transform: uppercase;
+}
+
 .workout-machine-visual {
   position: relative;
-  min-height: 54px;
+  min-height: 78px;
   overflow: hidden;
   border: 2px solid #315c73;
   background:
     linear-gradient(90deg, rgba(104, 211, 155, 0.06), transparent 45%),
     repeating-linear-gradient(90deg, #061923 0 11px, #091f2d 11px 12px);
+}
+
+.workout-trainer-pose {
+  position: absolute;
+  z-index: 2;
+  bottom: 1px;
+  left: 7px;
+  display: grid;
+  place-items: end center;
+  width: 56px;
+  height: 74px;
+}
+
+.workout-trainer-pose canvas {
+  max-width: none;
+  image-rendering: pixelated;
 }
 
 .workout-machine-visual > span {
@@ -2301,7 +2334,7 @@ html[data-gb-high-contrast='true'] :focus-visible {
   position: absolute;
   top: 8px;
   right: 8px;
-  max-width: 46%;
+  max-width: 42%;
   color: #eef2d0;
   font-size: 8px;
   letter-spacing: 0.06em;
@@ -2310,24 +2343,24 @@ html[data-gb-high-contrast='true'] :focus-visible {
 }
 
 .workout-machine-upright {
-  top: 6px;
+  top: 17px;
   width: 4px;
-  height: 40px;
+  height: 52px;
   border: 1px solid #061519;
   background: #285057;
 }
 
 .workout-machine-upright-left {
-  left: 18px;
+  left: 72px;
 }
 
 .workout-machine-upright-right {
-  left: 58px;
+  left: 112px;
 }
 
 .workout-machine-cable {
-  top: 7px;
-  left: 37px;
+  top: 18px;
+  left: 91px;
   width: 2px;
   height: 24px;
   background: #b9d8c4;
@@ -2335,8 +2368,8 @@ html[data-gb-high-contrast='true'] :focus-visible {
 }
 
 .workout-machine-handle {
-  top: 29px;
-  left: 29px;
+  top: 40px;
+  left: 83px;
   width: 19px;
   height: 4px;
   border-inline: 4px solid #ef6a5b;
@@ -2344,7 +2377,7 @@ html[data-gb-high-contrast='true'] :focus-visible {
 }
 
 .workout-machine-pad {
-  left: 23px;
+  left: 77px;
   bottom: 6px;
   width: 32px;
   height: 8px;
@@ -3071,6 +3104,24 @@ html[data-gb-high-contrast='true'] :focus-visible {
 
 .combat-figure-opponent {
   filter: drop-shadow(0 0 0 rgba(248, 113, 113, 0));
+}
+
+.combat-figure-opponent.boss-lighting-pumped {
+  filter: drop-shadow(0 0 3px rgba(242, 193, 78, 0.45));
+}
+
+.combat-figure-opponent.boss-lighting-overload {
+  filter: drop-shadow(0 0 5px rgba(239, 106, 91, 0.62));
+}
+
+.combat-figure-opponent.boss-lighting-final {
+  filter:
+    drop-shadow(-2px 0 3px rgba(104, 211, 155, 0.55))
+    drop-shadow(2px 0 3px rgba(242, 193, 78, 0.55));
+}
+
+.combat-figure-opponent.boss-lighting-defeated {
+  filter: saturate(0.72) brightness(0.9);
 }
 
 .combat-stage-lock .combat-figure-fighter {

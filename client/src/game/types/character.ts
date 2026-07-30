@@ -1,5 +1,6 @@
 import type { BuddyDiscipline } from './buddy';
 import type {
+  TrainerBuildAttributeId,
   TrainerFacingDirection,
   TrainerPose,
 } from './trainer';
@@ -14,7 +15,13 @@ export type MuscularBodyArchetypeId =
   | 'lower-body-specialist'
   | 'upper-body-specialist'
   | 'mobility-specialist'
-  | 'heavyweight-anchor';
+  | 'heavyweight-anchor'
+  | 'open-bodybuilder'
+  | 'taper-performer'
+  | 'sculpted-physique'
+  | 'figure-balance'
+  | 'platform-lifter'
+  | 'lean-athlete';
 
 export type MuscularBodyArchetype = {
   id: MuscularBodyArchetypeId;
@@ -41,6 +48,10 @@ export type CharacterAppearanceRecipe = {
   skinToneId: string;
   faceShapeId: string;
   eyesId: string;
+  eyebrowsId: string;
+  noseId: string;
+  mouthId: string;
+  facialHairId: string;
   hairStyleId: string;
   hairLengthId: string;
   hairColorId: string;
@@ -56,6 +67,22 @@ export type CharacterAppearanceRecipe = {
   accentColorId: string;
 };
 
+export type CharacterOutfitVariant = {
+  id: string;
+  label: string;
+  topId: string;
+  bottomsId: string;
+  primaryColorId: string;
+  secondaryColorId: string;
+  accentColorId: string;
+};
+
+export type CharacterSponsorPatch = {
+  id: string;
+  label: string;
+  symbol: 'anchor' | 'arc' | 'knot' | 'spark' | 'summit';
+};
+
 export type WorldCharacterKind =
   | 'npc-trainer'
   | 'rival'
@@ -69,12 +96,22 @@ export type WorldCharacterDesign = {
   appearance: CharacterAppearanceRecipe;
   idlePose: TrainerPose;
   expressionId: CharacterExpressionId;
+  primaryMuscleEmphasis: TrainerBuildAttributeId;
+  regionalMuscleEmphasis: TrainerBuildAttributeId[];
   trainingPhilosophy: string;
   signaturePose: TrainerPose;
+  warmupAnimationId: string;
+  victoryPose: TrainerPose;
+  lossReactionId: string;
   signatureClothing: string;
+  signatureOutfitId: string;
+  alternateLateGameOutfit: CharacterOutfitVariant;
   signatureEquipment: string;
+  gymAccessoryId: string;
+  sponsorPatch: CharacterSponsorPatch;
   battleStance: string;
   entranceAnimationId: string;
+  idleAnimationId: string;
   victoryAnimationId: string;
   handcrafted: boolean;
 };
@@ -90,8 +127,22 @@ export type NpcAppearanceTemplate = {
   topIds: string[];
   bottomIds: string[];
   accessoryIds: string[];
+  facialHairIds: string[];
+  eyebrowIds: string[];
+  regionalOutfitIds: string[];
+  trainingSpecialtyIds: string[];
+  posePreferenceIds: TrainerPose[];
   expressionIds: CharacterExpressionId[];
   idlePoseIds: TrainerPose[];
+};
+
+export type NpcOutfitCombination = {
+  id: string;
+  regionId: string;
+  topId: string;
+  bottomsId: string;
+  shoesId: string;
+  accessoryId: string;
 };
 
 export type NpcCharacterSeed = {

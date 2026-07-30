@@ -20,23 +20,36 @@ import type {
   TrainerAppearanceCategory,
   TrainerAppearanceOption,
   TrainerBuildAttributeId,
+  TrainerBuildRegion,
   TrainerColorOption,
   TrainerCreationDraft,
+  TrainerForgeMode,
   TrainerMuscleId,
 } from '../../game/types';
 
 export const TRAINER_CUSTOMIZATION_TABS: Array<{
   id: TrainerAppearanceCategory;
   label: string;
+  detailOnly?: boolean;
 }> = [
   { id: 'build', label: 'Build' },
+  { id: 'upper-body', label: 'Upper Body', detailOnly: true },
+  { id: 'core', label: 'Core', detailOnly: true },
+  { id: 'lower-body', label: 'Lower Body', detailOnly: true },
   { id: 'face', label: 'Face' },
   { id: 'hair', label: 'Hair' },
   { id: 'outfit', label: 'Outfit' },
   { id: 'colors', label: 'Colors' },
   { id: 'accessories', label: 'Accessories' },
-  { id: 'preview', label: 'Preview' },
+  { id: 'poses', label: 'Poses' },
+  { id: 'saved-looks', label: 'Saved Looks' },
 ];
+
+function cosmeticBuildBand(value: number) {
+  if (value <= 3) return 'Athletic';
+  if (value <= 7) return 'Developed';
+  return 'Showcase';
+}
 
 function OptionSelect({
   label,
@@ -112,49 +125,70 @@ function ColorPicker({
 function BuildControls({
   appearance,
   draft,
+  forgeMode,
   onAppearanceChange,
   onGameplayPresetSelect,
   onMuscleChange,
   onPhysiquePresetSelect,
+  region,
 }: {
   appearance: TrainerAppearance;
   draft: TrainerCreationDraft;
+  forgeMode: TrainerForgeMode;
   onAppearanceChange: (appearance: TrainerAppearance) => void;
   onGameplayPresetSelect: (presetId: string) => void;
   onMuscleChange: (key: TrainerMuscleId, value: number) => void;
   onPhysiquePresetSelect: (presetId: string) => void;
+  region: TrainerBuildRegion;
 }) {
   const changeBuild = (key: TrainerBuildAttributeId, value: number) => {
     onAppearanceChange(updateTrainerBuildValue(appearance, key, value));
   };
+  const visibleBuildAttributes = TRAINER_BUILD_ATTRIBUTES.filter(
+    (attribute) =>
+      forgeMode === 'quick'
+        ? attribute.quick
+        : attribute.region === region,
+  );
   return (
     <div className="trainer-tab-stack">
-      <section className="trainer-custom-section">
+      <details className="trainer-custom-section trainer-control-group" open>
+        <summary>
+          {forgeMode === 'quick'
+            ? 'Quick physique controls'
+            : `${TRAINER_CUSTOMIZATION_TABS.find((tab) => tab.id === region)?.label ?? 'Build'} controls`}
+        </summary>
         <div className="trainer-custom-copy">
-          <h3>Cosmetic physique</h3>
+          <h3>
+            {forgeMode === 'quick'
+              ? 'Strong silhouette essentials'
+              : 'Detailed fictional proportions'}
+          </h3>
           <p>
-            Presets are starting points. Every proportion remains adjustable,
-            and even minimum values preserve an intentionally athletic frame.
+            These are stylized RPG appearance controls, not health or medical
+            measurements. Cosmetic settings never change combat power.
           </p>
         </div>
-        <div className="trainer-physique-presets">
-          {TRAINER_PHYSIQUE_PRESETS.map((preset) => (
-            <button
-              className={
-                draft.physiquePresetId === preset.id ? 'active' : ''
-              }
-              data-setup-control="true"
-              key={preset.id}
-              onClick={() => onPhysiquePresetSelect(preset.id)}
-              type="button"
-            >
-              <strong>{preset.label}</strong>
-              <small>{preset.description}</small>
-            </button>
-          ))}
-        </div>
+        {region === 'build' ? (
+          <div className="trainer-physique-presets">
+            {TRAINER_PHYSIQUE_PRESETS.map((preset) => (
+              <button
+                className={
+                  draft.physiquePresetId === preset.id ? 'active' : ''
+                }
+                data-setup-control="true"
+                key={preset.id}
+                onClick={() => onPhysiquePresetSelect(preset.id)}
+                type="button"
+              >
+                <strong>{preset.label}</strong>
+                <small>{preset.description}</small>
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="trainer-build-controls">
-          {TRAINER_BUILD_ATTRIBUTES.map((attribute) => {
+          {visibleBuildAttributes.map((attribute) => {
             const value = appearance.build[attribute.id];
             return (
               <div className="trainer-build-control" key={attribute.id}>
@@ -186,7 +220,7 @@ function BuildControls({
                     value={value}
                   />
                   <output htmlFor={`trainer-build-${attribute.id}`}>
-                    {value}
+                    {value} · {cosmeticBuildBand(value)}
                   </output>
                   <button
                     aria-label={`Increase cosmetic ${attribute.label}`}
@@ -201,9 +235,11 @@ function BuildControls({
             );
           })}
         </div>
-      </section>
+      </details>
 
-      <section className="trainer-custom-section trainer-gameplay-stat-section">
+      {region === 'build' ? (
+      <details className="trainer-custom-section trainer-gameplay-stat-section trainer-control-group" open>
+        <summary>Separate gameplay attributes</summary>
         <div className="trainer-custom-copy">
           <p className="trainer-separation-label">Separate progression data</p>
           <h3>Fictional gameplay attributes</h3>
@@ -274,7 +310,8 @@ function BuildControls({
             );
           })}
         </div>
-      </section>
+      </details>
+      ) : null}
     </div>
   );
 }
@@ -365,6 +402,8 @@ function OutfitControls({
       <OptionSelect label="Wrist wraps" onChange={(value) => set('wristWrapsId', value)} options={TRAINER_APPEARANCE_OPTION_GROUPS.wristWraps} value={appearance.outfit.wristWrapsId} />
       <OptionSelect label="Elbow sleeves" onChange={(value) => set('elbowSleevesId', value)} options={TRAINER_APPEARANCE_OPTION_GROUPS.elbowSleeves} value={appearance.outfit.elbowSleevesId} />
       <OptionSelect label="Knee sleeves" onChange={(value) => set('kneeSleevesId', value)} options={TRAINER_APPEARANCE_OPTION_GROUPS.kneeSleeves} value={appearance.outfit.kneeSleevesId} />
+      <OptionSelect label="Original logo shape" onChange={(value) => set('logoShapeId', value)} options={TRAINER_APPEARANCE_OPTION_GROUPS.logoShapes} value={appearance.outfit.logoShapeId} />
+      <OptionSelect label="Chalk marks" onChange={(value) => set('chalkMarksId', value)} options={TRAINER_APPEARANCE_OPTION_GROUPS.chalkMarks} value={appearance.outfit.chalkMarksId} />
     </div>
   );
 }
@@ -396,6 +435,8 @@ function ColorControls({
       <ColorPicker label="Shoe accent" onChange={(value) => set('shoeAccentId', value)} value={appearance.colors.shoeAccentId} />
       <ColorPicker label="Accessory primary" onChange={(value) => set('accessoryPrimaryId', value)} value={appearance.colors.accessoryPrimaryId} />
       <ColorPicker label="Accessory accent" onChange={(value) => set('accessoryAccentId', value)} value={appearance.colors.accessoryAccentId} />
+      <ColorPicker label="Clothing trim" onChange={(value) => set('trimColorId', value)} value={appearance.colors.trimColorId} />
+      <ColorPicker label="Fictional logo" onChange={(value) => set('logoColorId', value)} value={appearance.colors.logoColorId} />
     </div>
   );
 }
@@ -421,6 +462,7 @@ function AccessoryControls({
       <OptionSelect label="Belt" onChange={(value) => set('beltId', value)} options={TRAINER_APPEARANCE_OPTION_GROUPS.belts} value={appearance.accessories.beltId} />
       <OptionSelect label="Gym bag" onChange={(value) => set('gymBagId', value)} options={TRAINER_APPEARANCE_OPTION_GROUPS.gymBags} value={appearance.accessories.gymBagId} />
       <OptionSelect label="Jewelry" onChange={(value) => set('jewelryId', value)} options={TRAINER_APPEARANCE_OPTION_GROUPS.jewelry} value={appearance.accessories.jewelryId} />
+      <OptionSelect label="Gym towel" onChange={(value) => set('towelId', value)} options={TRAINER_APPEARANCE_OPTION_GROUPS.towels} value={appearance.accessories.towelId} />
       <OptionSelect label="Late-game fantasy accessory" onChange={(value) => set('fantasyId', value)} options={TRAINER_APPEARANCE_OPTION_GROUPS.fantasy} value={appearance.accessories.fantasyId} />
     </div>
   );
@@ -429,29 +471,40 @@ function AccessoryControls({
 export function TrainerCustomizationControls({
   activeTab,
   draft,
+  forgeMode,
   onAppearanceChange,
   onGameplayPresetSelect,
   onMuscleChange,
   onPhysiquePresetSelect,
-  previewContent,
+  poseContent,
+  savedLooksContent,
 }: {
   activeTab: TrainerAppearanceCategory;
   draft: TrainerCreationDraft;
+  forgeMode: TrainerForgeMode;
   onAppearanceChange: (appearance: TrainerAppearance) => void;
   onGameplayPresetSelect: (presetId: string) => void;
   onMuscleChange: (key: TrainerMuscleId, value: number) => void;
   onPhysiquePresetSelect: (presetId: string) => void;
-  previewContent: ReactNode;
+  poseContent: ReactNode;
+  savedLooksContent: ReactNode;
 }) {
-  if (activeTab === 'build') {
+  if (
+    activeTab === 'build' ||
+    activeTab === 'upper-body' ||
+    activeTab === 'core' ||
+    activeTab === 'lower-body'
+  ) {
     return (
       <BuildControls
         appearance={draft.appearance}
         draft={draft}
+        forgeMode={forgeMode}
         onAppearanceChange={onAppearanceChange}
         onGameplayPresetSelect={onGameplayPresetSelect}
         onMuscleChange={onMuscleChange}
         onPhysiquePresetSelect={onPhysiquePresetSelect}
+        region={activeTab}
       />
     );
   }
@@ -470,5 +523,6 @@ export function TrainerCustomizationControls({
   if (activeTab === 'accessories') {
     return <AccessoryControls appearance={draft.appearance} onAppearanceChange={onAppearanceChange} />;
   }
-  return <>{previewContent}</>;
+  if (activeTab === 'poses') return <>{poseContent}</>;
+  return <>{savedLooksContent}</>;
 }

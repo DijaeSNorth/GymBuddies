@@ -34,6 +34,7 @@ import type {
   GamepadProfileId,
   KeyboardBindingMap,
   SaveAccessibilitySettings,
+  TrainerVisualProgressionPreferences,
 } from '../../game/types';
 import { InputAccessibilityPanel } from '../accessibility/InputAccessibilityPanel';
 
@@ -55,6 +56,7 @@ interface GamePresentationProps {
   directionAvailability: Record<CardinalDirection, boolean>;
   effectSkippable: boolean;
   keyboardBindings: KeyboardBindingMap;
+  visualProgression: TrainerVisualProgressionPreferences;
   movementDisabled: boolean;
   onAccessibilityChange: (settings: SaveAccessibilitySettings) => void;
   onAction: (action: InputAction) => void;
@@ -62,6 +64,9 @@ interface GamePresentationProps {
   onKeyboardBindingsChange: (bindings: KeyboardBindingMap) => void;
   onPauseChange: (paused: boolean) => void;
   onSkipEffect: () => void;
+  onVisualProgressionChange: (
+    preferences: TrainerVisualProgressionPreferences,
+  ) => void;
   partyCount: number;
   primaryActionDisabled: boolean;
   snapshot: Omit<GamePresentationSnapshot, 'motion'>;
@@ -94,6 +99,8 @@ export function GamePresentation({
   partyCount,
   primaryActionDisabled,
   snapshot,
+  visualProgression,
+  onVisualProgressionChange,
 }: GamePresentationProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -766,6 +773,7 @@ export function GamePresentation({
                 battleSpeed={battleSpeed}
                 gamepadProfile={gamepadProfile}
                 keyboardBindings={keyboardBindings}
+                visualProgression={visualProgression}
                 onAccessibilityChange={onAccessibilityChange}
                 onBattleSpeedChange={onBattleSpeedChange}
                 onKeyboardBindingsChange={onKeyboardBindingsChange}
@@ -774,6 +782,7 @@ export function GamePresentation({
                     remapKeyboardBinding(keyboardBindings, action, code),
                   )
                 }
+                onVisualProgressionChange={onVisualProgressionChange}
               />
               {import.meta.env.DEV ? (
                 <label className="gb-menu-toggle">
