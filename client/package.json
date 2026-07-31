@@ -27,7 +27,9 @@
     "prebuild": "npm run assets:validate && npm run sprites:validate",
     "preview:pages:test": "npm run build && node scripts/serve-pages-build.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.playwright.json",
-    "build": "vite build && node scripts/generate-release-assets.mjs"
+    "bundle:audit": "node scripts/audit-production-bundle.mjs",
+    "bundle:verify": "node scripts/verify-production-bundle.mjs",
+    "build": "vite build && node scripts/generate-release-assets.mjs && npm run bundle:verify"
   },
   "dependencies": {
     "phaser": "3.90.0",

@@ -1280,7 +1280,7 @@
       "path": "buddies/handcrafted/bosses/versions/v3/dome-warden-tiers.png",
       "standardId": "buddy-boss-tier-overlay",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "assetVersion": "3.0.0",
       "description": "Review-only Dome Warden tier overlay using seams, posture, mounts, and expression without shell scaling."
     },
@@ -1301,7 +1301,7 @@
       "path": "buddies/handcrafted/presentation/v3/titan-tortoise/battle-48.png",
       "standardId": "buddy-battle-48",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "loadGroup": "battle",
       "assetVersion": "3.0.0",
       "description": "Resolution-native Plastrong battle actions."
@@ -1312,7 +1312,7 @@
       "path": "buddies/handcrafted/presentation/v3/titan-tortoise/showcase-64.png",
       "standardId": "buddy-showcase-64",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "loadGroup": "showcase",
       "assetVersion": "3.0.0",
       "description": "Resolution-native Plastrong physique and pose showcase."
@@ -1323,7 +1323,7 @@
       "path": "buddies/handcrafted/presentation/v3/titan-tortoise/portrait-64.png",
       "standardId": "buddy-dialogue-64",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "loadGroup": "portrait",
       "assetVersion": "3.0.0",
       "description": "Review-only Plastrong introduction portrait."
@@ -1367,7 +1367,7 @@
       "path": "buddies/handcrafted/presentation/v3/ripped-rhino/portrait-64.png",
       "standardId": "buddy-dialogue-64",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "loadGroup": "portrait",
       "assetVersion": "3.0.0",
       "description": "Review-only Railhorn v3 introduction portrait."
@@ -1389,7 +1389,7 @@
       "path": "buddies/handcrafted/presentation/v3/boulder-bison/battle-48.png",
       "standardId": "buddy-battle-48",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "loadGroup": "battle",
       "assetVersion": "3.0.0",
       "description": "Resolution-native Cairnox battle actions."
@@ -1400,7 +1400,7 @@
       "path": "buddies/handcrafted/presentation/v3/boulder-bison/showcase-64.png",
       "standardId": "buddy-showcase-64",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "loadGroup": "showcase",
       "assetVersion": "3.0.0",
       "description": "Resolution-native Cairnox showcase poses."
@@ -1411,7 +1411,7 @@
       "path": "buddies/handcrafted/presentation/v3/boulder-bison/portrait-64.png",
       "standardId": "buddy-dialogue-64",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "loadGroup": "portrait",
       "assetVersion": "3.0.0",
       "description": "Review-only Cairnox introduction portrait."
@@ -1422,7 +1422,7 @@
       "path": "buddies/handcrafted/presentation/v3/dome-warden/menu-32.png",
       "standardId": "buddy-menu-32",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "loadGroup": "core",
       "assetVersion": "3.0.0",
       "description": "Resolution-native Dome Warden menu directions."
@@ -1433,7 +1433,7 @@
       "path": "buddies/handcrafted/presentation/v3/dome-warden/battle-64.png",
       "standardId": "buddy-boss-battle-64",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "loadGroup": "battle",
       "assetVersion": "3.0.0",
       "description": "Resolution-native Dome Warden battle actions across five rigid-shell-safe tiers."
@@ -1444,7 +1444,7 @@
       "path": "buddies/handcrafted/presentation/v3/dome-warden/showcase-64.png",
       "standardId": "buddy-boss-showcase-64",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "loadGroup": "showcase",
       "assetVersion": "3.0.0",
       "description": "Resolution-native Dome Warden showcase poses across five tiers."
@@ -1455,7 +1455,7 @@
       "path": "buddies/handcrafted/presentation/v3/dome-warden/portrait-64.png",
       "standardId": "buddy-dialogue-64",
       "paletteId": "kinetic-slate",
-      "status": "review",
+      "status": "revision-required",
       "loadGroup": "portrait",
       "assetVersion": "3.0.0",
       "description": "Review-only Dome Warden boss introduction portrait."

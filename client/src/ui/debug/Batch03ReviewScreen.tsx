@@ -8,6 +8,13 @@ import {
   type PlastrongDomeLayerId,
 } from '../../game/assets/domeShellModules';
 import {
+  PLASTRONG_ACCESSORY_PRIORITY_RULES,
+  resolvePlastrongAccessoryPriority,
+} from '../../game/assets/accessoryPriority';
+import {
+  BATCH_03_FORMAL_REVIEW_RECEIPTS,
+} from '../../game/assets/batch03FormalReview';
+import {
   BUDDY_BATTLE_POSES,
   BUDDY_SHOWCASE_POSES,
 } from '../../game/assets/types';
@@ -319,6 +326,129 @@ function CrossResolutionRow({
   );
 }
 
+function NativeScaleRow({
+  character,
+}: {
+  character: ReviewCharacter;
+}) {
+  const species = getBuddySpeciesById(character.speciesId);
+  const cosmetics = reviewCosmetics(character);
+  return (
+    <div className="batch03-native-scale-row">
+      <h3>{character.label}</h3>
+      {([1, 2, 4] as const).map((scale) => (
+        <Figure key={scale} label={`24×24 at ${scale}×`}>
+          <BuddySprite
+            bossId={character.bossId}
+            bossTier={character.bossId ? 'normal' : undefined}
+            cosmetics={cosmetics}
+            creature={species}
+            direction="front"
+            presentationContext="overworld"
+            reducedMotion
+            scale={scale}
+          />
+        </Figure>
+      ))}
+    </div>
+  );
+}
+
+function AccessoryPriorityMatrix() {
+  return (
+    <div className="batch03-accessory-matrix">
+      {PLASTRONG_ACCESSORY_PRIORITY_RULES.map((rule) => (
+        <article
+          data-accessory-priority={rule.accessoryId}
+          key={rule.accessoryId}
+        >
+          <header>
+            <h3>{rule.accessoryId.split('.').at(-1)}</h3>
+            <span>
+              P{rule.priority} · {rule.slot} ·{' '}
+              {rule.overworldPresentation}
+            </span>
+          </header>
+          <div className="batch03-grid batch03-accessory-directions">
+            {DIRECTIONS.map((direction) => {
+              const resolved = resolvePlastrongAccessoryPriority({
+                accessoryIds: [rule.accessoryId],
+                context: 'overworld',
+                direction,
+              })[0]!;
+              const mount = PLASTRONG_ACCESSORY_MOUNTS.find(
+                (entry) =>
+                  entry.accessoryId === rule.accessoryId &&
+                  entry.direction === direction,
+              )!;
+              return (
+                <div
+                  data-accessory-stress-case={`${rule.accessoryId}.${direction}.overworld`}
+                  key={direction}
+                >
+                  <DomeLayerCanvas direction={direction} showAll />
+                  <small>
+                    {direction} · {resolved.presentation} · (
+                    {mount.anchor.x},{mount.anchor.y})
+                  </small>
+                </div>
+              );
+            })}
+          </div>
+          <p>{rule.reason}</p>
+          {(['menu', 'battle', 'showcase', 'dialogue'] as const).map(
+            (context) => (
+              <span
+                className="batch03-context-chip"
+                data-accessory-stress-case={`${rule.accessoryId}.front.${context}`}
+                key={context}
+              >
+                {context}: full
+              </span>
+            ),
+          )}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function ApprovalLedger() {
+  return (
+    <div className="batch03-ledger-wrap">
+      <table className="batch03-ledger">
+        <thead>
+          <tr>
+            <th>Character</th>
+            <th>Profile</th>
+            <th>Resolution</th>
+            <th>Status</th>
+            <th>Alpha</th>
+            <th>Reviewer note</th>
+            <th>Required correction</th>
+          </tr>
+        </thead>
+        <tbody>
+          {BATCH_03_FORMAL_REVIEW_RECEIPTS.map((receipt) => (
+            <tr
+              data-approval-receipt={receipt.id}
+              key={receipt.id}
+            >
+              <td>{receipt.characterId}</td>
+              <td>{receipt.profile}</td>
+              <td>{receipt.authoredResolution}</td>
+              <td data-status={receipt.status}>{receipt.status}</td>
+              <td>{receipt.mayShipInAlpha ? 'yes' : 'no'}</td>
+              <td>{receipt.reviewerNote}</td>
+              <td>{receipt.requiredCorrection}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function CharacterContactSheet({
   character,
 }: {
@@ -566,6 +696,19 @@ export function Batch03ReviewScreen() {
 
       <section
         className="batch03-deliverable"
+        data-review-deliverable="native-scales"
+      >
+        <header>
+          <p>Formal Batch 03 gate</p>
+          <h1>Native 1×, 2×, and 4× overworld inspection</h1>
+        </header>
+        {CHARACTERS.map((character) => (
+          <NativeScaleRow character={character} key={character.id} />
+        ))}
+      </section>
+
+      <section
+        className="batch03-deliverable"
         data-review-deliverable="silhouettes"
       >
         <header>
@@ -634,6 +777,21 @@ export function Batch03ReviewScreen() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section
+        className="batch03-deliverable"
+        data-review-deliverable="accessory-priority"
+      >
+        <header>
+          <p>Formal Batch 03 gate</p>
+          <h1>Plastrong accessory priority and all 32 mount points</h1>
+          <span>
+            This is an anchor-and-density inspection. Final accessory pixels
+            remain an art correction, not an automatic approval.
+          </span>
+        </header>
+        <AccessoryPriorityMatrix />
       </section>
 
       <section
@@ -731,6 +889,21 @@ export function Batch03ReviewScreen() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section
+        className="batch03-deliverable"
+        data-review-deliverable="formal-ledger"
+      >
+        <header>
+          <p>Formal Batch 03 gate · reviewed 2026-07-30</p>
+          <h1>Resolution-specific approval ledger</h1>
+          <span>
+            No Batch 03 profile is approved or final. Review profiles may be
+            used in alpha only where the ledger explicitly says yes.
+          </span>
+        </header>
+        <ApprovalLedger />
       </section>
 
       {CHARACTERS.map((character) => (

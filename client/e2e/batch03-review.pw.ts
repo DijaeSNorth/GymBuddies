@@ -24,13 +24,20 @@ test('Batch 03 review deck renders every dome-shell deliverable', async ({
   ).toHaveCount(5);
   await expect(
     page.locator('[data-review-deliverable]'),
-  ).toHaveCount(6);
+  ).toHaveCount(9);
   await expect(
     page.locator('[data-review-deliverable="armor-layers"] canvas'),
   ).toHaveCount(12);
   await expect(
     page.locator('[data-review-deliverable="anchors"] svg'),
   ).toHaveCount(4);
+  await expect(page.locator('[data-accessory-priority]')).toHaveCount(8);
+  await expect(page.locator('[data-approval-receipt]')).toHaveCount(21);
+  await expect(
+    page.locator(
+      '[data-approval-receipt] [data-status="approved"], [data-approval-receipt] [data-status="final"]',
+    ),
+  ).toHaveCount(0);
 
   const canvases = page.locator(
     '.batch03-review-shell .buddy-pixel-canvas, .batch03-layer-canvas',

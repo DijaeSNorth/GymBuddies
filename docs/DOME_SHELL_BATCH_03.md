@@ -3,9 +3,13 @@
 ## Status
 
 Batch 03 is a review batch. No asset in this batch is approved or final.
+The formal 2026-07-30 gate records 9 profiles as `review` and 12 as
+`revision-required`; see
+[DOME_SHELL_BATCH_03_REVIEW.md](DOME_SHELL_BATCH_03_REVIEW.md) and
+[ASSET_APPROVAL_LEDGER.md](ASSET_APPROVAL_LEDGER.md).
 
 - Asset version: `3.0.0`
-- Asset status: `review`
+- Asset status: profile-specific `review` or `revision-required`
 - Primary species: Plastrong (`titan-tortoise`)
 - Low-profile armored control: Railhorn (`ripped-rhino`)
 - Rigid-torso/exposed-limb control: Cairnox (`boulder-bison`)

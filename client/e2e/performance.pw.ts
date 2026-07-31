@@ -44,6 +44,19 @@ test('idle gameplay bounds React work, save writes, input polling, and Phaser ca
   await startWithEmptyStorage(page);
 
   await page.goto('/');
+  await page.waitForTimeout(500);
+  await page.evaluate(() => {
+    const audit = window.__gymBuddiesPerformanceAudit;
+    audit.gamepadPolls = 0;
+    audit.reactCommits = 0;
+    audit.saveWrites = 0;
+  });
+  await page.waitForTimeout(2_200);
+  const openingAudit = await page.evaluate(
+    () => window.__gymBuddiesPerformanceAudit,
+  );
+  expect(openingAudit.saveWrites).toBe(0);
+
   await page.getByLabel('Trainer name').fill('Performance');
   await page.getByText('Normal Start', { exact: true }).click();
   await page
@@ -69,9 +82,57 @@ test('idle gameplay bounds React work, save writes, input polling, and Phaser ca
 
   for (let cycle = 0; cycle < 3; cycle += 1) {
     await page.getByRole('button', { name: 'Edit Trainer' }).first().click();
+    await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(0);
+    if (cycle === 0) {
+      await page.waitForTimeout(300);
+      await page.evaluate(() => {
+        const audit = window.__gymBuddiesPerformanceAudit;
+        audit.gamepadPolls = 0;
+        audit.reactCommits = 0;
+        audit.saveWrites = 0;
+      });
+      await page.waitForTimeout(2_200);
+      const inactiveAudit = await page.evaluate(
+        () => window.__gymBuddiesPerformanceAudit,
+      );
+      expect(inactiveAudit.saveWrites).toBeLessThanOrEqual(1);
+    }
     await page.getByRole('button', { name: 'Cancel Changes' }).click();
     await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(1);
   }
+});
+
+test('a journey UI failure preserves save export and recovery actions', async ({
+  page,
+}) => {
+  await startWithEmptyStorage(page);
+  await page.goto('/');
+  await page.getByLabel('Trainer name').fill('Recovery');
+  await page.getByText('Normal Start', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Confirm & Start Journey' })
+    .click();
+  await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(1);
+
+  await page.goto('/?debug=journey-error');
+  await expect(
+    page.getByRole('heading', {
+      name: 'The journey interface stopped safely.',
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Retry interface' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Return to trainer setup' }),
+  ).toBeVisible();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export save' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(
+    'gym-buddies-save.json',
+  );
 });
 
 declare global {

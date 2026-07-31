@@ -130,6 +130,8 @@ export function GamePresentation({
     useState<GamepadProfileId>('standard');
   const [toggledDirection, setToggledDirection] =
     useState<CardinalDirection | null>(null);
+  const [presentationFailure, setPresentationFailure] =
+    useState<Error | null>(null);
   const motion: PresentationMotionSettings = {
     reducedMotion: accessibility.reducedMotion,
     screenShake: accessibility.screenShake,
@@ -212,13 +214,27 @@ export function GamePresentation({
     if (!host) return;
     let active = true;
     let controller: GamePresentationController | null = null;
-    void import('../../game/phaser/createGamePresentation').then(({ createGamePresentation }) => {
-      if (!active || !latestSnapshotRef.current) return;
-      controller = createGamePresentation(host, latestSnapshotRef.current);
-      controller.setDebugOverlay(debugOverlayRef.current);
-      controller.setPaused(pausedRef.current || menuOpenRef.current);
-      controllerRef.current = controller;
-    });
+    void import('../../game/phaser/createGamePresentation')
+      .then(({ createGamePresentation }) => {
+        if (!active || !latestSnapshotRef.current) return;
+        controller = createGamePresentation(
+          host,
+          latestSnapshotRef.current,
+        );
+        controller.setDebugOverlay(debugOverlayRef.current);
+        controller.setPaused(
+          pausedRef.current || menuOpenRef.current,
+        );
+        controllerRef.current = controller;
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setPresentationFailure(
+          error instanceof Error
+            ? error
+            : new Error('The Phaser presentation could not start.'),
+        );
+      });
     return () => {
       active = false;
       controller?.destroy();
@@ -600,6 +616,8 @@ export function GamePresentation({
     '--gb-stage-height': '180px',
     '--gb-pixel-unit': '1px',
   } as CSSProperties;
+
+  if (presentationFailure) throw presentationFailure;
 
   return (
     <section

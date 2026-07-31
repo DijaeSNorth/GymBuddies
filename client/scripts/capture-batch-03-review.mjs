@@ -7,7 +7,7 @@ import { chromium } from '@playwright/test';
 const clientRoot = resolve(import.meta.dirname, '..');
 const outputRoot = resolve(
   clientRoot,
-  'art-source/review/batch-03-dome-shell',
+  'art-source/review/batch-03-formal',
 );
 const port = 4183;
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -19,11 +19,14 @@ const characters = [
 ];
 const deliverables = [
   'cross-resolution',
+  'native-scales',
   'silhouettes',
   'armor-layers',
   'anchors',
+  'accessory-priority',
   'mobile',
   'boss-tiers',
+  'formal-ledger',
 ];
 
 mkdirSync(outputRoot, { recursive: true });

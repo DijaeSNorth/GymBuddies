@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import deployment from '../deployment.config.json' with { type: 'json' };
+import { PLAYTEST_STORAGE_KEY } from '../src/game/playtest/playtestService';
 import {
   collectRuntimeErrors,
   expectHealthyGameShell,
@@ -15,6 +16,130 @@ type PublicAssetManifest = {
     path: string;
   }>;
 };
+
+test.describe('production journey loading boundary', () => {
+  test.use({ serviceWorkers: 'block' });
+
+  test('production defers playtest tools, JourneyGame, Buddy rendering, and Phaser until requested', async ({
+  page,
+}, testInfo) => {
+  await startWithEmptyStorage(page);
+  let releaseJourneyModule: () => void = () => undefined;
+  let journeyRequestSeen = false;
+  const journeyModuleGate = new Promise<void>((resolve) => {
+    releaseJourneyModule = resolve;
+  });
+  await page.route('**/*', async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname.endsWith('/sw.js')) {
+      await route.abort();
+      return;
+    }
+    if (/\/assets\/JourneyGame-[^/]+\.js$/.test(pathname)) {
+      journeyRequestSeen = true;
+      await journeyModuleGate;
+    }
+    await route.continue();
+  });
+  const scriptRequests: string[] = [];
+  page.on('response', (response) => {
+    if (response.request().resourceType() === 'script') {
+      scriptRequests.push(new URL(response.url()).pathname);
+    }
+  });
+
+  await page.goto(deployment.basePath);
+  await expectHealthyGameShell(page);
+  await expect(page.getByLabel('Trainer name')).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('production-trainer-creation.png'),
+    animations: 'disabled',
+    fullPage: true,
+  });
+  expect(
+    scriptRequests.some((path) =>
+      /(?:AlphaPlaytestPanel|JourneyGame|BuddySprite|GamePresentation|createGamePresentation)-/.test(path),
+    ),
+  ).toBe(false);
+  await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(0);
+  await page.getByTestId('playtest-note-launcher').click();
+  await expect(page.getByTestId('alpha-playtest-panel')).toBeVisible();
+  await expect
+    .poll(() =>
+      scriptRequests.some((path) => /AlphaPlaytestPanel-/.test(path)),
+    )
+    .toBe(true);
+  await page
+    .getByRole('button', { name: 'Close Alpha Playtest Mode' })
+    .click();
+
+  await page.getByLabel('Trainer name').fill('Lazy Avery');
+  await page.getByText('Normal Start', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Confirm & Start Journey' })
+    .click();
+
+  await expect.poll(() => journeyRequestSeen).toBe(true);
+  const journeyLoadingStatus = page.locator(
+    '.journey-module-loading[role="status"]',
+  );
+  await expect(journeyLoadingStatus).toBeVisible();
+  await expect(journeyLoadingStatus).toContainText(
+    'Preparing your Gym Buddies journey',
+  );
+  releaseJourneyModule();
+  await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(1);
+  await page.screenshot({
+    path: testInfo.outputPath('production-lazy-gameplay.png'),
+    animations: 'disabled',
+    fullPage: true,
+  });
+  await expect
+    .poll(() =>
+      scriptRequests.some((path) => /JourneyGame-/.test(path)),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      scriptRequests.some((path) => /BuddySprite-/.test(path)),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      scriptRequests.some((path) => /GamePresentation-/.test(path)),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      scriptRequests.some((path) =>
+        /createGamePresentation-/.test(path),
+      ),
+    )
+    .toBe(true);
+
+  expect(
+    scriptRequests.some((path) => /BuddyCustomizer-/.test(path)),
+  ).toBe(false);
+  await page
+    .getByRole('button', { name: 'Customize Buddy' })
+    .click();
+  await expect
+    .poll(() =>
+      scriptRequests.some((path) => /BuddyCustomizer-/.test(path)),
+    )
+    .toBe(true);
+
+  scriptRequests.length = 0;
+  await page.reload();
+  await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(1);
+  await expect
+    .poll(() =>
+      scriptRequests.some((path) => /JourneyGame-/.test(path)),
+    )
+    .toBe(true);
+  await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(1);
+  });
+});
 
 test('deployment smoke: release shell, manifests, and every asset load from the exact repository path', async ({
   page,
@@ -205,6 +330,9 @@ test('installed release loads its core game and local save while offline', async
   await expect
     .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
     .toBe(true);
+  await page.getByTestId('playtest-note-launcher').click();
+  await expect(page.getByTestId('enable-alpha-playtest')).toBeVisible();
+  await page.getByRole('button', { name: 'Close' }).click();
 
   await context.setOffline(true);
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -214,6 +342,21 @@ test('installed release loads its core game and local save while offline', async
   expect(
     (await readCurrentSaveState(page))?.trainer,
   ).toMatchObject({ name: 'Offline Avery' });
+  await page.getByTestId('playtest-note-launcher').click();
+  await page.getByTestId('enable-alpha-playtest').click();
+  await page
+    .getByLabel('Playtest note category')
+    .selectOption('control-issue');
+  await page
+    .getByRole('textbox', { name: 'Playtest note' })
+    .fill('Offline touch-control check.');
+  await page.getByTestId('save-playtest-note').click();
+  expect(
+    await page.evaluate(
+      (key) => Boolean(window.localStorage.getItem(key)),
+      PLAYTEST_STORAGE_KEY,
+    ),
+  ).toBe(true);
 
   const cacheAudit = await page.evaluate(async () => {
     const keys = await caches.keys();

@@ -16,6 +16,10 @@ import {
   validateBatch03DomeShellData,
 } from '../game/assets/domeShellModules';
 import {
+  BATCH_03_FORMAL_REVIEW_RECEIPTS,
+  validateBatch03FormalReview,
+} from '../game/assets/batch03FormalReview';
+import {
   ASSET_MANIFEST,
   getAssetByKey,
   getBuddyPresentationProfile,
@@ -317,7 +321,7 @@ describe('Handcrafted Batch 03 complete dome-shell pipeline', () => {
           tier as keyof typeof BATCH_03_BOSS_TIER_RULES,
         ),
       ).toMatchObject({
-        assetStatus: 'review',
+        assetStatus: 'revision-required',
         assetVersion: '3.0.0',
         sourceFrame: index,
         speciesId: 'titan-tortoise',
@@ -325,7 +329,12 @@ describe('Handcrafted Batch 03 complete dome-shell pipeline', () => {
     }
   });
 
-  it('selects review-only authored assets by context with React and Phaser parity', () => {
+  it('selects formally reviewed authored assets by context with React and Phaser parity', () => {
+    const expectedStatus = new Map(
+      BATCH_03_FORMAL_REVIEW_RECEIPTS.flatMap((receipt) =>
+        receipt.assetKeys.map((assetKey) => [assetKey, receipt.status] as const),
+      ),
+    );
     for (const speciesId of BATCH_SPECIES) {
       for (const direction of DIRECTIONS) {
         const input = { speciesId, direction, pose: 'idle' as const };
@@ -334,17 +343,19 @@ describe('Handcrafted Batch 03 complete dome-shell pipeline', () => {
         expect(react).toEqual(phaser);
         expect(react).toMatchObject({
           baseSource: 'authored',
-          assetStatus: 'review',
           assetVersion: '3.0.0',
           sourceDirection: direction,
         });
+        expect(react.assetStatus).toBe(expectedStatus.get(react.assetKey!));
       }
       for (const [context, size] of PRESENTATION_CONTEXTS) {
         const input = { speciesId, context };
         const react = resolveReactBuddyPresentationFrame(input);
         const phaser = resolvePhaserBuddyPresentation(input);
         expect(react).toEqual(phaser);
-        expect(react.assetStatus).toBe('review');
+        expect(react.assetStatus).toBe(
+          expectedStatus.get(react.assetKey!),
+        );
         expect(react.assetVersion).toBe('3.0.0');
         expect(react.frameWidth).toBe(size);
         expect(react.frameHeight).toBe(size);
@@ -361,7 +372,7 @@ describe('Handcrafted Batch 03 complete dome-shell pipeline', () => {
       characterId: 'dome-warden',
       frameWidth: 64,
       frameHeight: 64,
-      assetStatus: 'review',
+      assetStatus: 'revision-required',
       assetVersion: '3.0.0',
     });
   });
@@ -392,13 +403,20 @@ describe('Handcrafted Batch 03 complete dome-shell pipeline', () => {
     });
   });
 
-  it('keeps every v3 runtime asset review-only, present, and Pages-safe', () => {
+  it('keeps every v3 runtime asset gated, present, and Pages-safe', () => {
     const assets = ASSET_MANIFEST.assets.filter(
       (asset) => asset.assetVersion === '3.0.0',
     );
     expect(assets).toHaveLength(29);
+    expect(validateBatch03FormalReview(ASSET_MANIFEST)).toEqual([]);
+    expect(
+      assets.filter((asset) => asset.status === 'review'),
+    ).toHaveLength(17);
+    expect(
+      assets.filter((asset) => asset.status === 'revision-required'),
+    ).toHaveLength(12);
     for (const asset of assets) {
-      expect(asset.status).toBe('review');
+      expect(['review', 'revision-required']).toContain(asset.status);
       expect(
         existsSync(join(process.cwd(), 'public', ASSET_MANIFEST.basePath, asset.path)),
       ).toBe(true);
