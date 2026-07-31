@@ -1,0 +1,81 @@
+.playtest-viewer {
+  min-height: 100vh;
+  background: #071923;
+  color: #eef2d0;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.playtest-viewer header,
+.viewer-panel,
+.viewer-grid article {
+  border: 2px solid #2f5d6f;
+  background: #0b2030;
+  padding: 12px;
+}
+
+.playtest-viewer h1,
+.playtest-viewer h2,
+.playtest-viewer p {
+  margin-top: 0;
+}
+
+.viewer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.viewer-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.viewer-panel ul,
+.viewer-panel ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.viewer-panel li {
+  border-top: 1px dashed #2f5d6f;
+  padding-top: 7px;
+}
+
+.viewer-panel li span,
+.viewer-panel li small {
+  display: block;
+  margin-top: 4px;
+}
+
+.playtest-viewer select {
+  min-height: 38px;
+  border: 2px solid #2f5d6f;
+  background: #061822;
+  color: #eef2d0;
+  padding: 6px;
+  font: inherit;
+}
+
+.playtest-viewer dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+}
+
+.playtest-viewer dt {
+  color: #69d2a0;
+}
+
+.playtest-viewer dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .viewer-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

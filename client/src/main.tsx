@@ -14,8 +14,16 @@ const showBatch02Review =
   import.meta.env.DEV && debugView === 'batch02-review';
 const showBatch03Review =
   import.meta.env.DEV && debugView === 'batch03-review';
+const showPlaytestReportViewer =
+  import.meta.env.DEV && debugView === 'playtest-reports';
 
-if (showBatch03Review) {
+if (showPlaytestReportViewer) {
+  void import('./ui/debug/PlaytestReportViewer').then(
+    ({ PlaytestReportViewer }) => {
+      appRoot.render(<PlaytestReportViewer />);
+    },
+  );
+} else if (showBatch03Review) {
   void import('./ui/debug/Batch03ReviewScreen').then(
     ({ Batch03ReviewScreen }) => {
       appRoot.render(<Batch03ReviewScreen />);

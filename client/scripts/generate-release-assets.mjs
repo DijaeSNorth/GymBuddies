@@ -156,8 +156,25 @@ const deferredAssetPaths = new Set(
     )
     .map((asset) => `${assetManifest.basePath}/${asset.path}`),
 );
+const deferredRuntimePrefixes = [
+  'assets/JourneyGame-',
+  'assets/GamePresentation-',
+  'assets/createGamePresentation-',
+  'assets/BuddySprite-',
+  'assets/BuddyIndex-',
+  'assets/BuddyCustomizer-',
+  'assets/PhysiqueReviewPanel-',
+  'assets/AlphaPlaytestPanel-',
+];
+const deferredRuntimePaths = releaseFiles.filter((path) =>
+  deferredRuntimePrefixes.some((prefix) => path.startsWith(prefix)),
+);
+const deferredPaths = new Set([
+  ...deferredAssetPaths,
+  ...deferredRuntimePaths,
+]);
 const filesToCache = releaseFiles.filter(
-  (path) => !deferredAssetPaths.has(path),
+  (path) => !deferredPaths.has(path),
 );
 const releaseHash = createHash('sha256');
 releaseHash.update(packageJson.version);
@@ -169,7 +186,7 @@ for (const path of releaseFiles) {
 const cacheVersion = releaseHash.digest('hex').slice(0, 16);
 const cacheName = `gym-buddies-core-${cacheVersion}`;
 const precacheUrls = filesToCache.map((path) => `./${path}`);
-const deferredUrls = [...deferredAssetPaths]
+const deferredUrls = [...deferredPaths]
   .filter((path) => releaseFiles.includes(path))
   .map((path) => `./${path}`);
 
@@ -243,5 +260,5 @@ self.addEventListener('fetch', (event) => {
 writeBuildFile('sw.js', serviceWorker);
 
 process.stdout.write(
-  `Release assets generated for ${deployment.basePath} (${cacheName}, ${filesToCache.length} precached files, ${deferredUrls.length} lazy presentation files).\n`,
+  `Release assets generated for ${deployment.basePath} (${cacheName}, ${filesToCache.length} precached files, ${deferredUrls.length} lazy runtime files).\n`,
 );

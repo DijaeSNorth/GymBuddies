@@ -10,7 +10,7 @@ import {
 
 test('touch movement, menus, and Buddy styling work on a phone viewport', async ({
   page,
-}) => {
+}, testInfo) => {
   await startWithCurrentSave(page, createStartedJourneyFixture('Tessa'));
   const runtimeErrors = collectRuntimeErrors(page);
 
@@ -42,6 +42,10 @@ test('touch movement, menus, and Buddy styling work on a phone viewport', async 
   ).toBeVisible();
   await expect(page.getByLabel('Touchscreen game controls')).toBeVisible();
   await page.getByRole('button', { name: 'Resume route' }).tap();
+  await page.screenshot({
+    path: testInfo.outputPath('journey-game-390x844.png'),
+    fullPage: false,
+  });
 
   const customize = page.getByRole('button', { name: 'Customize Buddy' });
   await customize.scrollIntoViewIfNeeded();

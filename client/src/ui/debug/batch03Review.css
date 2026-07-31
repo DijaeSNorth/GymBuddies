@@ -146,6 +146,98 @@
   grid-template-columns: repeat(5, minmax(210px, 1fr));
 }
 
+.batch03-native-scale-row {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 180px repeat(3, minmax(160px, 1fr));
+  margin-top: 14px;
+}
+
+.batch03-accessory-matrix {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.batch03-accessory-matrix > article {
+  background: #0a1d21;
+  border: 1px solid var(--batch03-line);
+  padding: 12px;
+}
+
+.batch03-accessory-matrix > article > header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.batch03-accessory-matrix > article > header span,
+.batch03-accessory-matrix > article > p {
+  color: var(--batch03-muted);
+  font-size: 11px;
+}
+
+.batch03-accessory-directions {
+  grid-template-columns: repeat(4, minmax(90px, 1fr));
+}
+
+.batch03-accessory-directions > div {
+  align-items: center;
+  background: #18343a;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+}
+
+.batch03-accessory-directions small {
+  color: var(--batch03-muted);
+  font-size: 9px;
+  text-align: center;
+}
+
+.batch03-context-chip {
+  background: #18343a;
+  border: 1px solid var(--batch03-line);
+  display: inline-block;
+  font-size: 10px;
+  margin: 0 6px 6px 0;
+  padding: 4px 6px;
+}
+
+.batch03-ledger-wrap {
+  overflow-x: auto;
+}
+
+.batch03-ledger {
+  border-collapse: collapse;
+  font-size: 10px;
+  min-width: 1200px;
+  width: 100%;
+}
+
+.batch03-ledger th,
+.batch03-ledger td {
+  border: 1px solid var(--batch03-line);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.batch03-ledger th {
+  color: var(--batch03-accent);
+}
+
+.batch03-ledger [data-status='revision-required'] {
+  color: #ef8d75;
+}
+
+.batch03-ledger [data-status='review'] {
+  color: #68d39b;
+}
+
 .batch03-review-shell figure {
   margin: 0;
 }
@@ -298,6 +390,7 @@
 
   .batch03-cross-row,
   .batch03-silhouette-row,
+  .batch03-native-scale-row,
   .batch03-preset-grid,
   .batch03-background-grid,
   .batch03-anchor-grid,
@@ -309,6 +402,14 @@
   .batch03-action-grid,
   .batch03-layer-grid {
     grid-template-columns: repeat(2, minmax(130px, 1fr));
+  }
+
+  .batch03-accessory-matrix {
+    grid-template-columns: 1fr;
+  }
+
+  .batch03-accessory-directions {
+    grid-template-columns: repeat(2, minmax(100px, 1fr));
   }
 
   .batch03-anchor-diagram {

@@ -1,0 +1,181 @@
+.playtest-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: max(12px, env(safe-area-inset-top))
+    max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+  background: rgba(0, 12, 20, 0.86);
+}
+
+.playtest-panel {
+  width: min(820px, 100%);
+  max-height: min(860px, calc(100vh - 24px));
+  overflow: auto;
+  border: 3px solid #2f6d83;
+  background: #0b2030;
+  color: #eef2d0;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  box-shadow: 0 0 0 2px #031019, 0 16px 44px rgba(0, 0, 0, 0.55);
+}
+
+.playtest-panel-heading {
+  align-items: start;
+}
+
+.playtest-panel h2,
+.playtest-panel p {
+  margin: 0;
+}
+
+.playtest-privacy-summary,
+.playtest-enable-card,
+.playtest-section,
+.playtest-report-preview {
+  border: 1px solid #2f5d6f;
+  background: rgba(8, 38, 49, 0.86);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.playtest-privacy-summary strong {
+  color: #69d2a0;
+}
+
+.playtest-session-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.playtest-session-strip span {
+  border: 1px solid #2f5d6f;
+  padding: 5px 7px;
+  background: #071923;
+}
+
+.playtest-section {
+  margin: 0;
+}
+
+.playtest-section > legend,
+.playtest-section > summary {
+  color: #ffd166;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.playtest-rating-grid,
+.playtest-note-grid,
+.playtest-cohort-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.playtest-rating-grid label,
+.playtest-note-grid label,
+.playtest-section > label {
+  display: grid;
+  gap: 5px;
+}
+
+.playtest-panel select,
+.playtest-panel textarea {
+  width: 100%;
+  min-height: 40px;
+  border: 2px solid #2f5d6f;
+  background: #061822;
+  color: #eef2d0;
+  padding: 7px;
+  font: inherit;
+}
+
+.playtest-panel textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.playtest-checklist,
+.playtest-cohort-grid {
+  margin-top: 8px;
+}
+
+.playtest-checklist {
+  display: grid;
+  gap: 7px;
+}
+
+.playtest-checklist label,
+.playtest-cohort-grid label,
+.playtest-report-preview > label {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.playtest-panel input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.playtest-feedback-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.playtest-feedback-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px dashed #2f5d6f;
+  padding-top: 6px;
+}
+
+.playtest-status {
+  color: #69d2a0;
+}
+
+@media (max-width: 520px) {
+  .playtest-backdrop {
+    place-items: start center;
+    padding: 6px;
+  }
+
+  .playtest-panel {
+    max-height: calc(100vh - 12px);
+    padding: 10px;
+  }
+
+  .playtest-rating-grid,
+  .playtest-note-grid,
+  .playtest-cohort-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .playtest-feedback-list li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playtest-checkpoint-toast,
+  .playtest-panel {
+    scroll-behavior: auto;
+  }
+}

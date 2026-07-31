@@ -1,0 +1,50 @@
+.playtest-note-launcher {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 24;
+  min-height: 42px;
+  border: 2px solid #69d2a0;
+  border-radius: 4px;
+  background: #071c27;
+  color: #f6e7a2;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 9px;
+  box-shadow: 0 5px 0 #031019;
+  cursor: pointer;
+}
+
+.playtest-note-launcher:hover,
+.playtest-note-launcher:focus-visible {
+  border-color: #ffd166;
+  outline: 2px solid #ef6a5b;
+  outline-offset: 2px;
+}
+
+.playtest-checkpoint-toast {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(68px, calc(env(safe-area-inset-bottom) + 58px));
+  z-index: 23;
+  width: min(330px, calc(100vw - 24px));
+  border: 2px solid #69d2a0;
+  background: #0a2633;
+  color: #eef2d0;
+  padding: 10px;
+  display: grid;
+  gap: 7px;
+  box-shadow: 0 7px 0 rgba(0, 0, 0, 0.4);
+}
+
+.playtest-panel-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-content: center;
+  background: rgba(0, 12, 20, 0.9);
+  color: #eef2d0;
+  padding: 20px;
+  text-align: center;
+}

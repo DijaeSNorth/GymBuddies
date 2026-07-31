@@ -1,14 +1,14 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react';
 
-import { createRepresentativeTestSaves } from '../../game/debug/representativeSaves';
 import { SAVE_IMPORT_MAX_BYTES } from '../../game/content/save';
-import { exportSaveJson } from '../../game/save/saveService';
 import type { SaveData } from '../../game/types';
+import { downloadSaveJson } from './saveDownload';
 
 export type SaveUiActionResult = {
   ok: boolean;
@@ -35,16 +35,15 @@ type PendingAction =
       label: string;
     };
 
-function downloadJson(save: SaveData) {
-  const json = exportSaveJson(save);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `gym-buddies-save-v${save.schemaVersion}.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
+const LazyRepresentativeSaveTools = import.meta.env.DEV
+  ? lazy(() =>
+      import('../debug/RepresentativeSaveTools').then(
+        ({ RepresentativeSaveTools }) => ({
+          default: RepresentativeSaveTools,
+        }),
+      ),
+    )
+  : null;
 
 export function SaveManagementPanel({
   canRestorePrevious,
@@ -58,11 +57,6 @@ export function SaveManagementPanel({
   const dialogRef = useRef<HTMLElement>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [status, setStatus] = useState(loadMessage);
-  const representativeSaves = useMemo(
-    () =>
-      import.meta.env.DEV ? createRepresentativeTestSaves() : [],
-    [],
-  );
 
   useEffect(() => {
     setStatus(loadMessage);
@@ -138,7 +132,10 @@ export function SaveManagementPanel({
             className="secondary-btn micro-btn"
             onClick={() => {
               try {
-                downloadJson(save);
+                downloadSaveJson(
+                  save,
+                  `gym-buddies-save-v${save.schemaVersion}.json`,
+                );
                 setStatus('Exported the current schema-14 save.');
               } catch (error) {
                 setStatus(
@@ -196,33 +193,18 @@ export function SaveManagementPanel({
             </ul>
           </details>
         ) : null}
-        {representativeSaves.length > 0 ? (
-          <details className="save-developer-tools">
-            <summary>Developer Test Saves</summary>
-            <p className="small-note">
-              Development only. Every load still uses the normal migration,
-              validation, and confirmation path.
-            </p>
-            <div className="action-row">
-              {representativeSaves.map((entry) => (
-                <button
-                  className="secondary-btn micro-btn"
-                  key={entry.id}
-                  onClick={() =>
-                    setPending({
-                      kind: 'import',
-                      label: entry.label,
-                      json: entry.json,
-                    })
-                  }
-                  title={entry.description}
-                  type="button"
-                >
-                  {entry.label}
-                </button>
-              ))}
-            </div>
-          </details>
+        {LazyRepresentativeSaveTools ? (
+          <Suspense fallback={null}>
+            <LazyRepresentativeSaveTools
+              onSelect={(entry) =>
+                setPending({
+                  kind: 'import',
+                  label: entry.label,
+                  json: entry.json,
+                })
+              }
+            />
+          </Suspense>
         ) : null}
       </div>
 
