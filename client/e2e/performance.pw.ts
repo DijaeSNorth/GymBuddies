@@ -58,9 +58,9 @@ test('idle gameplay bounds React work, save writes, input polling, and Phaser ca
   expect(openingAudit.saveWrites).toBe(0);
 
   await page.getByLabel('Trainer name').fill('Performance');
-  await page.getByText('Normal Start', { exact: true }).click();
+  await page.getByLabel('Opening').selectOption('normal');
   await page
-    .getByRole('button', { name: 'Confirm & Start Journey' })
+    .getByRole('button', { name: 'Start Journey' })
     .click();
   await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(1);
 
@@ -81,6 +81,7 @@ test('idle gameplay bounds React work, save writes, input polling, and Phaser ca
   expect(idleAudit.gamepadPolls).toBeLessThanOrEqual(8);
 
   for (let cycle = 0; cycle < 3; cycle += 1) {
+    await page.getByRole('button', { name: 'Open system menu' }).click();
     await page.getByRole('button', { name: 'Edit Trainer' }).first().click();
     await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(0);
     if (cycle === 0) {
@@ -108,9 +109,9 @@ test('a journey UI failure preserves save export and recovery actions', async ({
   await startWithEmptyStorage(page);
   await page.goto('/');
   await page.getByLabel('Trainer name').fill('Recovery');
-  await page.getByText('Normal Start', { exact: true }).click();
+  await page.getByLabel('Opening').selectOption('normal');
   await page
-    .getByRole('button', { name: 'Confirm & Start Journey' })
+    .getByRole('button', { name: 'Start Journey' })
     .click();
   await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(1);
 

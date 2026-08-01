@@ -30,13 +30,14 @@ test('keyboard movement, menu controls, and audio settings persist', async ({
 
   await page.keyboard.press('KeyM');
   await expect(
-    page.getByRole('dialog', { name: 'Controls & accessibility' }),
+    page.getByRole('dialog', { name: 'System Menu' }),
   ).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(
-    page.getByRole('dialog', { name: 'Controls & accessibility' }),
+    page.getByRole('dialog', { name: 'System Menu' }),
   ).toHaveCount(0);
 
+  await page.getByTestId('journey-nav-settings').click();
   await page.getByRole('button', { name: 'Mute all audio' }).click();
   await expect
     .poll(async () => {
@@ -46,6 +47,7 @@ test('keyboard movement, menu controls, and audio settings persist', async ({
     .toBe(false);
 
   await page.reload();
+  await page.getByTestId('journey-nav-settings').click();
   await expect(page.getByRole('button', { name: 'Unmute all audio' })).toBeVisible();
   expect(runtimeErrors).toEqual([]);
 });

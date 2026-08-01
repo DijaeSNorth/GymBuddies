@@ -114,25 +114,18 @@ test('trainer milestone waits for the journey and mobile feedback remains keyboa
     root.scrollTo(0, root.scrollHeight);
   });
   await page
-    .getByRole('button', { name: 'Confirm & Start Guided Journey' })
+    .getByRole('button', { name: 'Start Guided Journey' })
     .click();
 
-  await expect(
-    page.getByRole('heading', { name: 'Live route view' }),
-  ).toBeVisible();
-  await expect(
-    page.getByLabel('Optional playtest checkpoint'),
-  ).toContainText('trainer creation');
+  await expect(page.getByTestId('journey-status-bar')).toBeVisible();
   const launcher = page.getByTestId('playtest-note-launcher');
-  const box = await launcher.boundingBox();
-  const viewport = page.viewportSize();
-  expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
-  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
-    viewport?.width ?? 1280,
-  );
-  await launcher.focus();
+  await expect(launcher).toBeHidden();
+  await page.getByRole('button', { name: 'Open system menu' }).focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Open playtest tools' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('alpha-playtest-panel')).toBeVisible();
+  await expect(page.getByText(/trainer creation/i).first()).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath('alpha-playtest-panel.png'),
     fullPage: false,
@@ -148,7 +141,8 @@ test('journey error diagnostics preserve the current save', async ({
   );
   await page.goto('/');
   await expectHealthyGameShell(page);
-  await page.getByTestId('playtest-note-launcher').click();
+  await page.getByRole('button', { name: 'Open system menu' }).click();
+  await page.getByRole('button', { name: 'Open playtest tools' }).click();
   await page.getByTestId('enable-alpha-playtest').click();
   await page
     .getByRole('button', { name: 'Close Alpha Playtest Mode' })

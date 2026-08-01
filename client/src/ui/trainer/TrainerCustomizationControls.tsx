@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 
 import {
+  DEFAULT_TRAINER_APPEARANCE,
   TRAINER_APPEARANCE_OPTION_GROUPS,
   TRAINER_BUILD_ATTRIBUTES,
   TRAINER_BUILD_MAX,
@@ -20,10 +21,8 @@ import type {
   TrainerAppearanceCategory,
   TrainerAppearanceOption,
   TrainerBuildAttributeId,
-  TrainerBuildRegion,
   TrainerColorOption,
   TrainerCreationDraft,
-  TrainerForgeMode,
   TrainerMuscleId,
 } from '../../game/types';
 
@@ -124,58 +123,41 @@ function ColorPicker({
 
 function BuildControls({
   appearance,
-  draft,
-  forgeMode,
+  attributeIds,
+  groupLabel,
   onAppearanceChange,
-  onGameplayPresetSelect,
-  onMuscleChange,
   onPhysiquePresetSelect,
-  region,
+  showPhysiquePresets,
 }: {
   appearance: TrainerAppearance;
-  draft: TrainerCreationDraft;
-  forgeMode: TrainerForgeMode;
+  attributeIds: readonly TrainerBuildAttributeId[];
+  groupLabel: string;
   onAppearanceChange: (appearance: TrainerAppearance) => void;
-  onGameplayPresetSelect: (presetId: string) => void;
-  onMuscleChange: (key: TrainerMuscleId, value: number) => void;
   onPhysiquePresetSelect: (presetId: string) => void;
-  region: TrainerBuildRegion;
+  showPhysiquePresets: boolean;
 }) {
   const changeBuild = (key: TrainerBuildAttributeId, value: number) => {
     onAppearanceChange(updateTrainerBuildValue(appearance, key, value));
   };
-  const visibleBuildAttributes = TRAINER_BUILD_ATTRIBUTES.filter(
-    (attribute) =>
-      forgeMode === 'quick'
-        ? attribute.quick
-        : attribute.region === region,
+  const attributeSet = new Set(attributeIds);
+  const visibleBuildAttributes = TRAINER_BUILD_ATTRIBUTES.filter((attribute) =>
+    attributeSet.has(attribute.id),
   );
   return (
     <div className="trainer-tab-stack">
       <details className="trainer-custom-section trainer-control-group" open>
-        <summary>
-          {forgeMode === 'quick'
-            ? 'Quick physique controls'
-            : `${TRAINER_CUSTOMIZATION_TABS.find((tab) => tab.id === region)?.label ?? 'Build'} controls`}
-        </summary>
+        <summary>{groupLabel}</summary>
         <div className="trainer-custom-copy">
-          <h3>
-            {forgeMode === 'quick'
-              ? 'Strong silhouette essentials'
-              : 'Detailed fictional proportions'}
-          </h3>
+          <h3>{groupLabel}</h3>
           <p>
             These are stylized RPG appearance controls, not health or medical
             measurements. Cosmetic settings never change combat power.
           </p>
         </div>
-        {region === 'build' ? (
+        {showPhysiquePresets ? (
           <div className="trainer-physique-presets">
             {TRAINER_PHYSIQUE_PRESETS.map((preset) => (
               <button
-                className={
-                  draft.physiquePresetId === preset.id ? 'active' : ''
-                }
                 data-setup-control="true"
                 key={preset.id}
                 onClick={() => onPhysiquePresetSelect(preset.id)}
@@ -223,6 +205,20 @@ function BuildControls({
                     {value} · {cosmeticBuildBand(value)}
                   </output>
                   <button
+                    aria-label={`Reset cosmetic ${attribute.label}`}
+                    data-setup-control="true"
+                    onClick={() =>
+                      changeBuild(
+                        attribute.id,
+                        DEFAULT_TRAINER_APPEARANCE.build[attribute.id],
+                      )
+                    }
+                    title={`Reset ${attribute.label}`}
+                    type="button"
+                  >
+                    R
+                  </button>
+                  <button
                     aria-label={`Increase cosmetic ${attribute.label}`}
                     data-setup-control="true"
                     onClick={() => changeBuild(attribute.id, value + 1)}
@@ -236,9 +232,21 @@ function BuildControls({
           })}
         </div>
       </details>
+    </div>
+  );
+}
 
-      {region === 'build' ? (
-      <details className="trainer-custom-section trainer-gameplay-stat-section trainer-control-group" open>
+export function GameplayAttributesPanel({
+  draft,
+  onGameplayPresetSelect,
+  onMuscleChange,
+}: {
+  draft: TrainerCreationDraft;
+  onGameplayPresetSelect: (presetId: string) => void;
+  onMuscleChange: (key: TrainerMuscleId, value: number) => void;
+}) {
+  return (
+    <details className="trainer-custom-section trainer-gameplay-stat-section trainer-control-group" open>
         <summary>Separate gameplay attributes</summary>
         <div className="trainer-custom-copy">
           <p className="trainer-separation-label">Separate progression data</p>
@@ -310,9 +318,7 @@ function BuildControls({
             );
           })}
         </div>
-      </details>
-      ) : null}
-    </div>
+    </details>
   );
 }
 
@@ -470,24 +476,24 @@ function AccessoryControls({
 
 export function TrainerCustomizationControls({
   activeTab,
+  buildAttributeIds,
+  buildGroupLabel,
   draft,
-  forgeMode,
   onAppearanceChange,
-  onGameplayPresetSelect,
-  onMuscleChange,
   onPhysiquePresetSelect,
   poseContent,
   savedLooksContent,
+  showPhysiquePresets = false,
 }: {
   activeTab: TrainerAppearanceCategory;
+  buildAttributeIds?: readonly TrainerBuildAttributeId[];
+  buildGroupLabel?: string;
   draft: TrainerCreationDraft;
-  forgeMode: TrainerForgeMode;
   onAppearanceChange: (appearance: TrainerAppearance) => void;
-  onGameplayPresetSelect: (presetId: string) => void;
-  onMuscleChange: (key: TrainerMuscleId, value: number) => void;
   onPhysiquePresetSelect: (presetId: string) => void;
   poseContent: ReactNode;
   savedLooksContent: ReactNode;
+  showPhysiquePresets?: boolean;
 }) {
   if (
     activeTab === 'build' ||
@@ -498,13 +504,18 @@ export function TrainerCustomizationControls({
     return (
       <BuildControls
         appearance={draft.appearance}
-        draft={draft}
-        forgeMode={forgeMode}
+        attributeIds={
+          buildAttributeIds ??
+          TRAINER_BUILD_ATTRIBUTES.filter((attribute) =>
+            activeTab === 'build'
+              ? attribute.quick
+              : attribute.region === activeTab,
+          ).map((attribute) => attribute.id)
+        }
+        groupLabel={buildGroupLabel ?? 'Build controls'}
         onAppearanceChange={onAppearanceChange}
-        onGameplayPresetSelect={onGameplayPresetSelect}
-        onMuscleChange={onMuscleChange}
         onPhysiquePresetSelect={onPhysiquePresetSelect}
-        region={activeTab}
+        showPhysiquePresets={showPhysiquePresets}
       />
     );
   }
