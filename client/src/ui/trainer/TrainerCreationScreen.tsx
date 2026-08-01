@@ -8,7 +8,6 @@ import {
 
 import {
   DEFAULT_TRAINER_APPEARANCE,
-  TRAINER_BUILD_ATTRIBUTES,
   TRAINER_RANDOMIZATION_FILTERS,
   cloneTrainerAppearance,
   getTrainerPhysiquePresetById,
@@ -19,13 +18,10 @@ import {
   type InputAction,
 } from '../../game/input/actionMap';
 import { subscribeToGamepadFrames } from '../../game/input/gamepadPolling';
-import {
-  randomizeTrainerAppearance,
-} from '../../game/systems/trainerAppearance';
+import { randomizeTrainerAppearance } from '../../game/systems/trainerAppearance';
 import type {
   KeyboardBindingMap,
   TrainerAppearance,
-  TrainerAppearanceCategory,
   TrainerAppearancePreset,
   TrainerCreationDraft,
   TrainerFacingDirection,
@@ -35,14 +31,22 @@ import type {
   TrainerRandomizationFilter,
   TrainerStartMode,
 } from '../../game/types';
-import {
-  TRAINER_CUSTOMIZATION_TABS,
-  TrainerCustomizationControls,
-} from './TrainerCustomizationControls';
-import {
-  TrainerPreviewControls,
-} from './TrainerPreviewControls';
+import { TrainerPreviewControls } from './TrainerPreviewControls';
 import { TrainerPreviewWorkbench } from './TrainerPreviewWorkbench';
+import { BuildNavigator } from './studio/BuildNavigator';
+import { CustomizationInspector } from './studio/CustomizationInspector';
+import { TrainerStudioDrawer } from './studio/TrainerStudioDrawer';
+import { TrainerStudioFooter } from './studio/TrainerStudioFooter';
+import { TrainerStudioHeader } from './studio/TrainerStudioHeader';
+import {
+  QUICK_FORGE_BUILD_IDS,
+  TRAINER_STUDIO_SECTIONS,
+  getBodyControlGroup,
+  getBodyRegion,
+  type TrainerBodyRegionId,
+  type TrainerStudioDrawerId,
+  type TrainerStudioSection,
+} from './studio/studioConfig';
 import './trainerCreation.css';
 
 interface TrainerCreationScreenProps {
@@ -55,9 +59,7 @@ interface TrainerCreationScreenProps {
   startMode: TrainerStartMode;
   validationIssues: readonly string[];
   onAppearanceChange: (appearance: TrainerAppearance) => void;
-  onAppearancePresetsChange: (
-    presets: readonly TrainerAppearancePreset[],
-  ) => void;
+  onAppearancePresetsChange: (presets: readonly TrainerAppearancePreset[]) => void;
   onCancelEdit: () => void;
   onCancelRestart: () => void;
   onConfirm: () => void;
@@ -71,38 +73,25 @@ interface TrainerCreationScreenProps {
 }
 
 const GAMEPAD_REPEAT_MS = 240;
+
 function focusableSetupControls(root: HTMLElement) {
   return Array.from(
-    root.querySelectorAll<HTMLElement>(
-      '[data-setup-control="true"]:not([disabled])',
-    ),
+    root.querySelectorAll<HTMLElement>('[data-setup-control="true"]:not([disabled])'),
   ).filter((element) => element.offsetParent !== null);
 }
 
-function updateFocusedRange(
-  element: HTMLInputElement,
-  direction: -1 | 1,
-) {
+function updateFocusedRange(element: HTMLInputElement, direction: -1 | 1) {
   const step = Number(element.step || 1);
   const minimum = Number(element.min || 0);
   const maximum = Number(element.max || 100);
-  const next = Math.min(
-    maximum,
-    Math.max(minimum, Number(element.value) + direction * step),
-  );
-  const setter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    'value',
-  )?.set;
+  const next = Math.min(maximum, Math.max(minimum, Number(element.value) + direction * step));
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   setter?.call(element, String(next));
   element.dispatchEvent(new Event('input', { bubbles: true }));
   element.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function updateFocusedSelect(
-  element: HTMLSelectElement,
-  direction: -1 | 1,
-) {
+function updateFocusedSelect(element: HTMLSelectElement, direction: -1 | 1) {
   const nextIndex = Math.min(
     element.options.length - 1,
     Math.max(0, element.selectedIndex + direction),
@@ -170,21 +159,10 @@ export function JourneyRestartDialog({
           as the previous-save backup.
         </p>
         <div className="action-row">
-          <button
-            autoFocus
-            className="secondary-btn"
-            data-setup-control="true"
-            onClick={onCancel}
-            type="button"
-          >
+          <button autoFocus className="secondary-btn" data-setup-control="true" onClick={onCancel} type="button">
             Keep Current Journey
           </button>
-          <button
-            className="trainer-confirm-reset"
-            data-setup-control="true"
-            onClick={onConfirm}
-            type="button"
-          >
+          <button className="trainer-confirm-reset" data-setup-control="true" onClick={onConfirm} type="button">
             Yes, Restart Everything
           </button>
         </div>
@@ -216,20 +194,18 @@ export function TrainerCreationScreen({
   onStartModeChange,
 }: TrainerCreationScreenProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const initialAppearanceRef = useRef(
-    cloneTrainerAppearance(draft.appearance),
-  );
+  const initialAppearanceRef = useRef(cloneTrainerAppearance(draft.appearance));
   const randomSeedRef = useRef((Date.now() ^ 0x47594d42) >>> 0);
   const previousGamepadActionsRef = useRef(new Set<InputAction>());
   const nextGamepadRepeatAtRef = useRef(0);
-  const [activeTab, setActiveTab] =
-    useState<TrainerAppearanceCategory>('build');
-  const [forgeMode, setForgeMode] =
-    useState<TrainerForgeMode>('quick');
+  const [activeSection, setActiveSection] = useState<TrainerStudioSection>('build');
+  const [activeDrawer, setActiveDrawer] = useState<TrainerStudioDrawerId | null>(null);
+  const [forgeMode, setForgeMode] = useState<TrainerForgeMode>('quick');
   const [randomizationFilter, setRandomizationFilter] =
     useState<TrainerRandomizationFilter>('any-physique');
-  const [direction, setDirection] =
-    useState<TrainerFacingDirection>('front');
+  const [selectedBodyRegion, setSelectedBodyRegion] = useState<TrainerBodyRegionId>('overall');
+  const [selectedBodyGroupId, setSelectedBodyGroupId] = useState('overall-frame');
+  const [direction, setDirection] = useState<TrainerFacingDirection>('front');
   const [pose, setPose] = useState<TrainerPose>('idle');
   const [undoStack, setUndoStack] = useState<TrainerAppearance[]>([]);
   const [redoStack, setRedoStack] = useState<TrainerAppearance[]>([]);
@@ -237,10 +213,7 @@ export function TrainerCreationScreen({
   const commitAppearance = useCallback(
     (appearance: TrainerAppearance) => {
       if (sameAppearance(appearance, draft.appearance)) return;
-      setUndoStack((stack) => [
-        ...stack.slice(-31),
-        cloneTrainerAppearance(draft.appearance),
-      ]);
+      setUndoStack((stack) => [...stack.slice(-31), cloneTrainerAppearance(draft.appearance)]);
       setRedoStack([]);
       onAppearanceChange(appearance);
     },
@@ -251,10 +224,7 @@ export function TrainerCreationScreen({
     const previous = undoStack.at(-1);
     if (!previous) return;
     setUndoStack((stack) => stack.slice(0, -1));
-    setRedoStack((stack) => [
-      ...stack.slice(-31),
-      cloneTrainerAppearance(draft.appearance),
-    ]);
+    setRedoStack((stack) => [...stack.slice(-31), cloneTrainerAppearance(draft.appearance)]);
     onAppearanceChange(previous);
   }, [draft.appearance, onAppearanceChange, undoStack]);
 
@@ -262,85 +232,53 @@ export function TrainerCreationScreen({
     const next = redoStack.at(-1);
     if (!next) return;
     setRedoStack((stack) => stack.slice(0, -1));
-    setUndoStack((stack) => [
-      ...stack.slice(-31),
-      cloneTrainerAppearance(draft.appearance),
-    ]);
+    setUndoStack((stack) => [...stack.slice(-31), cloneTrainerAppearance(draft.appearance)]);
     onAppearanceChange(next);
   }, [draft.appearance, onAppearanceChange, redoStack]);
 
-  const resetCategory = useCallback(() => {
+  const selectBodyRegion = (regionId: TrainerBodyRegionId) => {
+    const region = getBodyRegion(regionId);
+    setSelectedBodyRegion(region.id);
+    setSelectedBodyGroupId(region.groups[0]!.id);
+    setActiveSection('build');
+  };
+
+  const resetCurrentSection = useCallback(() => {
+    if (activeSection === 'poses' || activeSection === 'gameplay') return;
     const next = cloneTrainerAppearance(draft.appearance);
-    if (
-      activeTab === 'build' ||
-      activeTab === 'upper-body' ||
-      activeTab === 'core' ||
-      activeTab === 'lower-body'
-    ) {
-      for (const attribute of TRAINER_BUILD_ATTRIBUTES) {
-        if (
-          forgeMode === 'quick'
-            ? attribute.quick
-            : attribute.region === activeTab
-        ) {
-          next.build[attribute.id] =
-            DEFAULT_TRAINER_APPEARANCE.build[attribute.id];
-        }
+    if (activeSection === 'build') {
+      const attributeIds = forgeMode === 'quick'
+        ? QUICK_FORGE_BUILD_IDS
+        : getBodyControlGroup(selectedBodyRegion, selectedBodyGroupId).attributeIds;
+      for (const attributeId of attributeIds) {
+        next.build[attributeId] = DEFAULT_TRAINER_APPEARANCE.build[attributeId];
       }
-    } else if (activeTab === 'face') {
-      next.face = { ...DEFAULT_TRAINER_APPEARANCE.face };
-    } else if (activeTab === 'hair') {
-      next.hair = { ...DEFAULT_TRAINER_APPEARANCE.hair };
-    } else if (activeTab === 'outfit') {
-      next.outfit = { ...DEFAULT_TRAINER_APPEARANCE.outfit };
-    } else if (activeTab === 'colors') {
-      next.colors = { ...DEFAULT_TRAINER_APPEARANCE.colors };
-    } else if (activeTab === 'accessories') {
-      next.accessories = { ...DEFAULT_TRAINER_APPEARANCE.accessories };
-    } else if (activeTab === 'poses' || activeTab === 'saved-looks') {
-      return;
+    } else {
+      next[activeSection] = { ...DEFAULT_TRAINER_APPEARANCE[activeSection] } as never;
     }
     commitAppearance(next);
-  }, [activeTab, commitAppearance, draft.appearance, forgeMode]);
+  }, [activeSection, commitAppearance, draft.appearance, forgeMode, selectedBodyGroupId, selectedBodyRegion]);
 
   const applyPhysiquePreset = (presetId: string) => {
     const preset = getTrainerPhysiquePresetById(presetId);
-    setUndoStack((stack) => [
-      ...stack.slice(-31),
-      cloneTrainerAppearance(draft.appearance),
-    ]);
+    setUndoStack((stack) => [...stack.slice(-31), cloneTrainerAppearance(draft.appearance)]);
     setRedoStack([]);
     onPhysiquePresetSelect(preset.id);
   };
 
   const randomize = () => {
-    randomSeedRef.current =
-      (Math.imul(randomSeedRef.current, 1664525) + 1013904223) >>> 0;
-    commitAppearance(
-      randomizeTrainerAppearance(
-        randomSeedRef.current,
-        randomizationFilter,
-      ),
-    );
+    randomSeedRef.current = (Math.imul(randomSeedRef.current, 1664525) + 1013904223) >>> 0;
+    commitAppearance(randomizeTrainerAppearance(randomSeedRef.current, randomizationFilter));
   };
 
   useEffect(() => {
-    if (
-      forgeMode === 'quick' &&
-      (activeTab === 'upper-body' ||
-        activeTab === 'core' ||
-        activeTab === 'lower-body')
-    ) {
-      setActiveTab('build');
-    }
-  }, [activeTab, forgeMode]);
+    document.body.classList.add('gb-trainer-studio-active');
+    return () => document.body.classList.remove('gb-trainer-studio-active');
+  }, []);
 
   useEffect(() => {
     if (!window.matchMedia('(pointer: fine)').matches) return;
-    const firstControl = rootRef.current?.querySelector<HTMLElement>(
-      '[data-setup-autofocus="true"]',
-    );
-    firstControl?.focus();
+    rootRef.current?.querySelector<HTMLElement>('[data-setup-autofocus="true"]')?.focus();
   }, [mode]);
 
   useEffect(() => {
@@ -352,65 +290,36 @@ export function TrainerCreationScreen({
       const active = document.activeElement as HTMLElement | null;
       let index = active ? controls.indexOf(active) : -1;
 
-      if (
-        (active instanceof HTMLInputElement && active.type === 'range') ||
-        active instanceof HTMLSelectElement
-      ) {
+      if ((active instanceof HTMLInputElement && active.type === 'range') || active instanceof HTMLSelectElement) {
         if (action === 'move-left' || action === 'move-right') {
           const step = action === 'move-left' ? -1 : 1;
-          if (active instanceof HTMLInputElement) {
-            updateFocusedRange(active, step);
-          } else {
-            updateFocusedSelect(active, step);
-          }
+          if (active instanceof HTMLInputElement) updateFocusedRange(active, step);
+          else updateFocusedSelect(active, step);
           return;
         }
       }
-      if (
-        action === 'move-up' ||
-        action === 'move-left' ||
-        action === 'move-down' ||
-        action === 'move-right'
-      ) {
-        const step =
-          action === 'move-up' || action === 'move-left' ? -1 : 1;
+      if (action === 'move-up' || action === 'move-left' || action === 'move-down' || action === 'move-right') {
+        const step = action === 'move-up' || action === 'move-left' ? -1 : 1;
         index = (index + step + controls.length) % controls.length;
         controls[index]?.focus();
         return;
       }
       if (action === 'confirm' || action === 'interact') {
-        if (index < 0) {
-          controls[0]?.focus();
-          return;
-        }
-        if (
-          active instanceof HTMLButtonElement ||
-          active instanceof HTMLInputElement
-        ) {
-          active.click();
-        }
+        if (index < 0) controls[0]?.focus();
+        else if (active instanceof HTMLButtonElement || active instanceof HTMLInputElement) active.click();
         return;
       }
-      if (
-        (action === 'cancel' || action === 'menu') &&
-        mode === 'edit'
-      ) {
-        onCancelEdit();
+      if (action === 'cancel' || action === 'menu') {
+        if (activeDrawer) setActiveDrawer(null);
+        else if (mode === 'edit') onCancelEdit();
       }
     };
 
     return subscribeToGamepadFrames((gamepad, now) => {
-      const actions = gamepad
-        ? gamepadActions(gamepad.buttons, gamepad.axes)
-        : new Set<InputAction>();
+      const actions = gamepad ? gamepadActions(gamepad.buttons, gamepad.axes) : new Set<InputAction>();
       const previous = previousGamepadActionsRef.current;
-      const newlyPressed = [...actions].filter(
-        (action) => !previous.has(action),
-      );
-      const repeated =
-        actions.size > 0 && now >= nextGamepadRepeatAtRef.current
-          ? [...actions]
-          : [];
+      const newlyPressed = [...actions].filter((action) => !previous.has(action));
+      const repeated = actions.size > 0 && now >= nextGamepadRepeatAtRef.current ? [...actions] : [];
       const nextAction = newlyPressed[0] ?? repeated[0];
       if (nextAction) {
         handleAction(nextAction);
@@ -419,367 +328,182 @@ export function TrainerCreationScreen({
       if (actions.size === 0) nextGamepadRepeatAtRef.current = 0;
       previousGamepadActionsRef.current = actions;
     });
-  }, [mode, onCancelEdit]);
+  }, [activeDrawer, mode, onCancelEdit]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (validationIssues.length === 0) onConfirm();
   };
 
+  const presetLabel = draft.physiquePresetId
+    ? getTrainerPhysiquePresetById(draft.physiquePresetId).label
+    : 'Custom Build';
+  const activeSectionLabel = TRAINER_STUDIO_SECTIONS.find((section) => section.id === activeSection)?.label ?? 'Build';
+
   return (
     <div
-      className="app-shell trainer-creation-shell trainer-studio-v2"
+      className="trainer-creation-shell trainer-studio-v3"
+      data-forge-mode={forgeMode}
+      data-section={activeSection}
       ref={rootRef}
       onKeyDownCapture={(event) => {
-        const action = keyboardEventToAction(
-          event.nativeEvent,
-          keyboardBindings,
-        );
+        const action = keyboardEventToAction(event.nativeEvent, keyboardBindings);
         if (!action) return;
         const active = document.activeElement as HTMLElement | null;
-        if (
-          active instanceof HTMLInputElement &&
-          (active.type === 'text' || active.type === 'radio')
-        ) {
+        if (active instanceof HTMLInputElement && (active.type === 'text' || active.type === 'radio')) {
           if (action !== 'cancel') return;
         }
-        if (action === 'cancel' && mode === 'edit') {
-          event.preventDefault();
-          onCancelEdit();
+        if (action === 'cancel') {
+          if (activeDrawer) {
+            event.preventDefault();
+            setActiveDrawer(null);
+          } else if (mode === 'edit') {
+            event.preventDefault();
+            onCancelEdit();
+          }
           return;
         }
-        if (
-          active instanceof HTMLInputElement &&
-          active.type === 'range' &&
-          (action === 'move-left' || action === 'move-right')
-        ) {
+        if (active instanceof HTMLInputElement && active.type === 'range' && (action === 'move-left' || action === 'move-right')) {
           event.preventDefault();
           updateFocusedRange(active, action === 'move-left' ? -1 : 1);
           return;
         }
-        if (
-          action === 'confirm' &&
-          (active instanceof HTMLButtonElement ||
-            (active instanceof HTMLInputElement && active.type !== 'text'))
-        ) {
+        if (action === 'confirm' && (active instanceof HTMLButtonElement || (active instanceof HTMLInputElement && active.type !== 'text'))) {
           event.preventDefault();
           active.click();
         }
       }}
     >
-      <header className="top-banner trainer-creation-header">
-        <div>
-          <p className="trainer-kicker">
-            {mode === 'new'
-              ? 'New journey · required setup'
-              : 'Trainer studio · progress preserved'}
-          </p>
-          <h1>GYM BUDDIES</h1>
-          <p>
-            Trainer Forge: build an original fitness hero with a powerful
-            silhouette and your own proportions, features, outfit, and palette.
-          </p>
-        </div>
-        <div className="trainer-control-hint" aria-label="Setup controls">
-          Keyboard: Tab and arrows · Touch: tap and drag · Gamepad: D-pad,
-          south button, east button to cancel
-        </div>
-      </header>
+      <form className="trainer-studio-form" onSubmit={submit}>
+        <TrainerStudioHeader
+          canRedo={redoStack.length > 0}
+          canUndo={undoStack.length > 0}
+          mode={mode}
+          name={draft.name}
+          onDrawerOpen={setActiveDrawer}
+          onNameChange={onNameChange}
+          onRedo={redo}
+          onReset={resetCurrentSection}
+          onUndo={undo}
+          presetLabel={presetLabel}
+          resetDisabled={activeSection === 'poses' || activeSection === 'gameplay'}
+        />
 
-      <form className="trainer-studio-layout" onSubmit={submit}>
-        <aside
-          aria-label="Live animated trainer preview"
-          className="panel trainer-preview-panel trainer-studio-preview"
-        >
-          <div className="trainer-section-heading">
-            <span className="trainer-step">01</span>
-            <div>
-              <h2>Live Preview</h2>
-              <p>{direction} · {pose}</p>
+        <main className="trainer-studio-main">
+          <BuildNavigator
+            forgeMode={forgeMode}
+            onModeChange={setForgeMode}
+            onPresetSelect={applyPhysiquePreset}
+            onRegionSelect={selectBodyRegion}
+            selectedPresetId={draft.physiquePresetId ?? ''}
+            selectedRegion={selectedBodyRegion}
+          />
+
+          <section className="trainer-studio-preview" aria-label="Live animated trainer preview">
+            <div className="trainer-studio-preview-heading">
+              <span><small>LIVE PREVIEW</small><strong>{draft.name || 'Trainer'}</strong></span>
+              <span>{direction} · {pose}</span>
             </div>
-          </div>
-          <TrainerPreviewWorkbench
-            appearance={draft.appearance}
+            <TrainerPreviewWorkbench
+              appearance={draft.appearance}
+              compact
+              direction={direction}
+              highlightedRegion={getBodyRegion(selectedBodyRegion).previewRegion}
+              initialAppearance={initialAppearanceRef.current}
+              name={draft.name || 'Trainer'}
+              onDirectionChange={setDirection}
+              onPoseChange={setPose}
+              pose={pose}
+              reducedMotion={reducedMotion}
+            />
+            {mode === 'edit' ? (
+              <p className="trainer-progress-safe">Appearance only · journey progress preserved</p>
+            ) : null}
+          </section>
+
+          <CustomizationInspector
+            activeSection={activeSection}
             direction={direction}
-            initialAppearance={initialAppearanceRef.current}
-            name={draft.name || 'Trainer'}
+            draft={draft}
+            forgeMode={forgeMode}
+            onAppearanceChange={commitAppearance}
+            onAppearancePresetsChange={onAppearancePresetsChange}
+            onBodyGroupSelect={setSelectedBodyGroupId}
+            onDirectionChange={setDirection}
+            onGameplayPresetSelect={onPresetSelect}
+            onMuscleChange={onMuscleChange}
+            onPhysiquePresetSelect={applyPhysiquePreset}
+            onPoseChange={setPose}
+            onSectionChange={setActiveSection}
+            pose={pose}
+            selectedBodyGroupId={selectedBodyGroupId}
+            selectedBodyRegion={selectedBodyRegion}
+          />
+        </main>
+
+        <TrainerStudioFooter
+          direction={direction}
+          mode={mode}
+          onCancelEdit={onCancelEdit}
+          onDirectionChange={setDirection}
+          onPoseChange={setPose}
+          onStartModeChange={onStartModeChange}
+          physiqueLevel={physiqueLevel}
+          pose={pose}
+          startMode={startMode}
+          validationIssues={validationIssues}
+        />
+      </form>
+
+      {activeDrawer === 'saved-looks' ? (
+        <TrainerStudioDrawer onClose={() => setActiveDrawer(null)} title="Saved Looks">
+          <TrainerPreviewControls
+            appearance={draft.appearance}
+            appearancePresets={draft.appearancePresets}
+            direction={direction}
+            onAppearanceLoad={commitAppearance}
+            onAppearancePresetsChange={onAppearancePresetsChange}
             onDirectionChange={setDirection}
             onPoseChange={setPose}
             pose={pose}
-            reducedMotion={reducedMotion}
+            section="saved-looks"
           />
-          <label className="trainer-name-field">
-            Trainer name
-            <input
-              data-setup-autofocus="true"
-              data-setup-control="true"
-              maxLength={14}
-              onChange={(event) => onNameChange(event.target.value)}
-              placeholder="Trainer"
-              value={draft.name}
-            />
-          </label>
-          <div className="trainer-physique-card" aria-live="polite">
-            <span>Gameplay Physique Level</span>
-            <strong>{String(physiqueLevel).padStart(2, '0')}</strong>
-            <small>
-              Calculated from fictional gameplay attributes—not cosmetic body
-              proportions or a real-world assessment.
-            </small>
-          </div>
-          {mode === 'edit' ? (
-            <div className="trainer-progress-safe">
-              Saving here preserves Buddies, routes, victories, items, fatigue,
-              specialization, equipment bonuses, and gym progress.
-            </div>
-          ) : null}
-        </aside>
+        </TrainerStudioDrawer>
+      ) : null}
 
-        <main className="panel trainer-studio-controls">
-          <div className="trainer-section-heading">
-            <span className="trainer-step">02</span>
-            <div>
-              <h2>Customize</h2>
-              <p>Every option uses a stable content ID.</p>
-            </div>
-          </div>
-          <div className="trainer-forge-mode" aria-label="Trainer Forge mode">
-            <button
-              aria-pressed={forgeMode === 'quick'}
-              className={forgeMode === 'quick' ? 'active' : ''}
-              data-setup-control="true"
-              onClick={() => setForgeMode('quick')}
-              type="button"
-            >
-              <strong>Quick Forge</strong>
-              <small>Presets and essential silhouette controls</small>
-            </button>
-            <button
-              aria-pressed={forgeMode === 'detail'}
-              className={forgeMode === 'detail' ? 'active' : ''}
-              data-setup-control="true"
-              onClick={() => setForgeMode('detail')}
-              type="button"
-            >
-              <strong>Detail Forge</strong>
-              <small>Every regional proportion and comparison tool</small>
-            </button>
-          </div>
-          <div
-            aria-label="Trainer customization sections"
-            className="trainer-custom-tabs"
-            role="tablist"
-          >
-            {TRAINER_CUSTOMIZATION_TABS.filter(
-              (tab) => forgeMode === 'detail' || !tab.detailOnly,
-            ).map((tab) => (
-              <button
-                aria-controls={`trainer-tab-panel-${tab.id}`}
-                aria-selected={activeTab === tab.id}
-                className={activeTab === tab.id ? 'active' : ''}
-                data-setup-control="true"
-                id={`trainer-tab-${tab.id}`}
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                role="tab"
-                type="button"
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <div className="trainer-history-toolbar">
-            <label className="trainer-random-filter">
-              Random style
+      {activeDrawer === 'randomize' ? (
+        <TrainerStudioDrawer onClose={() => setActiveDrawer(null)} title="Controlled Randomizer">
+          <div className="trainer-studio-randomizer">
+            <p>Generate a valid muscular appearance using the existing deterministic filter rules.</p>
+            <label>
+              <span>Random style</span>
               <select
                 data-setup-control="true"
-                onChange={(event) =>
-                  setRandomizationFilter(
-                    event.target.value as TrainerRandomizationFilter,
-                  )
-                }
+                onChange={(event) => setRandomizationFilter(event.target.value as TrainerRandomizationFilter)}
                 value={randomizationFilter}
               >
                 {TRAINER_RANDOMIZATION_FILTERS.map((filter) => (
-                  <option key={filter.id} value={filter.id}>
-                    {filter.label}
-                  </option>
+                  <option key={filter.id} value={filter.id}>{filter.label}</option>
                 ))}
               </select>
             </label>
-            <button
-              data-setup-control="true"
-              onClick={randomize}
-              type="button"
-            >
-              Randomize
-            </button>
-            <button
-              data-setup-control="true"
-              disabled={undoStack.length === 0}
-              onClick={undo}
-              type="button"
-            >
-              Undo
-            </button>
-            <button
-              data-setup-control="true"
-              disabled={redoStack.length === 0}
-              onClick={redo}
-              type="button"
-            >
-              Redo
-            </button>
-            <button
-              data-setup-control="true"
-              disabled={
-                activeTab === 'poses' || activeTab === 'saved-looks'
-              }
-              onClick={resetCategory}
-              type="button"
-            >
-              Reset {activeTab.replace('-', ' ')}
-            </button>
+            <button className="primary-btn" data-setup-control="true" onClick={randomize} type="button">Randomize Appearance</button>
+            <small>Undo remains available after closing this drawer.</small>
           </div>
-          <section
-            aria-labelledby={`trainer-tab-${activeTab}`}
-            className="trainer-custom-tab-panel"
-            id={`trainer-tab-panel-${activeTab}`}
-            role="tabpanel"
-          >
-            <TrainerCustomizationControls
-              activeTab={activeTab}
-              draft={draft}
-              forgeMode={forgeMode}
-              onAppearanceChange={commitAppearance}
-              onGameplayPresetSelect={onPresetSelect}
-              onMuscleChange={onMuscleChange}
-              onPhysiquePresetSelect={applyPhysiquePreset}
-              poseContent={
-                <TrainerPreviewControls
-                  appearance={draft.appearance}
-                  appearancePresets={draft.appearancePresets}
-                  direction={direction}
-                  onAppearanceLoad={commitAppearance}
-                  onAppearancePresetsChange={
-                    onAppearancePresetsChange
-                  }
-                  onDirectionChange={setDirection}
-                  onPoseChange={setPose}
-                  pose={pose}
-                  section="poses"
-                />
-              }
-              savedLooksContent={
-                <TrainerPreviewControls
-                  appearance={draft.appearance}
-                  appearancePresets={draft.appearancePresets}
-                  direction={direction}
-                  onAppearanceLoad={commitAppearance}
-                  onAppearancePresetsChange={
-                    onAppearancePresetsChange
-                  }
-                  onDirectionChange={setDirection}
-                  onPoseChange={setPose}
-                  pose={pose}
-                  section="saved-looks"
-                />
-              }
-            />
-          </section>
-        </main>
+        </TrainerStudioDrawer>
+      ) : null}
 
-        <aside className="panel trainer-studio-finish">
-          <div className="trainer-section-heading">
-            <span className="trainer-step">03</span>
-            <div>
-              <h2>Finish</h2>
-              <p>Your full appearance is stored in the versioned save.</p>
-            </div>
+      {activeDrawer === 'help' ? (
+        <TrainerStudioDrawer onClose={() => setActiveDrawer(null)} title="Forge Help">
+          <div className="trainer-studio-help">
+            <h3>{activeSectionLabel}</h3>
+            <p>Quick Forge exposes the strongest silhouette decisions. Detail Forge reveals every existing regional control without changing current values.</p>
+            <p>Cosmetic proportions, outfit, pose, and colors remain separate from the fictional gameplay attributes under Gameplay.</p>
+            <p><strong>Controls:</strong> Tab or D-pad to move, arrows to tune a focused slider, confirm to activate, and cancel to close a drawer.</p>
+            <button className="trainer-danger-link" data-setup-control="true" onClick={onRequestRestart} type="button">Restart Entire Journey</button>
           </div>
-          {mode === 'new' ? (
-            <fieldset className="trainer-fieldset trainer-start-mode">
-              <legend>Choose your opening</legend>
-              <label className={startMode === 'guided' ? 'active' : ''}>
-                <input
-                  checked={startMode === 'guided'}
-                  data-setup-control="true"
-                  name="trainer-start-mode"
-                  onChange={() => onStartModeChange('guided')}
-                  type="radio"
-                />
-                <span>
-                  <strong>Guided Tutorial</strong>
-                  <small>
-                    Learn Home Gym training, route travel, scouting, capture,
-                    and boss signals step by step.
-                  </small>
-                </span>
-              </label>
-              <label className={startMode === 'normal' ? 'active' : ''}>
-                <input
-                  checked={startMode === 'normal'}
-                  data-setup-control="true"
-                  name="trainer-start-mode"
-                  onChange={() => onStartModeChange('normal')}
-                  type="radio"
-                />
-                <span>
-                  <strong>Normal Start</strong>
-                  <small>
-                    Begin at Home Gym with normal systems available and
-                    tutorial guidance completed.
-                  </small>
-                </span>
-              </label>
-            </fieldset>
-          ) : null}
-          <div className="trainer-separation-card">
-            <strong>Cosmetics stay cosmetic</strong>
-            <p>
-              Visible arms, body mass, equipment, fatigue presentation, and
-              style selections never silently modify battle power.
-            </p>
-          </div>
-          {validationIssues.length > 0 ? (
-            <div className="trainer-validation" role="alert">
-              {validationIssues[0]}
-            </div>
-          ) : null}
-          <div className="trainer-creation-actions">
-            <button
-              className="primary-btn"
-              data-setup-control="true"
-              disabled={validationIssues.length > 0}
-              type="submit"
-            >
-              {mode === 'new'
-                ? startMode === 'guided'
-                  ? 'Confirm & Start Guided Journey'
-                  : 'Confirm & Start Journey'
-                : 'Save Trainer Appearance'}
-            </button>
-            {mode === 'edit' ? (
-              <button
-                className="secondary-btn"
-                data-setup-control="true"
-                onClick={onCancelEdit}
-                type="button"
-              >
-                Cancel Changes
-              </button>
-            ) : null}
-            <button
-              className="trainer-danger-link"
-              data-setup-control="true"
-              onClick={onRequestRestart}
-              type="button"
-            >
-              Restart Entire Journey
-            </button>
-          </div>
-        </aside>
-      </form>
+        </TrainerStudioDrawer>
+      ) : null}
 
       <JourneyRestartDialog
         onCancel={onCancelRestart}

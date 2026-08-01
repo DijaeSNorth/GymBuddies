@@ -29,19 +29,20 @@ test('new-game onboarding creates a versioned guided-journey save', async ({
   ).toBeVisible();
 
   await page.getByLabel('Trainer name').fill('Morgan');
+  await page.getByRole('tab', { name: 'Gameplay', exact: true }).click();
   await page.getByRole('button', { name: /Control Specialist/i }).click();
   await page.locator('#root').evaluate((root) => {
     root.scrollTo(0, root.scrollHeight);
   });
   await page
-    .getByRole('button', { name: 'Confirm & Start Guided Journey' })
+    .getByRole('button', { name: 'Start Guided Journey' })
     .click();
 
-  await expect(page.getByRole('heading', { name: 'Live route view' })).toBeVisible();
+  await expect(page.getByTestId('journey-status-bar')).toBeVisible();
   await expect
     .poll(() => page.locator('#root').evaluate((root) => root.scrollTop))
     .toBe(0);
-  await expect(page.locator('.tutorial-card')).toBeVisible();
+  await expect(page.locator('.journey-dialogue-bar')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Next' })).toBeVisible();
 
   await expect
@@ -76,7 +77,7 @@ test('legacy saves migrate in the rendered application', async ({
 
   await page.goto('/');
   await expectHealthyGameShell(page);
-  await expect(page.getByRole('heading', { name: 'Live route view' })).toBeVisible();
+  await expect(page.getByTestId('journey-status-bar')).toBeVisible();
   await expect
     .poll(async () => (await readCurrentSaveState(page))?.schemaVersion)
     .toBe(19);
@@ -170,14 +171,15 @@ test('detailed trainer customization persists stable IDs and saved looks', async
   await page
     .getByRole('button', { name: /Classic Bodybuilder/i })
     .click();
-  await page.getByRole('tab', { name: 'Upper Body' }).click();
+  await page.getByRole('button', { name: 'Shoulders' }).click();
   await expect(page.locator('#trainer-build-shoulderWidth')).toHaveValue('9');
   await page.locator('#trainer-build-shoulderWidth').fill('10');
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.locator('#trainer-build-latWidth').fill('10');
   await page.getByRole('button', { name: /Quick Forge/i }).click();
-  await expect(page.getByRole('tab', { name: 'Upper Body' })).toHaveCount(0);
+  await expect(page.locator('#trainer-build-latWidth')).toHaveCount(0);
   await page.getByRole('button', { name: /Detail Forge/i }).click();
-  await page.getByRole('tab', { name: 'Upper Body' }).click();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.locator('#trainer-build-latWidth')).toHaveValue('10');
 
   await page.getByRole('tab', { name: 'Face' }).click();
@@ -207,6 +209,8 @@ test('detailed trainer customization persists stable IDs and saved looks', async
   await page.getByLabel('Gym bag').selectOption('duffel-small');
 
   await page.getByRole('button', { name: 'Randomize' }).click();
+  await page.getByRole('button', { name: 'Randomize Appearance' }).click();
+  await page.getByRole('button', { name: 'Close Controlled Randomizer' }).click();
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByLabel('Headband or hat')).toHaveValue(
     'wide-headband',
@@ -217,7 +221,7 @@ test('detailed trainer customization persists stable IDs and saved looks', async
   await page.getByRole('tab', { name: 'Poses' }).click();
   await page.getByRole('button', { name: /right trainer/i }).click();
   await page.getByRole('button', { name: 'Victory', exact: true }).click();
-  await page.getByRole('tab', { name: 'Saved Looks' }).click();
+  await page.getByRole('button', { name: 'Saved Looks' }).click();
   await page.getByLabel('Appearance preset name').fill('Arena Look');
   await page.getByRole('button', { name: 'Save Current Look' }).click();
   await expect(page.getByText('Arena Look', { exact: true })).toBeVisible();
@@ -236,13 +240,13 @@ test('detailed trainer customization persists stable IDs and saved looks', async
     path: testInfo.outputPath('trainer-forge-saved-looks.png'),
     fullPage: false,
   });
+  await page.getByRole('button', { name: 'Close Saved Looks' }).click();
 
-  await page.getByText('Normal Start', { exact: true }).click();
+  await page.getByLabel('Opening').selectOption('normal');
   await page
-    .getByRole('button', { name: 'Confirm & Start Journey' })
+    .getByRole('button', { name: 'Start Journey' })
     .click();
-  await expect(page.getByRole('heading', { name: 'Live route view' }))
-    .toBeVisible();
+  await expect(page.getByTestId('journey-status-bar')).toBeVisible();
 
   await expect
     .poll(async () => {
@@ -314,6 +318,7 @@ test('Buddy customization stays species-readable and persists cosmetic-only IDs'
 
   await page.goto('/');
   await expectHealthyGameShell(page);
+  await page.getByTestId('journey-nav-team').click();
   const customize = page.getByRole('button', { name: 'Customize Buddy' });
   await customize.scrollIntoViewIfNeeded();
   await customize.click();
@@ -407,8 +412,7 @@ test('a corrupted primary loads the valid previous save without a blank screen',
 
   await page.goto('/');
   await expectHealthyGameShell(page);
-  await expect(page.getByText(/Backup Avery · Physique Level/)).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Live route view' })).toBeVisible();
+  await expect(page.getByTestId('journey-status-bar')).toContainText('Backup Avery');
 });
 
 test('an oversized save file is rejected before confirmation', async ({
@@ -421,6 +425,7 @@ test('an oversized save file is rejected before confirmation', async ({
 
   await page.goto('/');
   await expectHealthyGameShell(page);
+  await page.getByRole('button', { name: 'Open system menu' }).click();
   await page.getByText('Save Management').click();
   await page
     .getByLabel('Choose Gym Buddies save JSON')
@@ -442,7 +447,7 @@ test('an oversized save file is rejected before confirmation', async ({
 
   await expect(page.getByText(/larger than the 1 MiB save import limit/i))
     .toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Import this journey?' })).toHaveCount(0);
 });
 
 test('storage denial in the optional setup flag does not break startup', async ({
@@ -465,6 +470,6 @@ test('storage denial in the optional setup flag does not break startup', async (
 
   await page.goto('/');
   await expectHealthyGameShell(page);
-  await expect(page.getByRole('heading', { name: 'Live route view' })).toBeVisible();
+  await expect(page.getByTestId('journey-status-bar')).toBeVisible();
   expect(runtimeErrors).toEqual([]);
 });

@@ -38,15 +38,16 @@ test('touch movement, menus, and Buddy styling work on a phone viewport', async 
 
   await page.getByRole('button', { name: 'Menu', exact: true }).tap();
   await expect(
-    page.getByRole('dialog', { name: 'Controls & accessibility' }),
+    page.getByRole('dialog', { name: 'System Menu' }),
   ).toBeVisible();
   await expect(page.getByLabel('Touchscreen game controls')).toBeVisible();
-  await page.getByRole('button', { name: 'Resume route' }).tap();
+  await page.getByRole('button', { name: 'Close System Menu' }).tap();
   await page.screenshot({
     path: testInfo.outputPath('journey-game-390x844.png'),
     fullPage: false,
   });
 
+  await page.getByTestId('journey-nav-team').tap();
   const customize = page.getByRole('button', { name: 'Customize Buddy' });
   await customize.scrollIntoViewIfNeeded();
   await customize.tap();
@@ -74,25 +75,27 @@ test('Trainer Forge stays usable at a 390 by 844 phone viewport', async ({
 
   await page.goto('/');
   await expectHealthyGameShell(page);
-  const forge = page.locator('.trainer-studio-v2');
+  const forge = page.locator('.trainer-studio-v3');
   await expect(forge).toBeVisible();
   await page.getByRole('button', { name: /Detail Forge/i }).tap();
-  await page.getByRole('tab', { name: 'Upper Body' }).tap();
+  await page.getByRole('button', { name: 'Back', exact: true }).tap();
   const latControl = page.locator('#trainer-build-latWidth');
   await latControl.scrollIntoViewIfNeeded();
   await latControl.fill('10');
   await expect(latControl).toHaveValue('10');
 
   await page.getByRole('button', { name: 'Front / Back' }).tap();
-  await expect(page.getByText('Front', { exact: true })).toBeVisible();
-  await expect(page.getByText('Back', { exact: true })).toBeVisible();
+  const preview = page.getByLabel('Live animated trainer preview');
+  await expect(preview.getByText('Front', { exact: true })).toBeVisible();
+  await expect(preview.getByText('Back', { exact: true })).toBeVisible();
+  await page.getByText('Preview tools', { exact: true }).tap();
   await page.getByRole('button', { name: 'In-Game Size' }).tap();
 
   const layout = await page.evaluate(() => ({
     viewportWidth: window.innerWidth,
     pageWidth: document.documentElement.scrollWidth,
     forgeWidth:
-      document.querySelector('.trainer-studio-v2')?.getBoundingClientRect()
+      document.querySelector('.trainer-studio-v3')?.getBoundingClientRect()
         .width ?? Number.POSITIVE_INFINITY,
     smallestTarget: Math.min(
       ...Array.from(
@@ -106,7 +109,7 @@ test('Trainer Forge stays usable at a 390 by 844 phone viewport', async ({
   }));
   expect(layout.pageWidth).toBeLessThanOrEqual(layout.viewportWidth);
   expect(layout.forgeWidth).toBeLessThanOrEqual(layout.viewportWidth);
-  expect(layout.smallestTarget).toBeGreaterThanOrEqual(38);
+  expect(layout.smallestTarget).toBeGreaterThanOrEqual(44);
   await page.screenshot({
     path: testInfo.outputPath('trainer-forge-390x844.png'),
     fullPage: false,

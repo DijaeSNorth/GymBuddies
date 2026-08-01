@@ -36,7 +36,9 @@ const LIGHTING_MODES: Array<{
 
 type TrainerPreviewWorkbenchProps = {
   appearance: TrainerAppearance;
+  compact?: boolean;
   direction: TrainerFacingDirection;
+  highlightedRegion?: 'upper-body' | 'core' | 'lower-body';
   initialAppearance: TrainerAppearance;
   name: string;
   onDirectionChange: (direction: TrainerFacingDirection) => void;
@@ -47,7 +49,9 @@ type TrainerPreviewWorkbenchProps = {
 
 export function TrainerPreviewWorkbench({
   appearance,
+  compact = false,
   direction,
+  highlightedRegion,
   initialAppearance,
   name,
   onDirectionChange,
@@ -59,8 +63,12 @@ export function TrainerPreviewWorkbench({
     useState<TrainerPreviewMode>('single');
   const [lighting, setLighting] =
     useState<TrainerPreviewLighting>('neutral');
-  const [previewSize, setPreviewSize] = useState<'small' | 'large'>('large');
+  const [previewSize, setPreviewSize] =
+    useState<'small' | 'battle' | 'large'>('large');
   const [autoRotate, setAutoRotate] = useState(false);
+  const [previewReducedMotion, setPreviewReducedMotion] =
+    useState(reducedMotion);
+  const effectiveReducedMotion = reducedMotion || previewReducedMotion;
 
   const competitionAppearance = useMemo(() => {
     const next = cloneTrainerAppearance(appearance);
@@ -76,7 +84,7 @@ export function TrainerPreviewWorkbench({
   }, [appearance]);
 
   useEffect(() => {
-    if (!autoRotate || reducedMotion) return;
+    if (!autoRotate || effectiveReducedMotion) return;
     const interval = window.setInterval(() => {
       const current = TRAINER_DIRECTIONS.indexOf(direction);
       onDirectionChange(
@@ -84,7 +92,7 @@ export function TrainerPreviewWorkbench({
       );
     }, 1_600);
     return () => window.clearInterval(interval);
-  }, [autoRotate, direction, onDirectionChange, reducedMotion]);
+  }, [autoRotate, direction, effectiveReducedMotion, onDirectionChange]);
 
   const rotate = (step: -1 | 1) => {
     const current = TRAINER_DIRECTIONS.indexOf(direction);
@@ -108,8 +116,8 @@ export function TrainerPreviewWorkbench({
     );
   };
 
-  const scale = previewSize === 'small' ? 2 : 4.6;
-  const comparisonScale = previewSize === 'small' ? 1.6 : 3;
+  const scale = previewSize === 'small' ? 2 : previewSize === 'battle' ? 3.2 : 4.6;
+  const comparisonScale = previewSize === 'small' ? 1.6 : previewSize === 'battle' ? 2.4 : 3;
   const figure = (
     figureAppearance: TrainerAppearance,
     label: string,
@@ -127,7 +135,7 @@ export function TrainerPreviewWorkbench({
         }
         label={label}
         pose={pose}
-        reducedMotion={reducedMotion}
+        reducedMotion={effectiveReducedMotion}
         scale={
           previewMode === 'single' ||
           previewMode === 'silhouette'
@@ -165,13 +173,21 @@ export function TrainerPreviewWorkbench({
       </>
     );
   } else if (previewMode === 'muscle-highlight') {
-    previewContent = (
-      <>
-        {figure(appearance, 'Upper Body', direction, false, 'upper-body')}
-        {figure(appearance, 'Core', direction, false, 'core')}
-        {figure(appearance, 'Lower Body', direction, false, 'lower-body')}
-      </>
-    );
+    previewContent = highlightedRegion
+      ? figure(
+          appearance,
+          highlightedRegion.replace('-', ' '),
+          direction,
+          false,
+          highlightedRegion,
+        )
+      : (
+          <>
+            {figure(appearance, 'Upper Body', direction, false, 'upper-body')}
+            {figure(appearance, 'Core', direction, false, 'core')}
+            {figure(appearance, 'Lower Body', direction, false, 'lower-body')}
+          </>
+        );
   } else if (previewMode === 'clothing-compare') {
     previewContent = (
       <>
@@ -182,7 +198,7 @@ export function TrainerPreviewWorkbench({
   }
 
   return (
-    <>
+    <div className={`trainer-preview-workbench ${compact ? 'trainer-preview-workbench-compact' : ''}`}>
       <div className="trainer-preview-tool-strip" aria-label="Preview modes">
         {PREVIEW_MODES.map((mode) => (
           <button
@@ -222,42 +238,76 @@ export function TrainerPreviewWorkbench({
           →
         </button>
       </div>
-      <div className="trainer-preview-secondary-tools">
-        <div aria-label="Preview lighting">
-          {LIGHTING_MODES.map((mode) => (
+      <details className="trainer-preview-more-tools">
+        <summary data-setup-control="true">Preview tools</summary>
+        <div className="trainer-preview-secondary-tools">
+          <div aria-label="Preview lighting">
+            {LIGHTING_MODES.map((mode) => (
+              <button
+                aria-pressed={lighting === mode.id}
+                className={lighting === mode.id ? 'active' : ''}
+                data-setup-control="true"
+                key={mode.id}
+                onClick={() => setLighting(mode.id)}
+                type="button"
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+          <div aria-label="Preview size">
             <button
-              aria-pressed={lighting === mode.id}
-              className={lighting === mode.id ? 'active' : ''}
+              aria-pressed={previewSize === 'small'}
+              className={previewSize === 'small' ? 'active' : ''}
               data-setup-control="true"
-              key={mode.id}
-              onClick={() => setLighting(mode.id)}
+              onClick={() => setPreviewSize('small')}
               type="button"
             >
-              {mode.label}
+              In-Game Size
             </button>
-          ))}
+            <button
+              aria-pressed={previewSize === 'large'}
+              className={previewSize === 'large' ? 'active' : ''}
+              data-setup-control="true"
+              onClick={() => setPreviewSize('large')}
+              type="button"
+            >
+              Creator Size
+            </button>
+            <button
+              aria-pressed={previewSize === 'battle'}
+              className={previewSize === 'battle' ? 'active' : ''}
+              data-setup-control="true"
+              onClick={() => setPreviewSize('battle')}
+              type="button"
+            >
+              Battle / Showcase
+            </button>
+          </div>
         </div>
-        <div aria-label="Preview size">
+        <div className="trainer-preview-motion-tools">
           <button
-            aria-pressed={previewSize === 'small'}
-            className={previewSize === 'small' ? 'active' : ''}
+            aria-pressed={effectiveReducedMotion}
+            className={effectiveReducedMotion ? 'active' : ''}
             data-setup-control="true"
-            onClick={() => setPreviewSize('small')}
+            disabled={reducedMotion}
+            onClick={() => setPreviewReducedMotion((active) => !active)}
             type="button"
           >
-            In-Game Size
+            {effectiveReducedMotion ? 'Reduced Motion Preview' : 'Full Motion Preview'}
           </button>
           <button
-            aria-pressed={previewSize === 'large'}
-            className={previewSize === 'large' ? 'active' : ''}
+            aria-pressed={autoRotate}
+            className="trainer-auto-rotate"
             data-setup-control="true"
-            onClick={() => setPreviewSize('large')}
+            disabled={effectiveReducedMotion}
+            onClick={() => setAutoRotate((active) => !active)}
             type="button"
           >
-            Creator Size
+            {autoRotate ? 'Stop Slow Rotation' : 'Start Slow Rotation'}
           </button>
         </div>
-      </div>
+      </details>
       <div className="trainer-pose-cycle">
         <button
           aria-label="Previous pose"
@@ -277,16 +327,6 @@ export function TrainerPreviewWorkbench({
           Next Pose
         </button>
       </div>
-      <button
-        aria-pressed={autoRotate}
-        className="trainer-auto-rotate"
-        data-setup-control="true"
-        disabled={reducedMotion}
-        onClick={() => setAutoRotate((active) => !active)}
-        type="button"
-      >
-        {autoRotate ? 'Stop Slow Rotation' : 'Start Slow Rotation'}
-      </button>
-    </>
+    </div>
   );
 }

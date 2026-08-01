@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 
 import type { PlaytestCheckpointId } from '../../game/playtest/types';
 import type { AlphaPlaytestController } from './useAlphaPlaytest';
@@ -36,6 +36,16 @@ export function AlphaPlaytestEntry({
     controller.enabled && controller.safeForCheckpoint
       ? controller.session?.pendingCheckpoints[0] ?? null
       : null;
+
+  useEffect(() => {
+    const openPlaytestTools = () => setOpen(true);
+    window.addEventListener('gym-buddies:open-playtest', openPlaytestTools);
+    return () =>
+      window.removeEventListener(
+        'gym-buddies:open-playtest',
+        openPlaytestTools,
+      );
+  }, []);
 
   return (
     <>

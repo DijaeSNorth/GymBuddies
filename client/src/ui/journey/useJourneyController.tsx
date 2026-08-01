@@ -1512,6 +1512,13 @@ export function useJourneyController({
     }));
   }
 
+  function previousTutorialStep() {
+    setSave((state) => ({
+      ...state,
+      tutorialStep: Math.max(0, state.tutorialStep - 1),
+    }));
+  }
+
   function openPhysiqueReview() {
     if (activeZone.id !== 'home') {
       setMessage('The Physique Review studio is available inside Home Gym.');
@@ -3262,6 +3269,7 @@ function resolveMatch(
     TUTORIAL_STEPS,
     currentTutorialText,
     nextTutorialStep,
+    previousTutorialStep,
     finishTutorialNow,
     trainer,
     trainingFatigueLevel,

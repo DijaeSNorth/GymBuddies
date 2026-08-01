@@ -70,6 +70,9 @@ interface GamePresentationProps {
   partyCount: number;
   primaryActionDisabled: boolean;
   snapshot: Omit<GamePresentationSnapshot, 'motion'>;
+  condensed?: boolean;
+  externallyPaused?: boolean;
+  onMenuRequest?: () => void;
 }
 
 function focusableControls(container: HTMLElement | null) {
@@ -101,6 +104,9 @@ export function GamePresentation({
   snapshot,
   visualProgression,
   onVisualProgressionChange,
+  condensed = false,
+  externallyPaused = false,
+  onMenuRequest,
 }: GamePresentationProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -136,7 +142,7 @@ export function GamePresentation({
     reducedMotion: accessibility.reducedMotion,
     screenShake: accessibility.screenShake,
   };
-  const effectivePaused = paused || menuOpen;
+  const effectivePaused = paused || menuOpen || externallyPaused;
   const displayedDialogue = dialogue.slice(0, dialogueCursor);
   const dialogueComplete = dialogueCursor >= dialogue.length;
   const keyboardShortcutText = useMemo(
@@ -263,7 +269,11 @@ export function GamePresentation({
       const isPresentationFullscreen = document.fullscreenElement === wrapper;
       const availableHeight = Math.max(
         180,
-        isPresentationFullscreen ? window.innerHeight - 24 : window.innerHeight * 0.72,
+        isPresentationFullscreen
+          ? window.innerHeight - 24
+          : condensed
+            ? wrapper.clientHeight
+            : window.innerHeight * 0.72,
       );
       const metrics = calculatePresentationScale(wrapper.clientWidth, availableHeight);
       stage.style.setProperty('--gb-stage-width', `${metrics.width}px`);
@@ -282,7 +292,7 @@ export function GamePresentation({
       window.removeEventListener('resize', updateScale);
       document.removeEventListener('fullscreenchange', updateScale);
     };
-  }, []);
+  }, [condensed]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -374,14 +384,16 @@ export function GamePresentation({
         ) {
           resumeGameplay();
         } else if (action === 'menu') {
-          setMenuOpen(true);
+          if (onMenuRequest) onMenuRequest();
+          else setMenuOpen(true);
         }
         return;
       }
 
       if (action === 'menu') {
         setToggledDirection(null);
-        setMenuOpen(true);
+        if (onMenuRequest) onMenuRequest();
+        else setMenuOpen(true);
         return;
       }
       if (action === 'pause') {
@@ -438,6 +450,7 @@ export function GamePresentation({
       dialogueVisible,
       directionAvailability,
       focusOverlayControl,
+      onMenuRequest,
       resumeGameplay,
     ],
   );
@@ -621,18 +634,21 @@ export function GamePresentation({
 
   return (
     <section
-      className="gb-presentation"
+      className={`gb-presentation ${condensed ? 'gb-presentation-condensed' : ''}`}
       data-game-presentation="true"
       data-high-contrast={accessibility.highContrast ? 'true' : 'false'}
-      aria-labelledby="gb-presentation-title"
+      aria-label={condensed ? 'Gym Buddies game presentation' : undefined}
+      aria-labelledby={condensed ? undefined : 'gb-presentation-title'}
     >
-      <div className="gb-presentation-heading">
-        <div>
-          <p className="gb-presentation-kicker">Field Link / 240</p>
-          <h2 id="gb-presentation-title">Live route view</h2>
+      {!condensed ? (
+        <div className="gb-presentation-heading">
+          <div>
+            <p className="gb-presentation-kicker">Field Link / 240</p>
+            <h2 id="gb-presentation-title">Live route view</h2>
+          </div>
+          <p>Focus the playfield for keyboard or gamepad control.</p>
         </div>
-        <p>Focus the playfield for keyboard or gamepad control.</p>
-      </div>
+      ) : null}
 
       <div ref={wrapperRef} className="gb-presentation-viewport">
         <div
@@ -658,14 +674,14 @@ export function GamePresentation({
           <div ref={canvasHostRef} className="gb-phaser-host" aria-hidden="true" />
           <div className="gb-letterbox gb-letterbox-bottom" aria-hidden="true" />
 
-          <div className="gb-status-hud" aria-label="Current game status">
+          {!condensed ? <div className="gb-status-hud" aria-label="Current game status">
             <span className="gb-hud-zone">{snapshot.activeZoneName}</span>
             <span className="gb-hud-divider" aria-hidden="true" />
             <span>Buddy {snapshot.buddyName || 'Solo'}</span>
             <span>HP {Math.max(0, snapshot.buddyHp)}/{Math.max(0, snapshot.buddyMaxHp)}</span>
             <span>Fatigue {Math.round(snapshot.fatigueRatio * 100)}%</span>
             <span>Team {partyCount}</span>
-          </div>
+          </div> : null}
 
           <div className="gb-stage-tools">
             <button
@@ -688,7 +704,7 @@ export function GamePresentation({
             </button>
           </div>
 
-          {dialogueVisible && !effectivePaused ? (
+          {!condensed && dialogueVisible && !effectivePaused ? (
             <div className="gb-dialogue" role="status">
               <div
                 className={`gb-dialogue-portrait gb-dialogue-portrait-${dialoguePortrait.kind}`}
@@ -719,7 +735,7 @@ export function GamePresentation({
             </div>
           ) : null}
 
-          {!dialogueVisible && !effectivePaused ? (
+          {!condensed && !dialogueVisible && !effectivePaused ? (
             <button
               type="button"
               className="gb-dialogue-restore"
@@ -757,9 +773,12 @@ export function GamePresentation({
               <button
                 type="button"
                 className="gb-menu-action"
-                onClick={() => setMenuOpen(true)}
+                onClick={() => {
+                  if (onMenuRequest) onMenuRequest();
+                  else setMenuOpen(true);
+                }}
               >
-                Open settings
+                {onMenuRequest ? 'Open menu' : 'Open settings'}
               </button>
             </div>
           ) : null}

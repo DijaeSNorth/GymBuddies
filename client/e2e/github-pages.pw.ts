@@ -74,9 +74,9 @@ test.describe('production journey loading boundary', () => {
     .click();
 
   await page.getByLabel('Trainer name').fill('Lazy Avery');
-  await page.getByText('Normal Start', { exact: true }).click();
+  await page.getByLabel('Opening').selectOption('normal');
   await page
-    .getByRole('button', { name: 'Confirm & Start Journey' })
+    .getByRole('button', { name: 'Start Journey' })
     .click();
 
   await expect.poll(() => journeyRequestSeen).toBe(true);
@@ -120,6 +120,7 @@ test.describe('production journey loading boundary', () => {
   expect(
     scriptRequests.some((path) => /BuddyCustomizer-/.test(path)),
   ).toBe(false);
+  await page.getByTestId('journey-nav-team').click();
   await page
     .getByRole('button', { name: 'Customize Buddy' })
     .click();
@@ -310,9 +311,9 @@ test('installed release loads its core game and local save while offline', async
 
   await page.goto(deployment.basePath);
   await page.getByLabel('Trainer name').fill('Offline Avery');
-  await page.getByText('Normal Start', { exact: true }).click();
+  await page.getByLabel('Opening').selectOption('normal');
   await page
-    .getByRole('button', { name: 'Confirm & Start Journey' })
+    .getByRole('button', { name: 'Start Journey' })
     .click();
   await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(1);
   await expect
@@ -330,7 +331,8 @@ test('installed release loads its core game and local save while offline', async
   await expect
     .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
     .toBe(true);
-  await page.getByTestId('playtest-note-launcher').click();
+  await page.getByRole('button', { name: 'Open system menu' }).click();
+  await page.getByRole('button', { name: 'Open playtest tools' }).click();
   await expect(page.getByTestId('enable-alpha-playtest')).toBeVisible();
   await page.getByRole('button', { name: 'Close' }).click();
 
@@ -338,11 +340,12 @@ test('installed release loads its core game and local save while offline', async
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expectHealthyGameShell(page);
   await expect(page.locator('.gb-phaser-host canvas')).toHaveCount(1);
-  await expect(page.getByText(/Offline Avery · Physique Level/)).toBeVisible();
+  await expect(page.getByTestId('journey-status-bar')).toContainText('Offline Avery');
   expect(
     (await readCurrentSaveState(page))?.trainer,
   ).toMatchObject({ name: 'Offline Avery' });
-  await page.getByTestId('playtest-note-launcher').click();
+  await page.getByRole('button', { name: 'Open system menu' }).click();
+  await page.getByRole('button', { name: 'Open playtest tools' }).click();
   await page.getByTestId('enable-alpha-playtest').click();
   await page
     .getByLabel('Playtest note category')

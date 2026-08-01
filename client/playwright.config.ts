@@ -26,14 +26,14 @@ export default defineConfig({
     {
       name: 'desktop-chromium',
       testMatch:
-        /(?:onboarding|controls-and-settings|performance|playtest|character-gallery|physique-review|sprite-strip-lab|batch02-review|batch03-review)\.pw\.ts/,
+        /(?:onboarding|controls-and-settings|performance|playtest|journey-workspace|trainer-forge|character-gallery|physique-review|sprite-strip-lab|batch02-review|batch03-review)\.pw\.ts/,
       use: {
         ...devices['Desktop Chrome'],
       },
     },
     {
       name: 'mobile-touch',
-      testMatch: /(?:touch-controls|playtest|character-gallery|physique-review|sprite-strip-lab|batch02-review|batch03-review)\.pw\.ts/,
+      testMatch: /(?:touch-controls|playtest|journey-workspace-mobile|trainer-forge-mobile|character-gallery|physique-review|sprite-strip-lab|batch02-review|batch03-review)\.pw\.ts/,
       use: {
         ...devices['Pixel 5'],
       },

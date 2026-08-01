@@ -15,6 +15,11 @@
   cursor: pointer;
 }
 
+body.gb-journey-active .playtest-note-launcher,
+body.gb-journey-active .playtest-checkpoint-toast {
+  display: none;
+}
+
 .playtest-note-launcher:hover,
 .playtest-note-launcher:focus-visible {
   border-color: #ffd166;
